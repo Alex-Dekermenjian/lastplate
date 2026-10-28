@@ -218,3 +218,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+.env
+.env.*
+!.env.example
+
+# Generated assets and private local uploads
+/staticfiles/
+/media/

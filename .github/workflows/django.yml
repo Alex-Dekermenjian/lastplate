@@ -1,0 +1,65 @@
+name: Django checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  django:
+    name: Django / PostgreSQL 17
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: lastplate_ci
+          POSTGRES_USER: lastplate_ci
+          POSTGRES_PASSWORD: ci-only-disposable-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lastplate_ci -d lastplate_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DJANGO_SECRET_KEY: ci-only-disposable-django-key-not-for-deployment
+      DB_NAME: lastplate_ci
+      DB_USER: lastplate_ci
+      DB_PASSWORD: ci-only-disposable-password
+      DB_HOST: 127.0.0.1
+      DB_PORT: "5432"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Install pinned dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Check dependency compatibility
+        run: python -m pip check
+      - name: Check Django configuration
+        run: python manage.py check
+      - name: Check migration files match models
+        run: python manage.py makemigrations --check --dry-run
+      - name: Collect static assets from a clean checkout
+        run: python manage.py collectstatic --noinput
+      - name: Check local development configuration
+        run: python manage.py check
+        env:
+          DJANGO_DEBUG: "True"
+      - name: Apply migrations to PostgreSQL
+        run: python manage.py migrate --noinput
+      - name: Run automated tests on a separate test database
+        run: python manage.py test --noinput --verbosity 2
