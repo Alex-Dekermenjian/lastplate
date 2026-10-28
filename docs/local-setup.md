@@ -103,5 +103,45 @@ If port 18080 is unavailable, choose another available localhost port.
 Django, PostgreSQL, the custom email-based user model,
 initial migrations and administrator login are working.
 
-Shop features, public pages, automated checks and deployment
-remain unfinished. This server is for local development.
+Shop features, public pages and deployment remain unfinished.
+Automated foundation tests and a PostgreSQL CI workflow are now included.
+This server is for local development.
+
+## 6. Run automated checks
+
+With PostgreSQL running and your .env configured:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe manage.py check
+.\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run
+.\.venv\Scripts\python.exe manage.py test --noinput --verbosity 2
+```
+
+Django creates a separate test database. These tests do not use your
+local administrator account or erase your normal development data.
+
+The foundation suite checks password hashing, email normalization,
+database-enforced case-insensitive uniqueness, administrator flags,
+and admin login/logout/access restrictions. It does not yet test the
+unimplemented shop, listing or reservation features.
+
+## Pull request checks and review
+
+GitHub Actions runs the Django checks against PostgreSQL 17 and Python
+3.14 on pull requests to main and pushes to main. Its database and
+credentials are disposable CI-only fixtures, not shared development
+or production accounts.
+
+Before merging:
+1. Confirm the latest commit's **Django / PostgreSQL 17** check is green.
+2. Have another contributor review the diff and relevant Jira completion checks.
+3. Resolve review feedback and check that no private configuration is included.
+4. Attach actual validation evidence to the Jira card.
+5. Merge the reviewed change. Mark the Jira card Done only when all its
+   acceptance criteria are complete.
+
+This is the documented manual review procedure. Automatic branch-protection
+enforcement has not been verified: the GitHub integration cannot read
+the branch-protection settings. A green check covers the implemented
+tests; it is not a guarantee that every application feature is correct.
