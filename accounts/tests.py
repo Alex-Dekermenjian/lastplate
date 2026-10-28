@@ -74,7 +74,11 @@ class AdminAccessTests(TestCase):
     def test_admin_can_login_with_case_variant_email_and_logout(self):
         response = self.client.post(
             reverse("admin:login"),
-            {"username": "ADMIN@EXAMPLE.TEST", "password": "Local-test-only!582Orbit"},
+            {
+                "username": "ADMIN@EXAMPLE.TEST",
+                "password": "Local-test-only!582Orbit",
+                "next": reverse("admin:index"),
+            },
         )
         self.assertRedirects(response, reverse("admin:index"))
         self.assertEqual(self.client.get(reverse("admin:index")).status_code, 200)
