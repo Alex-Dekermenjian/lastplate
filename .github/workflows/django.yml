@@ -53,6 +53,12 @@ jobs:
         run: python manage.py check
       - name: Check migration files match models
         run: python manage.py makemigrations --check --dry-run
+      - name: Collect static assets from a clean checkout
+        run: python manage.py collectstatic --noinput
+      - name: Check local development configuration
+        run: python manage.py check
+        env:
+          DJANGO_DEBUG: "True"
       - name: Apply migrations to PostgreSQL
         run: python manage.py migrate --noinput
       - name: Run automated tests on a separate test database
