@@ -67,6 +67,15 @@ Copy-Item .env.example .env
 In .env, replace the DB_PASSWORD placeholder with the password
 you chose for lastplate_user. Keep the surrounding quotes.
 
+For an existing .env created before the explicit debug setting was added,
+enable local development mode once:
+
+```powershell
+.\.venv\Scripts\python.exe -c "from dotenv import set_key; set_key('.env', 'DJANGO_DEBUG', 'True')"
+```
+
+New .env files copied from .env.example already contain this setting.
+
 Generate a private Django secret key:
 
 ```powershell
@@ -115,6 +124,7 @@ With PostgreSQL running and your .env configured:
 .\.venv\Scripts\python.exe -m pip check
 .\.venv\Scripts\python.exe manage.py check
 .\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run
+.\.venv\Scripts\python.exe manage.py collectstatic --noinput
 .\.venv\Scripts\python.exe manage.py test --noinput --verbosity 2
 ```
 
@@ -135,7 +145,9 @@ or production accounts.
 
 Before merging:
 1. Confirm the latest commit's **Django / PostgreSQL 17** check is green.
-2. Have another contributor review the diff and relevant Jira completion checks.
+2. Review the diff and relevant Jira completion checks. Prefer a teammate review;
+   for the initial setup, a documented AI-assisted review is also accepted and
+   must be labelled as such. Do not claim that AI review is a teammate's approval.
 3. Resolve review feedback and check that no private configuration is included.
 4. Attach actual validation evidence to the Jira card.
 5. Merge the reviewed change. Mark the Jira card Done only when all its
@@ -145,3 +157,15 @@ This is the documented manual review procedure. Automatic branch-protection
 enforcement has not been verified: the GitHub integration cannot read
 the branch-protection settings. A green check covers the implemented
 tests; it is not a guarantee that every application feature is correct.
+
+
+## Asset and storage configuration
+
+Shared HTML templates belong in templates/; shared CSS/JS/images in static/.
+App-specific template/static directories also work. collectstatic builds
+staticfiles/, which is generated and not committed. Local user uploads belong in
+media/ and are not committed. Development upload serving requires DJANGO_DEBUG=True.
+
+The selected hosting and persistent database/photo-storage architecture, with
+implementation and persistence checks for LP-11/LP-15, is recorded in
+[hosting-plan.md](hosting-plan.md). Local setup completion does not mean deployment.
