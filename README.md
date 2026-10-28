@@ -4,7 +4,9 @@ LastPlate is an EECE430 student website where bakeries and similar shops publish
 
 ## Current status
 
-The Jira backlog and initial repository are prepared. The Django application is not implemented yet. The features below describe the agreed release plan, not completed functionality.
+The local Django/PostgreSQL foundation is implemented: three app scaffolds, a custom email-based user model and its initial migration, private environment configuration, and a verified administrator login. Follow the [Windows development setup](docs/local-setup.md) to run it locally.
+
+Shop features, public pages, automated tests/CI and deployment remain unfinished. The features below describe the agreed release plan, not completed functionality.
 
 ## Release plan
 
@@ -43,7 +45,7 @@ Search/filtering and collected-value summaries are Should features. Complete req
 
 Delivery, online refunds, combined shopping carts, partial pickup, delegated-pickup workflows, ratings, chat and email/SMS alerts are outside the agreed release.
 
-## Planned implementation
+## Implementation and remaining plan
 
 - Django with server-rendered templates and a small amount of JavaScript.
 - PostgreSQL as the shared database.
@@ -52,7 +54,7 @@ Delivery, online refunds, combined shopping carts, partial pickup, delegated-pic
 - Figma for connected screen designs.
 - Automated checks and a shared HTTPS deployment with persistent database and photo storage.
 
-Exact versions, installation commands and deployment configuration will be documented during [LP-6](https://alexdekermen05.atlassian.net/browse/LP-6). Do not assume the application can run from this repository yet.
+Installed package versions are pinned in [requirements.txt](requirements.txt). Local installation and configuration are documented in [docs/local-setup.md](docs/local-setup.md), with placeholders in [.env.example](.env.example). Deployment configuration, automated checks and the remaining [LP-6](https://alexdekermen05.atlassian.net/browse/LP-6) acceptance work are still pending.
 
 ## Contribution workflow
 
@@ -69,7 +71,7 @@ The first setup branch is LP-1-repository-setup. Its documentation pull request 
 
 ## Repository hygiene
 
-The Python .gitignore excludes common temporary files, local virtual environments and .env files. Keep passwords, secret keys and database credentials out of commits. Add safe example configuration when the application setup exists.
+The Python .gitignore excludes common temporary files, local virtual environments and .env files. Keep passwords, secret keys and database credentials out of commits. The tracked .env.example contains placeholders; each developer creates their own ignored .env.
 
 Preserve database migrations and useful test evidence. Use fictional labelled demonstration data and communicate demo credentials privately.
 Local setup instructions: [Windows development setup](docs/local-setup.md).
