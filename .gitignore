@@ -221,3 +221,7 @@ __marimo__/
 .env
 .env.*
 !.env.example
+
+# Generated assets and private local uploads
+/staticfiles/
+/media/
