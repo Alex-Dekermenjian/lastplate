@@ -72,3 +72,4 @@ The first setup branch is LP-1-repository-setup. Its documentation pull request 
 The Python .gitignore excludes common temporary files, local virtual environments and .env files. Keep passwords, secret keys and database credentials out of commits. Add safe example configuration when the application setup exists.
 
 Preserve database migrations and useful test evidence. Use fictional labelled demonstration data and communicate demo credentials privately.
+Local setup instructions: [Windows development setup](docs/local-setup.md).
