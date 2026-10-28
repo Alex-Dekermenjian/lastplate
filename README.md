@@ -6,7 +6,7 @@ LastPlate is an EECE430 student website where bakeries and similar shops publish
 
 The local Django/PostgreSQL foundation is implemented: three app scaffolds, a custom email-based user model and its initial migration, private environment configuration, and a verified administrator login. Follow the [Windows development setup](docs/local-setup.md) to run it locally.
 
-Automated foundation tests and a PostgreSQL GitHub Actions workflow are included. Shop features, public pages and deployment remain unfinished. The features below describe the agreed release plan, not completed functionality.
+Nine automated foundation tests and a PostgreSQL GitHub Actions workflow are included, together with static collection checks and a documented review procedure. Shop features, public pages and deployment remain unfinished. The features below describe the agreed release plan, not completed functionality.
 
 ## Release plan
 
@@ -54,7 +54,7 @@ Delivery, online refunds, combined shopping carts, partial pickup, delegated-pic
 - Figma for connected screen designs.
 - Automated checks and a shared HTTPS deployment with persistent database and photo storage.
 
-Installed package versions are pinned in [requirements.txt](requirements.txt). Local installation and configuration are documented in [docs/local-setup.md](docs/local-setup.md), with placeholders in [.env.example](.env.example). Deployment configuration and the remaining [LP-6](https://alexdekermen05.atlassian.net/browse/LP-6) acceptance work are still pending.
+Installed package versions are pinned in [requirements.txt](requirements.txt). Local installation and configuration are documented in [docs/local-setup.md](docs/local-setup.md), with placeholders in [.env.example](.env.example). Shared template/static directories, static collection, development-only media serving and environment-based debug/host settings are configured. The deployment target and persistence decisions are recorded in [docs/hosting-plan.md](docs/hosting-plan.md). Production integration and deployment are tracked by LP-11/LP-15.
 
 ## Contribution workflow
 
