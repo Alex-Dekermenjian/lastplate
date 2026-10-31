@@ -39,7 +39,7 @@ Each Jira card contains its work, completion checks and dependencies. Card IDs i
 - If the shop cancels reserved food because it is unavailable, those units are removed from allocated stock rather than returned to sale.
 - Collection is allowed from pickup start until just before pickup end. Uncollected reservations expire after pickup ends.
 - Store the agreed food, prices, address and pickup times with each reservation. Later profile changes must not rewrite those terms.
-- Show times in Asia/Beirut using timezone-aware storage.
+- Show times in the user’s local time (Lebanon timezone) using timezone-aware storage.
 
 Search/filtering and collected-value summaries are Should features. Complete required flows and release checks first.
 
