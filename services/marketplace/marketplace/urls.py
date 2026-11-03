@@ -34,4 +34,11 @@ urlpatterns = [
         views.publish_listing,
         name="publish_listing",
     ),
+    
+    path(
+        "listings/<int:pk>/photo",
+        views.upload_listing_photo,
+        name="upload_listing_photo",
+    ),
+
 ]
