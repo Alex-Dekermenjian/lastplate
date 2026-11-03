@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}LastPlate — development status{% endblock %}
+
+{% block content %}
+<h1>LastPlate</h1>
+<p>Development foundation. Customer and shop pages are not built yet.</p>
+
+<h2>Service status</h2>
+<table>
+  <thead>
+    <tr><th>Service</th><th>Readiness</th><th>Detail</th></tr>
+  </thead>
+  <tbody>
+    {% for status in statuses %}
+    <tr><td>{{ status.name }}</td><td>{{ status.state }}</td><td>{{ status.detail }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

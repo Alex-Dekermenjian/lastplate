@@ -3,6 +3,12 @@
 Recorded 28 October 2026. This is the implementation target for LP-11/LP-15;
 no cloud services have been provisioned and this repository is not yet deployed.
 
+> **Needs revision before LP-15.** This decision assumed one Django web service
+> and one database. The microservices foundation runs four web services
+> (accounts, marketplace, reservations, web) with four databases, and later a
+> scheduled reconciler. Quotas, cost and private networking must be re-checked;
+> see [microservices-plan.md](microservices-plan.md) §10.
+
 | Component | Selected target | Reason |
 | --- | --- | --- |
 | Django application | Render web service, HTTPS, production WSGI server | Managed deployment of the existing Django project |
