@@ -6,18 +6,19 @@ app_name = "marketplace"
 
 urlpatterns = [
     path(
-        "listings/new/",
+        "listings",
         views.create_listing,
         name="create_listing",
     ),
     path(
-        "listings/<int:pk>/edit/",
+        "listings/<int:pk>",
         views.edit_listing,
         name="edit_listing",
     ),
     path(
-        "listings/success/",
-        views.listing_success,
-        name="listing_success",
+        "listings/<int:pk>/publish",
+        views.publish_listing,
+        name="publish_listing",
     ),
 ]
+
