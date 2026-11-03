@@ -43,6 +43,32 @@ class SignInForm(forms.Form):
     )
 
 
+class ShopProfileForm(forms.Form):
+    """Length rules mirror Marketplace for quick feedback; Marketplace is the
+    authority and its errors (including phone-number checks) are shown too."""
+
+    name = forms.CharField(
+        label="Shop name", min_length=2, max_length=150,
+        widget=forms.TextInput(attrs={"autocomplete": "organization"}),
+    )
+    address = forms.CharField(
+        label="Pickup address", min_length=5, max_length=255,
+        help_text="Where customers collect their food.",
+        widget=forms.TextInput(attrs={"autocomplete": "street-address"}),
+    )
+    area = forms.CharField(
+        label="Area", min_length=2, max_length=100,
+        help_text="Neighbourhood customers can filter by, for example Hamra.",
+        widget=forms.TextInput(attrs={"autocomplete": "address-level2"}),
+    )
+    public_contact = forms.CharField(
+        label="Shop phone number", max_length=32,
+        help_text="Shown to customers so they can call the shop, for example +961 1 234 567. "
+                  "Your sign-in email stays private and is never shown.",
+        widget=forms.TextInput(attrs={"type": "tel", "inputmode": "tel", "autocomplete": "off"}),
+    )
+
+
 class ShopSetupForm(forms.Form):
     shop_name = forms.CharField(
         label="Shop name", max_length=150,

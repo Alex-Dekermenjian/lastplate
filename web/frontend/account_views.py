@@ -12,7 +12,7 @@ from django.views.decorators.debug import sensitive_post_parameters, sensitive_v
 from django.views.decorators.http import require_POST
 
 from . import services, tokens
-from .forms import RegistrationForm, ShopSetupForm, SignInForm
+from .forms import RegistrationForm, ShopProfileForm, ShopSetupForm, SignInForm
 from .services import ServiceUnavailable
 
 ACCOUNT_KEY = "account"
@@ -223,6 +223,46 @@ def workspace(request):
     return render(request, "frontend/workspace.html", {
         "shop": shop, "status_label": label, "status_explanation": explanation,
     })
+
+
+PROFILE_UNAVAILABLE = "We can't reach the shop service right now, so your changes were not saved. Please try again in a few minutes."
+
+
+@operator_required
+def shop_profile(request):
+    """View and edit the operator's own shop profile (LP-8). Marketplace finds
+    the shop from the access token, so no shop ID is ever sent from here."""
+    try:
+        status, shop = authenticated_call(request, services.my_shop)
+    except ServiceUnavailable:
+        status, shop = None, None
+    if status == 404:
+        return redirect("finish-setup")
+
+    if request.method == "POST":
+        form = ShopProfileForm(request.POST)
+        if form.is_valid():
+            try:
+                save_status, body = authenticated_call(request, services.update_shop, form.cleaned_data)
+            except ServiceUnavailable:
+                form.add_error(None, PROFILE_UNAVAILABLE)
+            else:
+                if save_status == 200:
+                    messages.success(request, "Your shop profile has been saved.")
+                    return redirect("workspace")
+                if save_status == 400 and isinstance(body, dict):
+                    for field, errors in body.items():
+                        form.add_error(field if field in form.fields else None, errors)
+                else:
+                    form.add_error(None, PROFILE_UNAVAILABLE)
+    elif status == 200:
+        form = ShopProfileForm(initial={field: shop.get(field, "") for field in ShopProfileForm.base_fields})
+    else:
+        form = None  # cannot show current values without the shop service
+
+    shop = shop if status == 200 else None
+    status_label = STATUS_EXPLANATIONS.get(shop["approval_status"], (shop["approval_status"], ""))[0] if shop else ""
+    return render(request, "frontend/shop_profile.html", {"form": form, "shop": shop, "status_label": status_label})
 
 
 @operator_required

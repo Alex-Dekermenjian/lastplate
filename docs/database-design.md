@@ -85,6 +85,40 @@ Approval requires complete details and manual confirmation that the applicant re
 
 Use labelled fictional shops for demonstrations.
 
+### Shop profile rules (implemented in LP-8)
+
+The operator edits only their own shop through `PATCH /api/shops/me/`. Marketplace finds the shop from the operator ID in the verified access token; no shop ID is ever accepted.
+
+| Field | Rule |
+|---|---|
+| name | 2–150 characters |
+| address (shown as "Pickup address") | 5–255 characters |
+| area | 2–100 characters, free text (no agreed list of areas yet) |
+| public_contact (shown as "Shop phone number") | A phone number customers can call (see below) |
+
+**Public contact decision:** a phone number. LP-3 research says customers use a phone and pay in cash at pickup.
+- **Accepted:** digits, spaces, `-`, `.`, `/`, brackets and one optional leading `+`, totalling **7–15 digits** (15 is the E.164 maximum).
+- **Rejected as unusable:** too few digits (for example `666` or `12345`), too many, a single repeated digit (`0000000`), letters, email addresses, a `+` anywhere but the start.
+- **Why not an email address:** so the operator's sign-in email can never become public by mistake. The sign-in email is never shown on shop pages or used as a default.
+- **Storage:** the number is stored as entered, trimmed.
+
+**Other rules:**
+- A field that is sent may not be blank, so completed details cannot be erased by accident.
+- `approval_status`, `rejection_reason`, ownership, IDs and timestamps cannot be submitted (400).
+- An edit saves only the changed columns and never alters the approval decision. Whether editing an Approved shop should send it back to review is a decision for LP-9.
+- `profile_complete` is true when name, address, area and public contact are all set. It is the "complete profile" condition for publishing.
+
+### LP-10 integration checks (offers are not on main yet)
+
+When listings are merged, verify:
+1. Publishing is refused unless the shop is `APPROVED` **and** `profile_complete` is true. Pending, Rejected and incomplete shops can only save drafts.
+2. A listing belongs to the operator's own shop, found from the token, never a submitted `shop_id`.
+3. A new listing's pickup address starts as a copy of the shop's `address`, which the operator confirms.
+4. Later shop profile edits do not change existing listings' pickup addresses.
+5. Later shop profile edits do not change reservations' agreed terms (Sprint 2).
+6. Public offer pages show the shop's name, area and phone number, never the operator's sign-in email.
+7. Area filtering uses the shop's `area`.
+
 ## 5. Listing
 
 | Field | Purpose |
