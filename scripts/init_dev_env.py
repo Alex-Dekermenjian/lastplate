@@ -1,10 +1,11 @@
 """Create private local settings for the Docker Compose development stack.
 
-Writes compose.env (used by Docker Compose) and, unless --compose-only is
-given, a .env file in each service folder for running that service outside
-Docker against the Compose PostgreSQL. Existing files are never overwritten;
-missing service files reuse the passwords already in compose.env. Secrets are
-generated randomly and never printed.
+Writes compose.env (used by Docker Compose), the Accounts RS256 token key
+pair in .keys/, and, unless --compose-only is given, a .env file in each
+service folder for running that service outside Docker against the Compose
+PostgreSQL. --keys-only creates just the key pair. Existing files are never
+overwritten; missing service files reuse the passwords already in compose.env.
+Secrets are generated randomly and never printed.
 
 Usage (PowerShell, from the repository root):
     .\\.venv\\Scripts\\python.exe scripts\\init_dev_env.py
@@ -23,6 +24,9 @@ SERVICES = {
     "web": ROOT / "web",
 }
 POSTGRES_HOST_PORT = "55432"
+KEY_DIR = ROOT / ".keys"
+PRIVATE_KEY = KEY_DIR / "jwt-private.pem"
+PUBLIC_KEY = KEY_DIR / "jwt-public.pem"
 
 
 def read_env(path):
@@ -89,13 +93,52 @@ def write_service_env(name, folder, values):
     write_new(path, lines)
 
 
+def ensure_jwt_keys():
+    """Create the Accounts RS256 key pair once; never replace an existing key."""
+    if PRIVATE_KEY.exists() and PUBLIC_KEY.exists():
+        print("kept existing .keys/jwt-private.pem and .keys/jwt-public.pem")
+        return
+    if PRIVATE_KEY.exists() or PUBLIC_KEY.exists():
+        raise SystemExit(
+            "Only one of .keys/jwt-private.pem and .keys/jwt-public.pem exists. "
+            "Restore the missing file or remove both to generate a new pair."
+        )
+
+    # Imported here so the rest of the script needs only the standard library.
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    KEY_DIR.mkdir(exist_ok=True)
+    write_new(
+        PRIVATE_KEY,
+        key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        ).decode().splitlines(),
+    )
+    write_new(
+        PUBLIC_KEY,
+        key.public_key().public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        ).decode().splitlines(),
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "--compose-only", action="store_true", help="only create compose.env"
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--compose-only", action="store_true", help="only create compose.env and the token keys"
     )
+    group.add_argument("--keys-only", action="store_true", help="only create the token keys")
     args = parser.parse_args()
 
+    ensure_jwt_keys()
+    if args.keys_only:
+        return
     values = compose_values()
     if not args.compose_only:
         for name, folder in SERVICES.items():

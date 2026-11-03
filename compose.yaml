@@ -63,6 +63,12 @@ services:
       DB_PASSWORD: ${ACCOUNTS_DB_PASSWORD}
       DB_HOST: postgres
       DB_PORT: "5432"
+      JWT_PRIVATE_KEY_FILE: /run/lastplate-keys/jwt-private.pem
+      JWT_PUBLIC_KEY_FILE: /run/lastplate-keys/jwt-public.pem
+    volumes:
+      # Token keys from scripts/init_dev_env.py; mounted read-only, never baked
+      # into the image. Only Accounts receives the private key.
+      - ./.keys:/run/lastplate-keys:ro
     ports:
       - "127.0.0.1:8001:8000"
 
@@ -79,6 +85,16 @@ services:
       DB_PASSWORD: ${MARKETPLACE_DB_PASSWORD}
       DB_HOST: postgres
       DB_PORT: "5432"
+      JWT_PUBLIC_KEY_FILE: /run/lastplate-keys/jwt-public.pem
+    volumes:
+      # Only Accounts' public key, read-only: Marketplace can verify tokens but
+      # never sign them. Fails clearly if scripts/init_dev_env.py has not run.
+      - type: bind
+        source: ./.keys/jwt-public.pem
+        target: /run/lastplate-keys/jwt-public.pem
+        read_only: true
+        bind:
+          create_host_path: false
     ports:
       - "127.0.0.1:8002:8000"
 

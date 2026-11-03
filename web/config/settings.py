@@ -42,7 +42,8 @@ SERVICE_URLS = {
     "marketplace": os.environ.get("MARKETPLACE_SERVICE_URL", "http://127.0.0.1:8002"),
     "reservations": os.environ.get("RESERVATIONS_SERVICE_URL", "http://127.0.0.1:8003"),
 }
-SERVICE_TIMEOUT_SECONDS = 2
+SERVICE_TIMEOUT_SECONDS = 2  # health checks on the status page
+SERVICE_API_TIMEOUT_SECONDS = 8  # API calls; registration hashes a password
 
 
 # Application definition

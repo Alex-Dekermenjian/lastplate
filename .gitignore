@@ -228,3 +228,6 @@ media/
 
 # Private Docker Compose settings created by scripts/init_dev_env.py
 /compose.env
+# Local JWT signing keys created by scripts/init_dev_env.py
+/.keys/
+*.pem
