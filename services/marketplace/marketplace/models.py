@@ -1,6 +1,7 @@
 
 from django.db import models
-
+from .image_validators import validate_listing_photo
+from .upload_paths import listing_photo_upload_path
 
 class Listing(models.Model):
 
@@ -15,6 +16,26 @@ class Listing(models.Model):
     title = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
     category = models.CharField(max_length=100, blank=True)
+    
+    # LP-11: Optional food photo
+    photo = models.ImageField(
+        upload_to=listing_photo_upload_path,
+        validators=[validate_listing_photo],
+        null=True,
+        blank=True,
+    )
+
+    # LP-11: Shop-supplied food information
+    ingredients = models.TextField(
+        blank=True,
+        default="",
+    )
+
+    allergens = models.TextField(
+        blank=True,
+        default="",
+    )
+
 
 
     original_price = models.DecimalField(
