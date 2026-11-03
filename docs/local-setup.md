@@ -1,171 +1,225 @@
 # Local development setup — Windows
 
-Install Git, Python 3.14 and PostgreSQL 17.
-During PostgreSQL installation, remember your own postgres administrator password.
+LastPlate runs as separate services. Each has its own Django project,
+dependencies, settings, port and PostgreSQL database. The architecture and its
+open decisions are in [microservices-plan.md](microservices-plan.md).
 
-Clone the shared repository, then open its folder in VS Code:
+## What is implemented
+
+| Part | Implemented now | Planned, not built |
+| --- | --- | --- |
+| Accounts (`services/accounts`, port 8001) | Email-based user model with roles, its migration, Django admin login, health endpoints, 9 original tests + health tests | Registration, token sign-in and refresh (LP-7) |
+| Marketplace (`services/marketplace`, port 8002) | Runnable empty service, own database, health endpoints | Shops, approval, listings, stock (LP-8 to LP-13) |
+| Reservations (`services/reservations`, port 8003) | Runnable empty service, own database, health endpoints | All reservation logic (Sprint 2) |
+| Web frontend (`web`, port 8000) | Server-side session storage and token helpers, a status page that calls the services' health APIs | All customer and shop pages |
+| Docker Compose | PostgreSQL with one database and login role per service; all four apps | Production deployment (LP-15) |
+| CI | Checks and tests per service; Compose smoke check | Cross-service feature integration tests |
+
+No feature that a customer or shop would use exists yet.
+
+Each service exposes:
+- `GET /health/live/` — the process is serving requests.
+- `GET /health/ready/` — the service reaches its own database and every
+  migration is applied. It returns HTTP 503 otherwise.
+
+## 1. Install the tools
+
+Install Git, Python 3.14 and Docker Desktop. Start Docker Desktop and wait until
+it reports that the engine is running. A separately installed PostgreSQL is
+optional (see section 8).
+
+Run every command below in PowerShell from the repository folder.
 
 ```powershell
 git clone https://github.com/Alex-Dekermenjian/lastplate.git
 cd lastplate
-code .
 ```
 
-Run the remaining PowerShell commands from the lastplate folder.
-If you already cloned the repository, use that existing folder.
+If you already have a clone, update it instead: `git pull`.
 
-## 1. Install Python dependencies
+## 2. Install Python dependencies
 
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-## 2. Create your local database
+The root `requirements.txt` installs every service's pinned requirements into
+one local environment. Each service's Docker image installs only its own
+`requirements.txt`. If you already have a `.venv`, run only the second command.
 
-Open PostgreSQL's terminal:
+## 3. Create your private settings
 
 ```powershell
-& "C:\Program Files\PostgreSQL\17\bin\psql.exe" -h 127.0.0.1 -p 5432 -U postgres -d postgres
+.\.venv\Scripts\python.exe scripts\init_dev_env.py
 ```
 
-Enter your postgres administrator password.
+This creates random passwords and secret keys in:
+- `compose.env` — read by Docker Compose;
+- `.env` in each service folder — used when a service runs outside Docker.
 
-Inside psql, create the development user:
+It never overwrites an existing file and never prints a secret. All these files
+are ignored by Git. Never commit or share them.
+
+## 4. Run everything with Docker Compose
+
+```powershell
+docker compose --env-file compose.env up -d --build --wait
+docker compose --env-file compose.env ps
+```
+
+Always pass `--env-file compose.env`. It supplies the generated settings and
+stops Compose from reading the repository's private root `.env`.
+
+On first start PostgreSQL creates four databases (`lastplate_accounts`,
+`lastplate_marketplace`, `lastplate_reservations`, `lastplate_web`), each owned
+by a login role of the same name. Each role can connect only to its own
+database. Each service applies its own migrations when it starts.
+
+Open:
+- http://127.0.0.1:8000/ — web status page; all three services should show `ready`
+- http://127.0.0.1:8001/health/ready/
+- http://127.0.0.1:8002/health/ready/
+- http://127.0.0.1:8003/health/ready/
+- http://127.0.0.1:8001/admin/ — Accounts admin
+
+Create your own Accounts administrator:
+
+```powershell
+docker compose --env-file compose.env exec accounts python manage.py createsuperuser
+```
+
+View logs or stop the stack:
+
+```powershell
+docker compose --env-file compose.env logs -f accounts
+docker compose --env-file compose.env down
+```
+
+`down` keeps your data in the `lastplate-dev_pgdata` volume. **Do not add
+`-v` / `--volumes`**: it deletes all four databases. The init script runs only
+when that volume is first created; changing `compose.env` passwords later
+does not change existing database roles.
+
+## 5. Run the smoke check
+
+```powershell
+.\.venv\Scripts\python.exe scripts\smoke_check.py
+```
+
+It builds the images and then checks three things:
+
+- Each service started alone, with only PostgreSQL running, is live, ready and
+  connected to its own database.
+- With all four running together, they use four distinct databases and the web
+  status page sees all three services ready.
+- Every database role is refused by the other three databases.
+
+The stack is left running.
+
+## 6. Run one service outside Docker
+
+Useful for debugging. Stop that service's container, keep PostgreSQL in
+Docker, and run the service with your virtual environment:
+
+```powershell
+docker compose --env-file compose.env up -d --wait postgres
+docker compose --env-file compose.env stop accounts
+cd services\accounts
+..\..\.venv\Scripts\python.exe manage.py migrate
+..\..\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8001 --noreload
+```
+
+The service reads `services\accounts\.env`, which points to the Compose
+PostgreSQL on `127.0.0.1:55432`. Use ports 8002 and 8003 for Marketplace and
+Reservations, and from the `web` folder use `..\.venv\Scripts\python.exe` and
+port 8000.
+
+## 7. Run automated checks
+
+With the Compose PostgreSQL running:
+
+```powershell
+$py = (Resolve-Path .\.venv\Scripts\python.exe).Path
+foreach ($dir in "services\accounts", "services\marketplace", "services\reservations", "web") {
+    Push-Location $dir
+    Write-Host "== $dir"
+    & $py manage.py check
+    & $py manage.py makemigrations --check --dry-run
+    & $py manage.py test --noinput --verbosity 2
+    Pop-Location
+}
+```
+
+Django creates and then deletes a separate `test_` database per service,
+using that service's own role. Your development data is not touched.
+
+The Accounts suite still contains the nine original tests (password hashing,
+email normalisation, case-insensitive uniqueness, administrator flags and
+admin login/logout/access restrictions) plus health endpoint tests. The web
+suite checks that tokens are stored only server-side.
+
+## 8. Using an installed PostgreSQL instead of Docker (optional)
+
+Create a separate role and database per service. Do not reuse the old
+`lastplate` database. In psql as the postgres administrator:
 
 ```sql
-CREATE ROLE lastplate_user WITH LOGIN CREATEDB;
+CREATE ROLE lastplate_accounts WITH LOGIN CREATEDB;
+\password lastplate_accounts
+CREATE DATABASE lastplate_accounts OWNER lastplate_accounts ENCODING 'UTF8' TEMPLATE template0;
+REVOKE ALL ON DATABASE lastplate_accounts FROM PUBLIC;
 ```
 
-Set its password when prompted:
+Repeat for `lastplate_marketplace`, `lastplate_reservations` and
+`lastplate_web`. In each service's `.env`, set `DB_PORT=5432` and the password
+you chose for that role.
 
-```text
-\password lastplate_user
-```
+## Your previous single-project setup
 
-Then create the database:
+The monolith's files moved with `git mv`, so their history is preserved
+(`git log --follow services/accounts/accounts/models.py`). The last
+single-project commit on main is `efc5f0e`; the team may mark it with
+`git tag pre-microservices efc5f0e` and `git push origin pre-microservices`.
 
-```sql
-CREATE DATABASE lastplate OWNER lastplate_user ENCODING 'UTF8' TEMPLATE template0;
-```
-
-Exit psql:
-
-```text
-\q
-```
-
-Each developer uses their own local database and passwords.
-CREATEDB allows Django to create separate test databases during development.
-
-## 3. Configure private settings
-
-```powershell
-Copy-Item .env.example .env
-```
-
-In .env, replace the DB_PASSWORD placeholder with the password
-you chose for lastplate_user. Keep the surrounding quotes.
-
-For an existing .env created before the explicit debug setting was added,
-enable local development mode once:
-
-```powershell
-.\.venv\Scripts\python.exe -c "from dotenv import set_key; set_key('.env', 'DJANGO_DEBUG', 'True')"
-```
-
-New .env files copied from .env.example already contain this setting.
-
-Generate a private Django secret key:
-
-```powershell
-.\.venv\Scripts\python.exe -c "import secrets; from dotenv import set_key; set_key('.env', 'DJANGO_SECRET_KEY', secrets.token_urlsafe(50))"
-```
-
-Never commit .env or share its contents.
-The repository shares code and migrations, not local accounts or data.
-
-## 4. Create tables and your administrator account
-
-```powershell
-.\.venv\Scripts\python.exe manage.py migrate
-.\.venv\Scripts\python.exe manage.py createsuperuser
-.\.venv\Scripts\python.exe manage.py check
-```
-
-Use your own administrator email, display name and password.
-
-## 5. Start the application
-
-```powershell
-.\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:18080 --noreload
-```
-
-Leave the terminal running.
-Open http://127.0.0.1:18080/admin/ and sign in.
-
-With --noreload, restart the server after changing Python files.
-If port 18080 is unavailable, choose another available localhost port.
-
-## Current checkpoint
-
-Django, PostgreSQL, the custom email-based user model,
-initial migrations and administrator login are working.
-
-Shop features, public pages and deployment remain unfinished.
-Automated foundation tests and a PostgreSQL CI workflow are now included.
-This server is for local development.
-
-## 6. Run automated checks
-
-With PostgreSQL running and your .env configured:
-
-```powershell
-.\.venv\Scripts\python.exe -m pip check
-.\.venv\Scripts\python.exe manage.py check
-.\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run
-.\.venv\Scripts\python.exe manage.py collectstatic --noinput
-.\.venv\Scripts\python.exe manage.py test --noinput --verbosity 2
-```
-
-Django creates a separate test database. These tests do not use your
-local administrator account or erase your normal development data.
-
-The foundation suite checks password hashing, email normalization,
-database-enforced case-insensitive uniqueness, administrator flags,
-and admin login/logout/access restrictions. It does not yet test the
-unimplemented shop, listing or reservation features.
+- The root `.env` and your old `lastplate` database are **no longer used**
+  and were not changed or deleted. Keep them until the team agrees they are
+  not needed; delete them yourself afterwards.
+- Old development data (for example your admin account) is not copied.
+  Create a new administrator in the Accounts service (section 4).
+- Compose uses port 55432, so an installed PostgreSQL on 5432 keeps running
+  unaffected.
 
 ## Pull request checks and review
 
-GitHub Actions runs the Django checks against PostgreSQL 17 and Python
-3.14 on pull requests to main and pushes to main. Its database and
-credentials are disposable CI-only fixtures, not shared development
-or production accounts.
+GitHub Actions (`.github/workflows/django.yml`) runs on pull requests to main
+and pushes to main:
+
+- **One job per service** against its own disposable PostgreSQL 17: pip check,
+  Django checks, the migration check, collectstatic where used, migrate and the
+  tests. The Accounts job also runs the nine original tests by name.
+- **Docker Compose smoke check**, after the service jobs pass: section 5's
+  script.
+
+CI database credentials and keys are disposable CI-only fixtures.
 
 Before merging:
-1. Confirm the latest commit's **Django / PostgreSQL 17** check is green.
+1. Confirm that all service jobs and the smoke check are green.
 2. Review the diff and relevant Jira completion checks. Prefer a teammate review;
-   for the initial setup, a documented AI-assisted review is also accepted and
-   must be labelled as such. Do not claim that AI review is a teammate's approval.
+   an AI-assisted review must be labelled as such and is not a teammate's approval.
 3. Resolve review feedback and check that no private configuration is included.
 4. Attach actual validation evidence to the Jira card.
 5. Merge the reviewed change. Mark the Jira card Done only when all its
    acceptance criteria are complete.
 
-This is the documented manual review procedure. Automatic branch-protection
-enforcement has not been verified: the GitHub integration cannot read
-the branch-protection settings. A green check covers the implemented
-tests; it is not a guarantee that every application feature is correct.
-
+Automatic branch-protection enforcement has not been verified. A green check
+covers the implemented tests; it is not a guarantee that every feature is
+correct.
 
 ## Asset and storage configuration
 
-Shared HTML templates belong in templates/; shared CSS/JS/images in static/.
-App-specific template/static directories also work. collectstatic builds
-staticfiles/, which is generated and not committed. Local user uploads belong in
-media/ and are not committed. Development upload serving requires DJANGO_DEBUG=True.
-
-The selected hosting and persistent database/photo-storage architecture, with
-implementation and persistence checks for LP-11/LP-15, is recorded in
-[hosting-plan.md](hosting-plan.md). Local setup completion does not mean deployment.
+Web templates belong in `web/templates/` and shared CSS/JS/images in
+`web/static/`. Accounts collects only Django admin assets. `collectstatic`
+output (`staticfiles/`) and local uploads (`media/`) are ignored by Git. Photo
+storage will belong to Marketplace; see [hosting-plan.md](hosting-plan.md),
+which still describes the earlier single-service target.

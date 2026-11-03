@@ -1,7 +1,6 @@
-﻿asgiref==3.13.0
-Django==5.2.18
-psycopg==3.3.6
-psycopg-binary==3.3.6
-python-dotenv==1.2.4
-sqlparse==0.6.0
-tzdata==2026.6
+# Installs every service's pinned dependencies into one local virtual
+# environment for development. Each service also installs its own file alone.
+-r services/accounts/requirements.txt
+-r services/marketplace/requirements.txt
+-r services/reservations/requirements.txt
+-r web/requirements.txt
