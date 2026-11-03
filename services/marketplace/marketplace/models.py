@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.db.models import Q
 
@@ -7,8 +8,8 @@ class Shop(models.Model):
 
     operator_user_id is the Accounts user ID; there is deliberately no
     cross-service ForeignKey. The operator edits the profile fields (LP-8);
-    approval_status and rejection_reason are set by the approval workflow
-    (LP-9) and are read-only to the operator.
+    approval_status, rejection_reason and the review record are set only by a
+    team admin in this service's Django admin (LP-9).
     """
 
     class ApprovalStatus(models.TextChoices):
@@ -28,10 +29,21 @@ class Shop(models.Model):
         default=ApprovalStatus.PENDING,
     )
     rejection_reason = models.TextField(blank=True)
+    # A local team-admin account in this service, kept so the decision stays
+    # attributable: an account that has reviewed shops cannot be deleted.
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        permissions = [("review_shop", "Can approve or reject shops")]
         constraints = [
             models.CheckConstraint(
                 condition=Q(approval_status__in=["PENDING", "APPROVED", "REJECTED"]),

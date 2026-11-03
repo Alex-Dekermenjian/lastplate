@@ -9,7 +9,7 @@ open decisions are in [microservices-plan.md](microservices-plan.md).
 | Part | Implemented now | Planned, not built |
 | --- | --- | --- |
 | Accounts (`services/accounts`, port 8001) | Email-based user model with roles, its migration, Django admin login, health endpoints; LP-7 APIs: shop-operator registration, RS256 token sign-in, refresh, logout (refresh-token blacklist), `/api/users/me/`, throttling; 9 original tests + health and auth API tests | Web sign-in/registration pages and the Pending shop (rest of LP-7) |
-| Marketplace (`services/marketplace`, port 8002) | Own database, health endpoints; LP-7: verifies Accounts tokens with the public key only, minimal `Shop` (one per operator, Pending), `POST /api/shops/` (idempotent), `GET /api/shops/me/`; LP-8: shop profile (pickup address, area, public contact) via `PATCH /api/shops/me/`, read-only rejection reason | Approval workflow (LP-9), listings, stock (LP-10 to LP-13) |
+| Marketplace (`services/marketplace`, port 8002) | Own database, health endpoints; LP-7: verifies Accounts tokens with the public key only, minimal `Shop` (one per operator, Pending), `POST /api/shops/` (idempotent), `GET /api/shops/me/`; LP-8: shop profile (pickup address, area, public contact) via `PATCH /api/shops/me/`; LP-9: team-admin shop review in Django admin (`/admin/`) | Listings, stock (LP-10 to LP-13) |
 | Reservations (`services/reservations`, port 8003) | Runnable empty service, own database, health endpoints | All reservation logic (Sprint 2) |
 | Web frontend (`web`, port 8000) | Server-side sessions; status page; LP-7: shop-operator registration (`/register/`), sign-in (`/sign-in/`), POST sign-out, workspace with shop status (`/workspace/`), finish-shop-setup retry (`/workspace/finish-setup/`); LP-8: shop profile page (`/workspace/profile/`) | Customer pages, offers |
 | Docker Compose | PostgreSQL with one database and login role per service; all four apps | Production deployment (LP-15) |
@@ -126,6 +126,35 @@ It builds the images and then checks three things:
 
 The stack is left running.
 
+## Review a shop (LP-9)
+
+Shops are approved or rejected in Marketplace's own Django admin. It has its own
+team-admin accounts, separate from Accounts and from shop operators. Create one once:
+
+```powershell
+docker compose --env-file compose.env exec marketplace python manage.py createsuperuser
+```
+
+To give another team member review rights without full control, sign in at
+http://127.0.0.1:8002/admin/, add a user under **Users**, tick **Staff status**, and
+add the permission **marketplace | shop | Can approve or reject shops**.
+
+**Pending → Approved:**
+1. Register a shop at http://127.0.0.1:8000/register/. The workspace shows **Pending review**.
+2. Complete the profile at http://127.0.0.1:8000/workspace/profile/.
+3. At http://127.0.0.1:8002/admin/marketplace/shop/, open the shop, choose **Approved**,
+   tick **I confirmed the applicant represents this shop**, and save.
+4. Refresh the workspace. It shows **Approved**.
+
+**Pending → Rejected:**
+1. Register a second shop in a private window (a different browser session).
+2. In the admin, open it, choose **Rejected**, write a reason, and save.
+3. Refresh that workspace. It shows **Not approved** and your reason.
+
+The admin refuses approval when the profile is incomplete or the confirmation box is
+unticked, and refuses rejection without a reason. Rules:
+[database-design.md](database-design.md).
+
 ## 6. Run one service outside Docker
 
 Useful for debugging. Stop that service's container, keep PostgreSQL in
@@ -228,7 +257,7 @@ correct.
 ## Asset and storage configuration
 
 Web templates belong in `web/templates/` and shared CSS/JS/images in
-`web/static/`. Accounts collects only Django admin assets. `collectstatic`
+`web/static/`. Accounts and Marketplace collect only Django admin assets. `collectstatic`
 output (`staticfiles/`) and local uploads (`media/`) are ignored by Git. Photo
 storage will belong to Marketplace; see [hosting-plan.md](hosting-plan.md),
 which still describes the earlier single-service target.

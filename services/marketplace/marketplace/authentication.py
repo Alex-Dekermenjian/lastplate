@@ -24,8 +24,8 @@ class TokenUser:
 class AccessTokenAuthentication(authentication.BaseAuthentication):
     """Verifies Accounts-issued access tokens with the RS256 public key only.
 
-    Uses PyJWT directly because SimpleJWT's stateless authentication imports
-    Django's auth models, which would add unused user tables to this service.
+    Uses PyJWT directly: shop operators have no accounts in this service, and
+    its auth tables hold only local team admins for the Django admin (LP-9).
     """
 
     keyword = "Bearer"

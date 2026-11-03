@@ -105,13 +105,44 @@ The operator edits only their own shop through `PATCH /api/shops/me/`. Marketpla
 **Other rules:**
 - A field that is sent may not be blank, so completed details cannot be erased by accident.
 - `approval_status`, `rejection_reason`, ownership, IDs and timestamps cannot be submitted (400).
-- An edit saves only the changed columns and never alters the approval decision. Whether editing an Approved shop should send it back to review is a decision for LP-9.
+- An edit saves only the changed columns and never alters the approval decision. An Approved shop keeps its approval after an edit. The admin list shows `updated_at` beside `reviewed_at`, so a reviewer can see later edits and reject if needed. Automatic re-review is not built; that is a team decision.
 - `profile_complete` is true when name, address, area and public contact are all set. It is the "complete profile" condition for publishing.
+
+### Shop review rules (implemented in LP-9)
+
+Shops are reviewed in Marketplace's own Django admin at `/admin/` (port 8002). The Accounts admin cannot do this because it has no access to the Marketplace database.
+
+**Who can review:** a local Marketplace team-admin account that is staff and has the permission **Can approve or reject shops** (`marketplace.review_shop`), or a superuser. Stock `change_shop` permission alone is not enough. Shop operators live in Accounts, have no account in this admin, and cannot sign in to it. `view_shop` gives read-only access.
+
+| Decision | Requires | Effect |
+|---|---|---|
+| Approve | Complete profile (`profile_complete`), and the reviewer ticks "I confirmed the applicant represents this shop" | Status Approved; any earlier reason cleared |
+| Reject | A reason, which the owner sees | Status Rejected; reason stored |
+| Back to Pending | Not allowed once reviewed | Approve or reject instead |
+
+- Each decision records `reviewed_by` and `reviewed_at`. Django's admin also keeps a change history.
+- A reviewer account cannot be deleted while a shop refers to it (deactivate it instead). Its identity is not exposed to shop owners.
+- Only the decision is editable in the admin. Shop details, ownership and the review record are read-only; shops cannot be added or deleted there.
+- The operator API rejects `approval_status`, `rejection_reason`, `reviewed_by` and `reviewed_at` with 400.
+- The identity confirmation is a required step at approval and is not stored separately; `reviewed_by` and `reviewed_at` record who approved and when.
 
 ### LP-10 integration checks (offers are not on main yet)
 
+**The approval check for publishing:**
+
+```python
+with transaction.atomic():  # select_for_update() raises an error outside a transaction
+    shop = Shop.objects.select_for_update().get(operator_user_id=request.user.id)
+    can_publish = shop.approval_status == Shop.ApprovalStatus.APPROVED and shop.profile_complete
+    # Publish here, inside the same transaction, so a rejection cannot slip in between.
+```
+
+Evaluate it on the server at the moment of publishing, from the current `Shop` row. Do not cache it in a session or token, because a team admin can reject a shop at any time. `feature/lp10-lp11` currently compares `shop.operator_id`; on `main` the field is `operator_user_id`.
+
+**Open decision for LP-10:** what happens to offers already published when an Approved shop is later rejected. LP-9 does not affect them because no offers exist yet.
+
 When listings are merged, verify:
-1. Publishing is refused unless the shop is `APPROVED` **and** `profile_complete` is true. Pending, Rejected and incomplete shops can only save drafts.
+1. Publishing is refused unless the check above passes. Pending, Rejected and incomplete shops can only save drafts.
 2. A listing belongs to the operator's own shop, found from the token, never a submitted `shop_id`.
 3. A new listing's pickup address starts as a copy of the shop's `address`, which the operator confirms.
 4. Later shop profile edits do not change existing listings' pickup addresses.
