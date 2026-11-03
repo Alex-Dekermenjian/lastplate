@@ -1,0 +1,121 @@
+# LastPlate local development stack.
+#
+# Always pass the generated env file, which also stops Compose from reading the
+# repository's private .env:
+#   docker compose --env-file compose.env up -d --build --wait
+#
+# One PostgreSQL server hosts four separate databases, each with its own login
+# role. Its data lives in the lastplate-dev_pgdata volume, which is separate from
+# any PostgreSQL installed on your computer. Never add --volumes (-v) to
+# "docker compose down" unless you intend to delete all local Compose data.
+
+name: lastplate-dev
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready/', timeout=3)"]
+    interval: 5s
+    timeout: 5s
+    retries: 12
+    start_period: 10s
+  # Applies this service's migrations to its own database, then serves.
+  command: ["sh", "-c", "python manage.py migrate --noinput && exec python manage.py runserver 0.0.0.0:8000"]
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: lastplate_admin
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Run scripts/init_dev_env.py and pass --env-file compose.env}
+      POSTGRES_DB: postgres
+      ACCOUNTS_DB_PASSWORD: ${ACCOUNTS_DB_PASSWORD:?missing from compose.env}
+      MARKETPLACE_DB_PASSWORD: ${MARKETPLACE_DB_PASSWORD:?missing from compose.env}
+      RESERVATIONS_DB_PASSWORD: ${RESERVATIONS_DB_PASSWORD:?missing from compose.env}
+      WEB_DB_PASSWORD: ${WEB_DB_PASSWORD:?missing from compose.env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      # 55432 avoids clashing with a PostgreSQL installed on port 5432.
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-55432}:5432"
+    healthcheck:
+      # TCP check: the image's temporary init server listens on a socket only,
+      # so this passes once the service databases have been created.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "lastplate_admin", "-d", "postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  accounts:
+    <<: *service-defaults
+    build: ./services/accounts
+    environment:
+      DJANGO_SECRET_KEY: ${ACCOUNTS_SECRET_KEY:?missing from compose.env}
+      DJANGO_DEBUG: "True"
+      DJANGO_ALLOWED_HOSTS: accounts,127.0.0.1,localhost
+      HEALTH_EXPOSE_DETAILS: "True"
+      DB_NAME: lastplate_accounts
+      DB_USER: lastplate_accounts
+      DB_PASSWORD: ${ACCOUNTS_DB_PASSWORD}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+    ports:
+      - "127.0.0.1:8001:8000"
+
+  marketplace:
+    <<: *service-defaults
+    build: ./services/marketplace
+    environment:
+      DJANGO_SECRET_KEY: ${MARKETPLACE_SECRET_KEY:?missing from compose.env}
+      DJANGO_DEBUG: "True"
+      DJANGO_ALLOWED_HOSTS: marketplace,127.0.0.1,localhost
+      HEALTH_EXPOSE_DETAILS: "True"
+      DB_NAME: lastplate_marketplace
+      DB_USER: lastplate_marketplace
+      DB_PASSWORD: ${MARKETPLACE_DB_PASSWORD}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+    ports:
+      - "127.0.0.1:8002:8000"
+
+  reservations:
+    <<: *service-defaults
+    build: ./services/reservations
+    environment:
+      DJANGO_SECRET_KEY: ${RESERVATIONS_SECRET_KEY:?missing from compose.env}
+      DJANGO_DEBUG: "True"
+      DJANGO_ALLOWED_HOSTS: reservations,127.0.0.1,localhost
+      HEALTH_EXPOSE_DETAILS: "True"
+      DB_NAME: lastplate_reservations
+      DB_USER: lastplate_reservations
+      DB_PASSWORD: ${RESERVATIONS_DB_PASSWORD}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+    ports:
+      - "127.0.0.1:8003:8000"
+
+  web:
+    <<: *service-defaults
+    build: ./web
+    environment:
+      DJANGO_SECRET_KEY: ${WEB_SECRET_KEY:?missing from compose.env}
+      DJANGO_DEBUG: "True"
+      DJANGO_ALLOWED_HOSTS: web,127.0.0.1,localhost
+      HEALTH_EXPOSE_DETAILS: "True"
+      DB_NAME: lastplate_web
+      DB_USER: lastplate_web
+      DB_PASSWORD: ${WEB_DB_PASSWORD}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      ACCOUNTS_SERVICE_URL: http://accounts:8000
+      MARKETPLACE_SERVICE_URL: http://marketplace:8000
+      RESERVATIONS_SERVICE_URL: http://reservations:8000
+    ports:
+      - "127.0.0.1:8000:8000"
+
+volumes:
+  pgdata:

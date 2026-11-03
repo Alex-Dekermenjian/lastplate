@@ -9,11 +9,7 @@ class Listing(models.Model):
         PUBLISHED = "PUBLISHED", "Published"
         WITHDRAWN = "WITHDRAWN", "Withdrawn"
 
-    shop = models.ForeignKey(
-        "accounts.Shop",
-        on_delete=models.PROTECT,
-        related_name="listings",
-    )
+    shop_id = models.PositiveBigIntegerField()
 
 
     title = models.CharField(max_length=200, blank=True)

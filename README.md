@@ -4,9 +4,9 @@ LastPlate is an EECE430 student website where bakeries and similar shops publish
 
 ## Current status
 
-The local Django/PostgreSQL foundation is implemented: three app scaffolds, a custom email-based user model and its initial migration, private environment configuration, and a verified administrator login. Follow the [Windows development setup](docs/local-setup.md) to run it locally.
+LastPlate is being restructured into independently running services, as the course requires. The foundation is implemented: separate Accounts, Marketplace and Reservations Django/DRF services and a thin web frontend. Each has its own settings, port, PostgreSQL database and health endpoints, and they run together with Docker Compose. The existing email-based user model, its migration and its nine tests now live in the Accounts service. See the [microservices plan](docs/microservices-plan.md) and the [Windows development setup](docs/local-setup.md), which lists exactly what is implemented and what is planned.
 
-Nine automated foundation tests and a PostgreSQL GitHub Actions workflow are included, together with static collection checks and a documented review procedure. Shop features, public pages and deployment remain unfinished. The features below describe the agreed release plan, not completed functionality.
+GitHub Actions checks each service against its own PostgreSQL and runs a Docker Compose smoke check. Registration, shops, listings, reservations, customer pages and deployment remain unfinished. The features below describe the agreed release plan, not completed functionality.
 
 ## Release plan
 
@@ -30,7 +30,7 @@ Each Jira card contains its work, completion checks and dependencies. Card IDs i
 
 ## Core rules
 
-- One website and one shared database serve customer and shop pages.
+- One website serves customer and shop pages. Behind it, each service owns its own database; services share data only through APIs (proposed in the [microservices plan](docs/microservices-plan.md), pending team agreement).
 - Each reservation covers one food listing and a positive whole-number quantity.
 - Prices use USD with decimal precision. Customers pay at pickup; there is no online payment or platform fee in this release.
 - All permissions, prices, stock and time limits are checked on the server.
@@ -48,9 +48,9 @@ Delivery, online refunds, combined shopping carts, partial pickup, delegated-pic
 ## Implementation and remaining plan
 
 - Django with server-rendered templates and a small amount of JavaScript.
-- PostgreSQL as the shared database.
+- PostgreSQL, with a separate database per service.
 - Django authentication and built-in administration.
-- Logical apps: accounts, marketplace and reservations.
+- Independently running services: accounts, marketplace and reservations, plus a thin web frontend.
 - Figma for connected screen designs.
 - Automated checks and a shared HTTPS deployment with persistent database and photo storage.
 

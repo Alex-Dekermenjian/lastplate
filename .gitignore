@@ -223,5 +223,8 @@ __marimo__/
 !.env.example
 
 # Generated assets and private local uploads
-/staticfiles/
-/media/
+staticfiles/
+media/
+
+# Private Docker Compose settings created by scripts/init_dev_env.py
+/compose.env

@@ -3,6 +3,14 @@
 Status: proposed design for review.
 Jira task: LP-5.
 
+> **Architecture update (3 November 2026).** The course requires independently
+> running services, so the single shared database below is being replaced by one
+> database per service. Shop moves to Marketplace, and Marketplace gains an
+> Allocation record. Cross-service links become plain IDs, and cross-record stock
+> rules run inside Marketplace's own transactions. See
+> [microservices-plan.md](microservices-plan.md). Field-level rules in this
+> document still apply unless the plan says otherwise.
+
 ## 1. Overall structure
 
 Use one PostgreSQL database shared by the whole website.

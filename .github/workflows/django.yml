@@ -1,4 +1,4 @@
-name: Django checks
+name: Service checks
 
 on:
   pull_request:
@@ -10,31 +10,51 @@ permissions:
   contents: read
 
 jobs:
-  django:
-    name: Django / PostgreSQL 17
+  service:
+    name: ${{ matrix.service }} / PostgreSQL 17
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: accounts
+            path: services/accounts
+            static: true
+          - service: marketplace
+            path: services/marketplace
+            static: false
+          - service: reservations
+            path: services/reservations
+            static: false
+          - service: web
+            path: web
+            static: true
+    # Each job gets its own PostgreSQL with only this service's database.
     services:
       postgres:
         image: postgres:17
         env:
-          POSTGRES_DB: lastplate_ci
-          POSTGRES_USER: lastplate_ci
+          POSTGRES_DB: lastplate_${{ matrix.service }}
+          POSTGRES_USER: lastplate_${{ matrix.service }}
           POSTGRES_PASSWORD: ci-only-disposable-password
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U lastplate_ci -d lastplate_ci"
+          --health-cmd "pg_isready -U lastplate_${{ matrix.service }}"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
     env:
       DJANGO_SECRET_KEY: ci-only-disposable-django-key-not-for-deployment
-      DB_NAME: lastplate_ci
-      DB_USER: lastplate_ci
+      DB_NAME: lastplate_${{ matrix.service }}
+      DB_USER: lastplate_${{ matrix.service }}
       DB_PASSWORD: ci-only-disposable-password
       DB_HOST: 127.0.0.1
       DB_PORT: "5432"
+    defaults:
+      run:
+        working-directory: ${{ matrix.path }}
     steps:
       - name: Check out source
         uses: actions/checkout@v7
@@ -45,7 +65,8 @@ jobs:
         with:
           python-version: "3.14"
           cache: pip
-      - name: Install pinned dependencies
+          cache-dependency-path: ${{ matrix.path }}/requirements.txt
+      - name: Install this service's pinned dependencies only
         run: python -m pip install -r requirements.txt
       - name: Check dependency compatibility
         run: python -m pip check
@@ -54,12 +75,43 @@ jobs:
       - name: Check migration files match models
         run: python manage.py makemigrations --check --dry-run
       - name: Collect static assets from a clean checkout
+        if: matrix.static
         run: python manage.py collectstatic --noinput
       - name: Check local development configuration
         run: python manage.py check
         env:
           DJANGO_DEBUG: "True"
-      - name: Apply migrations to PostgreSQL
+      - name: Apply migrations to this service's database
         run: python manage.py migrate --noinput
-      - name: Run automated tests on a separate test database
+      - name: Run the nine original account tests by name
+        if: matrix.service == 'accounts'
+        run: >-
+          python manage.py test --noinput --verbosity 2
+          accounts.tests.UserAccountTests accounts.tests.AdminAccessTests
+      - name: Run all automated tests on a separate test database
         run: python manage.py test --noinput --verbosity 2
+
+  smoke:
+    name: Docker Compose smoke check
+    needs: service
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Generate disposable Compose settings
+        run: python scripts/init_dev_env.py --compose-only
+      - name: Start each service alone, then together, and check isolation
+        run: python scripts/smoke_check.py
+      - name: Show service logs
+        if: failure()
+        run: docker compose --env-file compose.env logs --no-color
+      - name: Stop the stack
+        if: always()
+        run: docker compose --env-file compose.env down
