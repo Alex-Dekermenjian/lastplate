@@ -1,27 +1,34 @@
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
+from django.http import Http404
 
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .authentication import IsShopOperator
-from .models import Shop
-from .serializers import ShopCreateSerializer, ShopSerializer
-from .listing_service import save_listing_draft
-from .models import Listing
-from .serializers import ListingSerializer
-from rest_framework.decorators import api_view, permission_classes
-from .listing_service import publish_listing as publish_listing_service
-from django.core.exceptions import ValidationError as DjangoValidationError
-from django.http import Http404
-from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.decorators import parser_classes
-
+from .listing_service import (
+    save_listing_draft,
+    publish_listing as publish_listing_service,
+)
+from .models import Listing, Shop
 from .photo_service import replace_listing_photo
+from .serializers import (
+    ListingSerializer,
+    ShopCreateSerializer,
+    ShopProfileSerializer,
+    ShopSerializer,
+)
+
+
+# --------------------------------------------------
 # LP-7: Shop creation
+# --------------------------------------------------
+
 class ShopCreateView(APIView):
     permission_classes = [IsAuthenticated, IsShopOperator]
 
@@ -36,7 +43,7 @@ class ShopCreateView(APIView):
                     **serializer.validated_data,
                 )
         except IntegrityError:
-            # An existing shop must not be overwritten.
+            # Never overwrite an existing shop.
             shop = Shop.objects.get(
                 operator_user_id=request.user.id
             )
@@ -51,14 +58,25 @@ class ShopCreateView(APIView):
         )
 
 
-# LP-7: Retrieve the authenticated operator's shop
+# --------------------------------------------------
+# LP-7 and LP-8: Shop profile
+# --------------------------------------------------
+
 class MyShopView(APIView):
+    """
+    Operators can only view and edit their own shop.
+
+    Shop ownership is determined from the verified JWT.
+    """
     permission_classes = [IsAuthenticated, IsShopOperator]
 
-    def get(self, request):
-        shop = Shop.objects.filter(
+    def get_own_shop(self, request):
+        return Shop.objects.filter(
             operator_user_id=request.user.id
         ).first()
+
+    def get(self, request):
+        shop = self.get_own_shop(request)
 
         if shop is None:
             return Response(
@@ -68,22 +86,36 @@ class MyShopView(APIView):
 
         return Response(ShopSerializer(shop).data)
 
+    def patch(self, request):
+        shop = self.get_own_shop(request)
 
-# LP-10: Temporary listing endpoints
-def feature_not_ready():
-    return Response(
-        {
-            "code": "FEATURE_NOT_READY",
-            "detail": (
-                "Listing operations are unavailable until "
-                "authentication and shop permissions are integrated."
-            ),
-        },
-        status=status.HTTP_503_SERVICE_UNAVAILABLE,
-    )
+        if shop is None:
+            return Response(
+                {"detail": "You have no shop yet."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = ShopProfileSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        for field, value in serializer.validated_data.items():
+            setattr(shop, field, value)
+
+        # Update only the edited profile fields.
+        # Never overwrite a simultaneous approval decision.
+        shop.save(
+            update_fields=[
+                *serializer.validated_data,
+                "updated_at",
+            ]
+        )
+
+        return Response(ShopSerializer(shop).data)
 
 
-
+# --------------------------------------------------
+# LP-10: Listing creation
+# --------------------------------------------------
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated, IsShopOperator])
@@ -98,6 +130,7 @@ def create_listing(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
+    # The browser must never choose ownership or status.
     if "shop_id" in request.data or "status" in request.data:
         return Response(
             {"detail": "shop_id and status cannot be supplied."},
@@ -115,12 +148,13 @@ def create_listing(request):
     )
 
 
-
+# --------------------------------------------------
+# LP-10: Listing editing
+# --------------------------------------------------
 
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated, IsShopOperator])
 def edit_listing(request, pk):
-    # Find the shop belonging to the authenticated operator.
     shop = Shop.objects.filter(
         operator_user_id=request.user.id
     ).first()
@@ -131,7 +165,6 @@ def edit_listing(request, pk):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    # Only allow editing a draft owned by this shop.
     listing = Listing.objects.filter(
         pk=pk,
         shop_id=shop.id,
@@ -144,7 +177,6 @@ def edit_listing(request, pk):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    # Do not let the client change protected fields.
     protected_fields = {
         "shop_id",
         "status",
@@ -156,7 +188,9 @@ def edit_listing(request, pk):
         "photo",
     }
 
-    forbidden = protected_fields.intersection(request.data.keys())
+    forbidden = protected_fields.intersection(
+        request.data.keys()
+    )
 
     if forbidden:
         return Response(
@@ -167,7 +201,6 @@ def edit_listing(request, pk):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Validate only the supplied fields.
     serializer = ListingSerializer(
         listing,
         data=request.data,
@@ -176,21 +209,28 @@ def edit_listing(request, pk):
     serializer.is_valid(raise_exception=True)
     serializer.save()
 
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(
+        serializer.data,
+        status=status.HTTP_200_OK,
+    )
 
+
+# --------------------------------------------------
+# LP-10: Listing publication
+# --------------------------------------------------
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated, IsShopOperator])
 def publish_listing(request, pk):
-    # Publication settings must never come from user input.
+    # Never accept approval flags from the browser.
     if request.data:
         return Response(
             {"detail": "Publication does not accept request fields."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Identify the shop using the authenticated user.
+    # Get the shop belonging to the authenticated operator.
     shop = Shop.objects.filter(
         operator_user_id=request.user.id
     ).first()
@@ -201,34 +241,49 @@ def publish_listing(request, pk):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    # LP-8 profile completeness is not available yet.
-    # Keep publishing disabled until it is implemented.
-    profile_complete = False
+    # Verify ownership before proceeding.
+    listing = Listing.objects.filter(pk=pk).first()
 
-    # Read approval from the database, never the request.
+    if listing is None or listing.shop_id != shop.id:
+        return Response(
+            {"detail": "You do not own this listing."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    # Approval must come from the database.
     shop_approved = (
         shop.approval_status == Shop.ApprovalStatus.APPROVED
     )
 
-    listing = publish_listing_service(
-        listing_id=pk,
-        shop_id=shop.id,
-        shop_approved=shop_approved,
-        profile_complete=profile_complete,
-    )
+    if not shop_approved:
+        return Response(
+            {"detail": "Your shop must be approved before publishing."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
+    # LP-8: Check actual profile completeness.
+    profile_complete = shop.profile_complete
+
+    if not profile_complete:
+        return Response(
+            {"detail": "Complete your shop profile before publishing."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    # Keep successful publication disabled until LP-9 is integrated.
     return Response(
-        ListingSerializer(listing).data,
-        status=status.HTTP_200_OK,
+        {"detail": "Publishing is unavailable until LP-9 is integrated."},
+        status=status.HTTP_503_SERVICE_UNAVAILABLE,
     )
 
-
+# --------------------------------------------------
+# LP-11: Secure photo upload and replacement
+# --------------------------------------------------
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated, IsShopOperator])
 @parser_classes([MultiPartParser, FormParser])
 def upload_listing_photo(request, pk):
-    # Identify the shop using the authenticated operator.
     shop = Shop.objects.filter(
         operator_user_id=request.user.id
     ).first()
@@ -239,7 +294,6 @@ def upload_listing_photo(request, pk):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    # Only allow uploads to this shop's draft listings.
     listing = Listing.objects.filter(
         pk=pk,
         shop_id=shop.id,
@@ -249,7 +303,6 @@ def upload_listing_photo(request, pk):
     if listing is None:
         raise Http404("Draft listing not found.")
 
-    # Require exactly one photo and no other input fields.
     if set(request.data.keys()) != {"photo"}:
         return Response(
             {"photo": ["Upload exactly one photo."]},
@@ -285,4 +338,3 @@ def upload_listing_photo(request, pk):
         ).data,
         status=status.HTTP_200_OK,
     )
-

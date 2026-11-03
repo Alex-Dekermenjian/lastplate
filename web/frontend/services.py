@@ -79,3 +79,8 @@ def create_shop(access, name):
 @sensitive_variables("access")
 def my_shop(access):
     return _call("marketplace", "GET", "/api/shops/me/", token=access)
+
+
+@sensitive_variables("access")
+def update_shop(access, profile):
+    return _call("marketplace", "PATCH", "/api/shops/me/", profile, token=access)

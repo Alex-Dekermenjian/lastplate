@@ -6,7 +6,7 @@ from .image_validators import validate_listing_photo
 from .upload_paths import listing_photo_upload_path
 
 
-# LP-7: Shop model
+# LP-7 and LP-8: Shop model
 class Shop(models.Model):
     """
     A shop operated by a user from the Accounts service.
@@ -23,11 +23,22 @@ class Shop(models.Model):
     operator_user_id = models.PositiveBigIntegerField(unique=True)
     name = models.CharField(max_length=150)
 
+    # LP-8: Shop profile information
+    address = models.CharField(
+        "pickup address",
+        max_length=255,
+        blank=True,
+    )
+    area = models.CharField(max_length=100, blank=True)
+    public_contact = models.CharField(max_length=150, blank=True)
+
+    # Shop approval information
     approval_status = models.CharField(
         max_length=10,
         choices=ApprovalStatus.choices,
         default=ApprovalStatus.PENDING,
     )
+    rejection_reason = models.TextField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -46,6 +57,20 @@ class Shop(models.Model):
             ),
         ]
 
+    PROFILE_FIELDS = (
+        "name",
+        "address",
+        "area",
+        "public_contact",
+    )
+
+    @property
+    def profile_complete(self):
+        return all(
+            getattr(self, field).strip()
+            for field in self.PROFILE_FIELDS
+        )
+
     def __str__(self):
         return self.name
 
@@ -58,7 +83,7 @@ class Listing(models.Model):
         PUBLISHED = "PUBLISHED", "Published"
         WITHDRAWN = "WITHDRAWN", "Withdrawn"
 
-    # Temporary numeric shop reference (no cross-service FK)
+    # Numeric reference to a Shop in Marketplace
     shop_id = models.PositiveBigIntegerField()
 
     title = models.CharField(max_length=200, blank=True)

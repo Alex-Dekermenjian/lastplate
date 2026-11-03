@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Shop profile — LastPlate{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h1>Shop profile</h1>
+  {% if shop %}
+    <p class="muted">Status: <span class="status status--{{ shop.approval_status }}">{{ status_label }}</span></p>
+  {% endif %}
+  {% if form %}
+    <p class="muted">These details are shown to customers. Editing them does not change your approval status.</p>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% include "frontend/_form.html" %}
+      <button class="button button--primary button--block" type="submit">Save profile</button>
+    </form>
+  {% else %}
+    <p class="notice notice--warning" role="alert">We can't reach the shop service right now, so your profile can't be loaded. Please try again in a few minutes.</p>
+  {% endif %}
+  <p style="margin-top: 16px;"><a href="{% url 'workspace' %}">Back to workspace</a></p>
+</section>
+{% endblock %}

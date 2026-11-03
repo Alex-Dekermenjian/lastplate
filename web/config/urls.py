@@ -14,6 +14,7 @@ urlpatterns = [
     path("sign-out/", account_views.sign_out, name="sign-out"),
     path("workspace/", account_views.workspace, name="workspace"),
     path("workspace/finish-setup/", account_views.finish_setup, name="finish-setup"),
+    path("workspace/profile/", account_views.shop_profile, name="shop-profile"),
     path("health/live/", health.live, name="health-live"),
     path("health/ready/", health.ready, name="health-ready"),
 ]

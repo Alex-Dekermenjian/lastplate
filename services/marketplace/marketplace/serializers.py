@@ -1,4 +1,6 @@
 
+import re
+
 from django.core.exceptions import ValidationError
 from rest_framework import serializers
 
@@ -7,15 +9,35 @@ from .models import Listing, Shop
 from .validators import validate_listing_data
 
 
-# LP-7: Shop creation
-class ShopCreateSerializer(serializers.Serializer):
-    """
-    Only the shop name may be provided.
-    Ownership comes from the authenticated token.
-    """
+# LP-8: Public contact must be a valid phone number.
+PHONE_CHARACTERS = re.compile(r"\+?[0-9 ()./-]+")
 
-    name = serializers.CharField(max_length=150)
 
+def validate_public_contact(value):
+    if not PHONE_CHARACTERS.fullmatch(value):
+        raise serializers.ValidationError(
+            "Enter a phone number using digits, spaces, +, -, "
+            "brackets or dots, for example +961 1 234 567."
+        )
+
+    digits = re.sub(r"\D", "", value)
+
+    if not 7 <= len(digits) <= 15:
+        raise serializers.ValidationError(
+            "Enter a full phone number with 7 to 15 digits, "
+            "for example +961 1 234 567."
+        )
+
+    if len(set(digits)) == 1:
+        raise serializers.ValidationError(
+            "Enter a real phone number customers can call."
+        )
+
+    return value
+
+
+# LP-7 and LP-8: Reject protected or unknown input fields.
+class RejectUnknownFieldsMixin:
     def to_internal_value(self, data):
         unexpected = sorted(set(data) - set(self.fields))
 
@@ -30,19 +52,86 @@ class ShopCreateSerializer(serializers.Serializer):
         return super().to_internal_value(data)
 
 
-# LP-7: Shop details
+# LP-7: Shop creation
+class ShopCreateSerializer(
+    RejectUnknownFieldsMixin,
+    serializers.Serializer,
+):
+    """
+    Only the shop name can be supplied during creation.
+    Ownership and approval come from the server.
+    """
+
+    name = serializers.CharField(max_length=150)
+
+
+# LP-8: Shop profile editing
+class ShopProfileSerializer(
+    RejectUnknownFieldsMixin,
+    serializers.Serializer,
+):
+    """
+    Shop operators may update profile information,
+    but cannot change approval or ownership fields.
+    """
+
+    name = serializers.CharField(
+        min_length=2,
+        max_length=150,
+        required=False,
+    )
+
+    address = serializers.CharField(
+        min_length=5,
+        max_length=255,
+        required=False,
+    )
+
+    area = serializers.CharField(
+        min_length=2,
+        max_length=100,
+        required=False,
+    )
+
+    public_contact = serializers.CharField(
+        max_length=32,
+        required=False,
+        validators=[validate_public_contact],
+    )
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError(
+                "Send at least one profile field to change."
+            )
+
+        return attrs
+
+
+# LP-7 and LP-8: Shop details
 class ShopSerializer(serializers.ModelSerializer):
+
+    profile_complete = serializers.BooleanField(
+        read_only=True
+    )
 
     class Meta:
         model = Shop
+
         fields = [
             "id",
             "operator_user_id",
             "name",
+            "address",
+            "area",
+            "public_contact",
             "approval_status",
+            "rejection_reason",
+            "profile_complete",
             "created_at",
             "updated_at",
         ]
+
         read_only_fields = fields
 
 
@@ -138,6 +227,8 @@ class ListingSerializer(serializers.ModelSerializer):
                 publishing=False,
             )
         except ValidationError as exc:
-            raise serializers.ValidationError(exc.message_dict)
+            raise serializers.ValidationError(
+                exc.message_dict
+            )
 
         return attrs

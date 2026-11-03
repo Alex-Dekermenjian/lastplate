@@ -4,7 +4,7 @@
 
 {% block content %}
 <section class="card card--wide">
-  <p class="muted">Signed in as {{ request.session.account.display_name }} ({{ request.session.account.email }})</p>
+  <p class="muted">Signed in as {{ request.session.account.display_name }}</p>
   {% if unavailable %}
     <h1>Your shop</h1>
     <p class="notice notice--warning" role="alert">We can't reach the shop service right now, so your shop's status can't be shown. Please refresh in a few minutes.</p>
@@ -15,7 +15,24 @@
       <dd><span class="status status--{{ shop.approval_status }}">{{ status_label }}</span></dd>
     </dl>
     <p>{{ status_explanation }}</p>
-    <p class="muted">Approval is a manual onboarding check; it does not certify food safety or business legality.</p>
+    {% if shop.approval_status == "REJECTED" %}
+      <div class="notice notice--error">
+        <strong>Reason given:</strong>
+        {% if shop.rejection_reason %}{{ shop.rejection_reason|linebreaksbr }}{% else %}No reason has been recorded yet.{% endif %}
+      </div>
+    {% endif %}
+
+    <h2>Shop profile</h2>
+    {% if not shop.profile_complete %}
+      <p class="notice notice--warning">Complete your pickup address, area and shop phone number. Shops need a complete profile before they can publish offers.</p>
+    {% endif %}
+    <dl class="details">
+      <dt>Pickup address</dt><dd>{{ shop.address|default:"Not set" }}</dd>
+      <dt>Area</dt><dd>{{ shop.area|default:"Not set" }}</dd>
+      <dt>Shop phone</dt><dd>{{ shop.public_contact|default:"Not set" }}</dd>
+    </dl>
+    <a class="button button--primary" href="{% url 'shop-profile' %}">Edit shop profile</a>
+    <p class="muted" style="margin-top: 16px;">Approval is a manual onboarding check; it does not certify food safety or business legality.</p>
   {% endif %}
 </section>
 {% endblock %}
