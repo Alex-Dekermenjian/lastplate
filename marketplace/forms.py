@@ -8,6 +8,11 @@ from .validators import validate_listing_data
 
 class ListingForm(forms.ModelForm):
 
+    confirm_pickup_address = forms.BooleanField(
+        required=False,
+        label="I confirm that the pickup address is correct",
+    )
+
     class Meta:
         model = Listing
         fields = [
@@ -55,6 +60,12 @@ class ListingForm(forms.ModelForm):
         cleaned_data = super().clean()
 
         if self.publishing:
+            if not cleaned_data.get("confirm_pickup_address"):
+                self.add_error(
+                    "confirm_pickup_address",
+                    "Confirm the pickup address before publishing.",
+                )
+
             for name in (
                 "title",
                 "description",
@@ -63,7 +74,6 @@ class ListingForm(forms.ModelForm):
             ):
                 if not cleaned_data.get(name):
                     self.add_error(name, "This field is required.")
-
         # Do not run further checks on fields that
         # already failed Django's built-in validation.
         validation_fields = (

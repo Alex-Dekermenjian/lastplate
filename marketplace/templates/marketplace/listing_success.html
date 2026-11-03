@@ -1,0 +1,48 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offer Saved - LastPlate</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f6f8;
+            padding: 40px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 80px auto;
+            background: white;
+            padding: 35px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #228b5a;
+        }
+
+        a {
+            display: inline-block;
+            margin-top: 20px;
+            background: #228b5a;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Food Offer Saved!</h1>
+        <p>Your food offer has been saved successfully.</p>
+        <a href="{% url 'marketplace:create_listing' %}">
+            Create Another Offer
+        </a>
+    </div>
+</body>
+</html>
