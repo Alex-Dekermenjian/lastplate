@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+*.pem
 **/__pycache__
 *.py[cod]
 staticfiles/

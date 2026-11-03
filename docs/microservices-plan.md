@@ -79,11 +79,60 @@ Changes from `docs/database-design.md`:
 
 ## 4. Authentication
 
-- Accounts issues JWTs with `djangorestframework-simplejwt`, signed with RS256.
+- Accounts issues JWTs with `djangorestframework-simplejwt`. **Implemented
+  (LP-7, Accounts part):**
+  - `POST /api/auth/register/` (shop operators only);
+  - `POST /api/auth/token/`;
+  - `POST /api/auth/token/refresh/`;
+  - `POST /api/auth/logout/` (blacklists the refresh token);
+  - `GET /api/users/me/`.
+
+  Customer registration is a separate task.
+- Registration sets `role = SHOP_OPERATOR` on the server. Any supplied `role`,
+  `is_staff`, `is_superuser`, `is_active`, `approval_status` or other field is
+  rejected with 400.
 - Access token claims: `user_id`, `role`, `is_staff`, `display_name`.
   Access tokens last 15 minutes, refresh tokens 1 day.
-- Marketplace and Reservations verify tokens offline with Accounts' public key
-  (`JWTStatelessUserAuthentication`). They do not call Accounts per request.
+- **Signing: RS256 (implemented).** Only Accounts holds the private key and
+  signs tokens. Marketplace and Reservations will receive the public key only,
+  so they can verify tokens but never create them.
+  - Keys are PEM files created by `scripts/init_dev_env.py` in the git-ignored
+    `.keys/` folder.
+  - Docker Compose mounts them read-only. They are never in Git or an image.
+  - Paths are configurable with `JWT_PRIVATE_KEY_FILE` / `JWT_PUBLIC_KEY_FILE`.
+- Marketplace and Reservations verify tokens offline with the public key. They
+  do not call Accounts per request.
+- **Marketplace (implemented, LP-7):** `marketplace/authentication.py` uses
+  PyJWT directly.
+  - It accepts RS256 only, requires `exp`, `token_type == "access"` and a
+    numeric `user_id`.
+  - SimpleJWT's `JWTStatelessUserAuthentication` was not used because it
+    imports Django's auth models, which would add unused user tables to
+    Marketplace.
+  - Compose mounts only `jwt-public.pem` into Marketplace.
+  - Endpoints: `POST /api/shops/` and `GET /api/shops/me/`, shop operators
+    only. The owner comes from the token and the status is always PENDING.
+    Creation is idempotent: the unique `operator_user_id` makes a retried or
+    concurrent request return the existing shop unchanged (200) instead of
+    creating or overwriting one (201 on first creation).
+- **Throttling (implemented):** standard DRF throttles using the default
+  in-process cache.
+  - Registration: 10/hour per client.
+  - Sign-in: 30/minute per client and 5/minute per email.
+  - Once the web frontend calls Accounts for browsers, "client" is the frontend,
+    so the per-email limit is what protects individual accounts. Trusting
+    `X-Forwarded-For` is safe only if Accounts is not directly reachable.
+  - Limits are per process. Several workers or instances each keep their own
+    counters.
+- **Registration recovery:** after an ambiguous failure (timeout, lost
+  response), the web frontend signs in with the same email and password before
+  continuing. "Email already exists" alone never proves ownership. Only a
+  successful sign-in does.
+- **Sign-out limitation:** blacklisting the refresh token stops new access
+  tokens, but an access token already issued stays valid until it expires (at
+  most 15 minutes). A test documents this. The web frontend must delete its
+  server-side copy on sign-out. Instant revocation would need a denylist
+  checked on every request, which is deliberately not built.
 - Every service still checks role and ownership itself. Example: Marketplace
   checks that the listing's shop has `operator_user_id == token.user_id`.
 - Shop approval is an `is_staff`-only Marketplace endpoint. Each service may

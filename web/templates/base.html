@@ -1,12 +1,38 @@
-<!doctype html>
+{% load static %}<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}LastPlate{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Fraunces:opsz,wght@9..144,600&display=swap">
+  <link rel="stylesheet" href="{% static 'css/lastplate.css' %}">
 </head>
 <body>
-  <main>
+  <header class="site-header">
+    <a class="logo" href="{% url 'home' %}">LastPlate</a>
+    <nav class="site-nav" aria-label="Account">
+      {% if request.session.account %}
+        <a class="button button--secondary" href="{% url 'workspace' %}">Workspace</a>
+        <form method="post" action="{% url 'sign-out' %}">
+          {% csrf_token %}
+          <button class="button button--primary" type="submit">Sign out</button>
+        </form>
+      {% else %}
+        <a class="button button--secondary" href="{% url 'sign-in' %}">Sign in</a>
+        <a class="button button--primary" href="{% url 'register' %}">Register your shop</a>
+      {% endif %}
+    </nav>
+  </header>
+  <main class="page">
+    {% if messages %}
+      <ul class="messages">
+        {% for message in messages %}
+          <li class="notice notice--{{ message.tags }}" role="status">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
     {% block content %}{% endblock %}
   </main>
 </body>

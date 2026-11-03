@@ -2,7 +2,7 @@
 Server-side storage for the Accounts service's access and refresh tokens.
 
 Tokens are kept in the database-backed session. The browser only receives the
-HttpOnly session ID cookie, never a token. Sign-in (LP-7) will call these.
+HttpOnly session ID cookie, never a token.
 """
 
 ACCESS_TOKEN_KEY = "accounts_access_token"
@@ -14,6 +14,10 @@ def store_tokens(request, access, refresh):
     request.session.cycle_key()
     request.session[ACCESS_TOKEN_KEY] = access
     request.session[REFRESH_TOKEN_KEY] = refresh
+
+
+def set_access_token(request, access):
+    request.session[ACCESS_TOKEN_KEY] = access
 
 
 def get_access_token(request):

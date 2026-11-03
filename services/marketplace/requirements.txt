@@ -1,8 +1,12 @@
 asgiref==3.13.0
+cffi==2.1.1
+cryptography==50.0.2
 Django==5.2.18
 djangorestframework==3.18.3
 psycopg==3.3.6
 psycopg-binary==3.3.6
+pycparser==3.12
+PyJWT==2.15.1
 python-dotenv==1.2.4
 sqlparse==0.6.0
 tzdata==2026.6

@@ -1,0 +1,104 @@
+/* LastPlate tokens (from the LP-4 Figma foundations). */
+:root {
+  --bg-canvas: #FBF7F0;
+  --bg-surface: #FFFFFF;
+  --bg-muted: #F3ECE1;
+  --bg-brand: #1F4D33;
+  --bg-brand-subtle: #E4EEE6;
+  --bg-accent: #F08A3C;
+  --bg-accent-subtle: #FDEBDC;
+  --bg-error-subtle: #FDECEC;
+  --text-primary: #1C2620;
+  --text-secondary: #56615A;
+  --text-brand: #1F4D33;
+  --text-accent-strong: #9A4612;
+  --text-error: #B42318;
+  --border: #E7DED0;
+  --border-strong: #CFC3B1;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --font-heading: "Fraunces", Georgia, serif;
+  --font-body: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  font: 16px/1.5 var(--font-body);
+}
+a { color: var(--text-brand); font-weight: 600; }
+h1, h2 { font-family: var(--font-heading); font-weight: 600; line-height: 1.2; margin: 0 0 8px; }
+h1 { font-size: 30px; }
+h2 { font-size: 22px; }
+p { margin: 0 0 12px; }
+.muted { color: var(--text-secondary); }
+
+/* Header */
+.site-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px; background: var(--bg-surface); border-bottom: 1px solid var(--border);
+}
+.logo { font: 600 22px/1 var(--font-heading); color: var(--text-brand); text-decoration: none; }
+.site-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.site-nav form { margin: 0; }
+
+/* Layout */
+.page { max-width: 1120px; margin: 0 auto; padding: 32px 16px 64px; }
+.card {
+  max-width: 480px; margin: 0 auto; padding: 24px;
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: 0 4px 16px rgba(31, 61, 43, 0.08);
+}
+.card--wide { max-width: 720px; }
+
+/* Forms */
+.field { margin-bottom: 16px; }
+.field label { display: block; font-weight: 600; margin-bottom: 6px; }
+.field input {
+  width: 100%; min-height: 48px; padding: 12px 14px;
+  font: inherit; color: var(--text-primary);
+  background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+}
+.field input:focus { outline: 3px solid var(--bg-accent); outline-offset: 1px; border-color: var(--bg-brand); }
+.field--error input { border: 2px solid var(--text-error); }
+.help { font-size: 14px; color: var(--text-secondary); margin: 0 0 6px; }
+.field-error { font-size: 14px; color: var(--text-error); margin: 6px 0 0; font-weight: 600; }
+
+/* Buttons */
+.button {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; padding: 10px 20px; border-radius: var(--radius-md);
+  font: 600 15px/1.2 var(--font-body); text-decoration: none; cursor: pointer;
+  border: 1px solid transparent;
+}
+.button--primary { background: var(--bg-brand); color: #FFFFFF; }
+.button--secondary { background: var(--bg-surface); color: var(--text-primary); border-color: var(--border-strong); }
+.button--block { width: 100%; }
+
+/* Messages */
+.notice { padding: 12px 16px; border-radius: var(--radius-md); margin: 0 0 16px; }
+.notice--info, .notice--success { background: var(--bg-brand-subtle); }
+.notice--warning { background: var(--bg-accent-subtle); color: var(--text-accent-strong); }
+.notice--error { background: var(--bg-error-subtle); color: var(--text-error); font-weight: 600; }
+.messages { max-width: 720px; margin: 0 auto 16px; padding: 0; list-style: none; }
+
+/* Status */
+.status {
+  display: inline-block; padding: 4px 12px; border-radius: 999px;
+  font-size: 14px; font-weight: 600;
+}
+.status--PENDING { background: var(--bg-accent-subtle); color: var(--text-accent-strong); }
+.status--APPROVED { background: var(--bg-brand-subtle); color: var(--text-brand); }
+.status--REJECTED { background: var(--bg-error-subtle); color: var(--text-error); }
+.details { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 16px 0; }
+.details dt { color: var(--text-secondary); }
+.details dd { margin: 0; font-weight: 600; }
+
+@media (min-width: 768px) {
+  .site-header { padding: 16px 80px; }
+  .page { padding: 48px 80px 80px; }
+  .card { padding: 32px; }
+  h1 { font-size: 36px; }
+}
