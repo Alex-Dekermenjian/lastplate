@@ -8,10 +8,10 @@ open decisions are in [microservices-plan.md](microservices-plan.md).
 
 | Part | Implemented now | Planned, not built |
 | --- | --- | --- |
-| Accounts (`services/accounts`, port 8001) | Email-based user model with roles, its migration, Django admin login, health endpoints, 9 original tests + health tests | Registration, token sign-in and refresh (LP-7) |
-| Marketplace (`services/marketplace`, port 8002) | Runnable empty service, own database, health endpoints | Shops, approval, listings, stock (LP-8 to LP-13) |
+| Accounts (`services/accounts`, port 8001) | Email-based user model with roles, its migration, Django admin login, health endpoints; LP-7 APIs: shop-operator registration, RS256 token sign-in, refresh, logout (refresh-token blacklist), `/api/users/me/`, throttling; 9 original tests + health and auth API tests | Web sign-in/registration pages and the Pending shop (rest of LP-7) |
+| Marketplace (`services/marketplace`, port 8002) | Own database, health endpoints; LP-7: verifies Accounts tokens with the public key only, minimal `Shop` (one per operator, Pending), `POST /api/shops/` (idempotent), `GET /api/shops/me/` | Shop profile editing (LP-8), approval (LP-9), listings, stock (LP-10 to LP-13) |
 | Reservations (`services/reservations`, port 8003) | Runnable empty service, own database, health endpoints | All reservation logic (Sprint 2) |
-| Web frontend (`web`, port 8000) | Server-side session storage and token helpers, a status page that calls the services' health APIs | All customer and shop pages |
+| Web frontend (`web`, port 8000) | Server-side sessions; status page; LP-7: shop-operator registration (`/register/`), sign-in (`/sign-in/`), POST sign-out, workspace with shop status (`/workspace/`), finish-shop-setup retry (`/workspace/finish-setup/`) | Customer pages, shop profile editing, offers |
 | Docker Compose | PostgreSQL with one database and login role per service; all four apps | Production deployment (LP-15) |
 | CI | Checks and tests per service; Compose smoke check | Cross-service feature integration tests |
 
@@ -56,10 +56,19 @@ one local environment. Each service's Docker image installs only its own
 
 This creates random passwords and secret keys in:
 - `compose.env` — read by Docker Compose;
-- `.env` in each service folder — used when a service runs outside Docker.
+- `.env` in each service folder — used when a service runs outside Docker;
+- `.keys/jwt-private.pem` and `.keys/jwt-public.pem` — the RS256 key pair
+  Accounts uses to sign sign-in tokens. Docker Compose mounts them read-only;
+  they are never copied into an image.
 
 It never overwrites an existing file and never prints a secret. All these files
-are ignored by Git. Never commit or share them.
+are ignored by Git. Never commit or share them, especially the private key.
+
+**Already set up before LP-7?** Run the same command once more (step 2 first, to
+install the new packages). It keeps your existing settings and only adds the
+missing key pair. Then rebuild Accounts:
+`docker compose --env-file compose.env up -d --build accounts`. Accounts will
+not start without its keys.
 
 ## 4. Run everything with Docker Compose
 

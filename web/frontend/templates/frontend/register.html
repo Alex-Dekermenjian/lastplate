@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Register your shop — LastPlate{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h1>Register your shop</h1>
+  <p class="muted">Create a shop-operator account. New shops start as Pending until a LastPlate administrator reviews them.</p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "frontend/_form.html" %}
+    <button class="button button--primary button--block" type="submit">Create account</button>
+  </form>
+  <p class="muted" style="margin-top: 16px;">Already registered? <a href="{% url 'sign-in' %}">Sign in</a></p>
+</section>
+{% endblock %}

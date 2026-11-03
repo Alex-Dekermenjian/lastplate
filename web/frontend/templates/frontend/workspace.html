@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Shop workspace — LastPlate{% endblock %}
+
+{% block content %}
+<section class="card card--wide">
+  <p class="muted">Signed in as {{ request.session.account.display_name }} ({{ request.session.account.email }})</p>
+  {% if unavailable %}
+    <h1>Your shop</h1>
+    <p class="notice notice--warning" role="alert">We can't reach the shop service right now, so your shop's status can't be shown. Please refresh in a few minutes.</p>
+  {% else %}
+    <h1>{{ shop.name }}</h1>
+    <dl class="details">
+      <dt>Status</dt>
+      <dd><span class="status status--{{ shop.approval_status }}">{{ status_label }}</span></dd>
+    </dl>
+    <p>{{ status_explanation }}</p>
+    <p class="muted">Approval is a manual onboarding check; it does not certify food safety or business legality.</p>
+  {% endif %}
+</section>
+{% endblock %}

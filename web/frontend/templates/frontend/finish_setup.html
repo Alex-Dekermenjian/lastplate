@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}Finish shop setup — LastPlate{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h1>Finish shop setup</h1>
+  <p class="muted">Your account exists. Submit your shop name to send it for review. Trying again never creates a second shop.</p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "frontend/_form.html" %}
+    <button class="button button--primary button--block" type="submit">Finish shop setup</button>
+  </form>
+</section>
+{% endblock %}

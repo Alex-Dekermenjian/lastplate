@@ -1,8 +1,56 @@
 
 from django.db import models
+from django.db.models import Q
+
 from .image_validators import validate_listing_photo
 from .upload_paths import listing_photo_upload_path
 
+
+# LP-7: Shop model
+class Shop(models.Model):
+    """
+    A shop operated by a user from the Accounts service.
+
+    operator_user_id refers to the Accounts user ID.
+    No cross-service ForeignKey is used.
+    """
+
+    class ApprovalStatus(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        APPROVED = "APPROVED", "Approved"
+        REJECTED = "REJECTED", "Rejected"
+
+    operator_user_id = models.PositiveBigIntegerField(unique=True)
+    name = models.CharField(max_length=150)
+
+    approval_status = models.CharField(
+        max_length=10,
+        choices=ApprovalStatus.choices,
+        default=ApprovalStatus.PENDING,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(
+                    approval_status__in=[
+                        "PENDING",
+                        "APPROVED",
+                        "REJECTED",
+                    ]
+                ),
+                name="marketplace_shop_valid_approval_status",
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+# LP-10 and LP-11: Food listing model
 class Listing(models.Model):
 
     class Status(models.TextChoices):
@@ -10,13 +58,13 @@ class Listing(models.Model):
         PUBLISHED = "PUBLISHED", "Published"
         WITHDRAWN = "WITHDRAWN", "Withdrawn"
 
+    # Temporary numeric shop reference (no cross-service FK)
     shop_id = models.PositiveBigIntegerField()
-
 
     title = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
     category = models.CharField(max_length=100, blank=True)
-    
+
     # LP-11: Optional food photo
     photo = models.ImageField(
         upload_to=listing_photo_upload_path,
@@ -25,18 +73,9 @@ class Listing(models.Model):
         blank=True,
     )
 
-    # LP-11: Shop-supplied food information
-    ingredients = models.TextField(
-        blank=True,
-        default="",
-    )
-
-    allergens = models.TextField(
-        blank=True,
-        default="",
-    )
-
-
+    # LP-11: Ingredients and allergens
+    ingredients = models.TextField(blank=True, default="")
+    allergens = models.TextField(blank=True, default="")
 
     original_price = models.DecimalField(
         max_digits=10,
@@ -54,7 +93,6 @@ class Listing(models.Model):
 
     total_quantity = models.PositiveIntegerField(default=0)
 
-
     pickup_address = models.CharField(
         max_length=255,
         blank=True,
@@ -69,7 +107,6 @@ class Listing(models.Model):
         null=True,
         blank=True,
     )
-
 
     status = models.CharField(
         max_length=20,

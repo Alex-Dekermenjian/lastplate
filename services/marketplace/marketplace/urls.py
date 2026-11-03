@@ -1,10 +1,24 @@
 
 from django.urls import path
+
 from . import views
 
-app_name = "marketplace"
+
 
 urlpatterns = [
+    # LP-7: Shop endpoints
+    path(
+        "shops/",
+        views.ShopCreateView.as_view(),
+        name="shop-create",
+    ),
+    path(
+        "shops/me/",
+        views.MyShopView.as_view(),
+        name="shop-me",
+    ),
+
+    # LP-10: Listing endpoints
     path(
         "listings",
         views.create_listing,
@@ -21,4 +35,3 @@ urlpatterns = [
         name="publish_listing",
     ),
 ]
-

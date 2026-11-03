@@ -68,6 +68,9 @@ jobs:
           cache-dependency-path: ${{ matrix.path }}/requirements.txt
       - name: Install this service's pinned dependencies only
         run: python -m pip install -r requirements.txt
+      - name: Create disposable JWT keys
+        if: matrix.service == 'accounts' || matrix.service == 'marketplace'
+        run: python ../../scripts/init_dev_env.py --keys-only
       - name: Check dependency compatibility
         run: python -m pip check
       - name: Check Django configuration
@@ -105,8 +108,10 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.14"
-      - name: Generate disposable Compose settings
-        run: python scripts/init_dev_env.py --compose-only
+      - name: Generate disposable Compose settings and JWT keys
+        run: |
+          python -m pip install cryptography==50.0.2
+          python scripts/init_dev_env.py --compose-only
       - name: Start each service alone, then together, and check isolation
         run: python scripts/smoke_check.py
       - name: Show service logs
