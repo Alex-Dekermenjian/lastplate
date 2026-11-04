@@ -366,3 +366,98 @@ def publish_listing(request, listing_id):
         )
 
     return redirect("workspace")
+
+
+# LP-12: Messages for refusals from the Marketplace stock API.
+STOCK_ERROR_MESSAGES = {
+    "zero_change": "Enter a quantity change other than zero.",
+    "reason_required": "Give a reason for the stock change.",
+    "invalid": (
+        "Enter a whole number to add or remove, and a reason "
+        "of up to 500 characters."
+    ),
+    "below_zero": "You can't remove more units than the offer has.",
+    "below_committed": (
+        "You can't remove units that customers have already reserved "
+        "or collected."
+    ),
+    "not_published": "Only published offers can have their stock adjusted.",
+    "pickup_ended": (
+        "The pickup window has ended, so this offer's stock "
+        "can no longer change."
+    ),
+    "not_owner": "You can only adjust stock for your own offers.",
+    "no_shop": "You can only adjust stock for your own offers.",
+    "too_large": "That quantity is too large.",
+}
+
+
+@operator_required
+@require_http_methods(["POST"])
+def adjust_stock(request, listing_id):
+    """Add or remove units of a published offer, with a reason."""
+
+    raw_change = request.POST.get("quantity_change", "").strip()
+    reason = request.POST.get("reason", "").strip()
+
+    try:
+        quantity_change = int(raw_change)
+    except ValueError:
+        quantity_change = None
+
+    if quantity_change is None:
+        messages.error(
+            request,
+            "Enter a whole number to add (for example 3) "
+            "or remove (for example -2).",
+        )
+        return redirect("workspace")
+
+    if quantity_change == 0:
+        messages.error(request, STOCK_ERROR_MESSAGES["zero_change"])
+        return redirect("workspace")
+
+    if not reason:
+        messages.error(request, STOCK_ERROR_MESSAGES["reason_required"])
+        return redirect("workspace")
+
+    try:
+        status, response = authenticated_call(
+            request,
+            services.adjust_stock,
+            listing_id,
+            quantity_change,
+            reason,
+        )
+    except ServiceUnavailable:
+        # The change may or may not have been saved; retrying blindly
+        # could apply it twice.
+        messages.warning(
+            request,
+            "We couldn't confirm whether the stock was changed. "
+            "Check the offer's available quantity before trying again.",
+        )
+        return redirect("workspace")
+
+    if status == 201:
+        listing = response.get("listing") or {}
+        free = listing.get("free_quantity")
+        if quantity_change > 0:
+            done = f"Added {quantity_change} unit{'s' if quantity_change != 1 else ''}."
+        else:
+            removed = -quantity_change
+            done = f"Removed {removed} unit{'s' if removed != 1 else ''}."
+        if free is not None:
+            done += f" {free} now available."
+        messages.success(request, done)
+        return redirect("workspace")
+
+    code = response.get("code") if isinstance(response, dict) else None
+    messages.error(
+        request,
+        STOCK_ERROR_MESSAGES.get(
+            code,
+            "The stock change was unsuccessful. Please try again.",
+        ),
+    )
+    return redirect("workspace")

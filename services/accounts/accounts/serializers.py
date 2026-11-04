@@ -64,6 +64,12 @@ class SignInSerializer(TokenObtainPairSerializer):
 
     default_error_messages = {"no_active_account": INVALID_CREDENTIALS}
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # LP-14: Registration keeps spaces in passwords, so sign-in must too,
+        # or such an account could never sign in.
+        self.fields["password"].trim_whitespace = False
+
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)

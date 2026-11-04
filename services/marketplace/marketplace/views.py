@@ -2,15 +2,22 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
 from django.http import Http404
+from django.views.decorators.csrf import csrf_exempt
 
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.decorators import (
+    api_view,
+    authentication_classes,
+    parser_classes,
+    permission_classes,
+)
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .authentication import IsShopOperator
+from .browse import visible_listing, visible_listings
 from .listing_service import (
     save_listing_draft,
     publish_listing as publish_listing_service,
@@ -19,10 +26,15 @@ from .models import Listing, Shop
 from .photo_service import replace_listing_photo
 from .serializers import (
     ListingSerializer,
+    PublicListingDetailSerializer,
+    PublicListingSerializer,
     ShopCreateSerializer,
     ShopProfileSerializer,
     ShopSerializer,
+    StockAdjustmentRequestSerializer,
+    StockAdjustmentSerializer,
 )
+from .stock_service import StockAdjustmentError, adjust_stock
 
 
 # --------------------------------------------------
@@ -392,3 +404,146 @@ def my_listings(request):
         serializer.data,
         status=status.HTTP_200_OK,
     )
+
+
+# --------------------------------------------------
+# LP-12: Stock adjustments and their history
+# --------------------------------------------------
+
+def _error(code, detail, http_status, **extra):
+    return Response(
+        {"code": code, "detail": detail, **extra},
+        status=http_status,
+    )
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated, IsShopOperator])
+def listing_stock_adjustments(request, pk):
+    # Ownership comes only from the verified JWT.
+    shop = Shop.objects.filter(
+        operator_user_id=request.user.id
+    ).first()
+
+    if shop is None:
+        return _error(
+            "no_shop",
+            "You have no shop.",
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    if request.method == "GET":
+        listing = Listing.objects.filter(pk=pk, shop_id=shop.id).first()
+
+        if listing is None:
+            return _error(
+                "not_owner",
+                "You do not own this listing.",
+                status.HTTP_403_FORBIDDEN,
+            )
+
+        return Response(
+            StockAdjustmentSerializer(
+                listing.stock_adjustments.all(),
+                many=True,
+            ).data,
+            status=status.HTTP_200_OK,
+        )
+
+    serializer = StockAdjustmentRequestSerializer(data=request.data)
+
+    if not serializer.is_valid():
+        return _error(
+            "invalid",
+            "Check the quantity change and reason.",
+            status.HTTP_400_BAD_REQUEST,
+            fields=serializer.errors,
+        )
+
+    try:
+        listing, adjustment = adjust_stock(
+            listing_id=pk,
+            shop_id=shop.id,
+            quantity_change=serializer.validated_data["quantity_change"],
+            reason=serializer.validated_data["reason"],
+            actor_user_id=request.user.id,
+        )
+    except StockAdjustmentError as exc:
+        return _error(exc.code, exc.detail, exc.http_status)
+
+    return Response(
+        {
+            "adjustment": StockAdjustmentSerializer(adjustment).data,
+            "listing": ListingSerializer(
+                listing,
+                context={"request": request},
+            ).data,
+        },
+        status=status.HTTP_201_CREATED,
+    )
+
+
+# --------------------------------------------------
+# LP-13: Public marketplace (no sign-in)
+# --------------------------------------------------
+
+# Public pages ignore any Authorization header, so a stale token in the
+# browser can never turn a public page into a 401.
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def browse_listings(request):
+    visible = visible_listings()
+
+    serializer = PublicListingSerializer(
+        [listing for listing, _shop in visible],
+        many=True,
+        context={
+            "request": request,
+            "shops": {shop.id: shop for _listing, shop in visible},
+        },
+    )
+
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def listing_offer(request, pk):
+    # Drafts, withdrawn offers, unapproved shops, ended and sold-out offers
+    # all look the same from outside: not found.
+    visible = visible_listing(pk)
+
+    if visible is None:
+        return _error(
+            "not_found",
+            "This offer is not available.",
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    listing, shop = visible
+
+    return Response(
+        PublicListingDetailSerializer(
+            listing,
+            context={"request": request, "shops": {shop.id: shop}},
+        ).data,
+        status=status.HTTP_200_OK,
+    )
+
+
+# One URL serves both the public read and the operator's write. Each target
+# view keeps its own authentication, permissions and CSRF handling.
+@csrf_exempt
+def listings_collection(request):
+    if request.method == "GET":
+        return browse_listings(request)
+    return create_listing(request)
+
+
+@csrf_exempt
+def listing_resource(request, pk):
+    if request.method == "GET":
+        return listing_offer(request, pk)
+    return edit_listing(request, pk)

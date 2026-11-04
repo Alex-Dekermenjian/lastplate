@@ -16,11 +16,12 @@ urlpatterns = [
         name="shop-me",
     ),
 
-    # LP-10: Listing endpoints
+    # LP-10 and LP-13: Listing endpoints. GET is the public marketplace
+    # (anyone); POST creates and PATCH edits the operator's own draft.
     path(
         "listings",
-        views.create_listing,
-        name="create_listing",
+        views.listings_collection,
+        name="listings",
     ),
     path(
         "listings/mine",
@@ -29,8 +30,8 @@ urlpatterns = [
     ),
     path(
         "listings/<int:pk>",
-        views.edit_listing,
-        name="edit_listing",
+        views.listing_resource,
+        name="listing_detail",
     ),
     path(
         "listings/<int:pk>/publish",
@@ -43,5 +44,12 @@ urlpatterns = [
         "listings/<int:pk>/photo",
         views.upload_listing_photo,
         name="upload_listing_photo",
+    ),
+
+    # LP-12: Stock adjustments (POST) and their history (GET)
+    path(
+        "listings/<int:pk>/stock-adjustments",
+        views.listing_stock_adjustments,
+        name="listing_stock_adjustments",
     ),
 ]

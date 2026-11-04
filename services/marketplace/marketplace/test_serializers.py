@@ -46,14 +46,9 @@ class ListingSerializerTests(SimpleTestCase):
             "status": "PUBLISHED",
         })
 
-        self.assertTrue(
-            serializer.is_valid(),
-            serializer.errors,
-        )
-        self.assertNotIn(
-            "status",
-            serializer.validated_data,
-        )
+        # LP-14: read-only fields are rejected, not silently dropped.
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("status", serializer.errors)
 
 class ListingDisplayTests(SimpleTestCase):
     

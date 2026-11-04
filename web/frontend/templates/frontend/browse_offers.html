@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Available food — LastPlate{% endblock %}
+
+{% block content %}
+<section class="browse">
+  <h1>Available food</h1>
+  <p class="muted">
+    Surplus food from approved local shops. Pickup times are in Lebanon time,
+    and you pay the shop when you collect.
+  </p>
+
+  {% if unavailable %}
+    <p class="notice notice--warning" role="alert">{{ unavailable }}</p>
+  {% elif not offers %}
+    <p class="notice notice--info">
+      There's no food available right now. Check back later today.
+    </p>
+  {% else %}
+    <ul class="offer-grid" aria-label="Food offers">
+      {% for offer in offers %}
+        <li class="offer-card">
+          {% if offer.photo_url %}
+            <img class="offer-card__photo" src="{{ offer.photo_url }}" alt="Photo of {{ offer.title }}">
+          {% else %}
+            <div class="offer-card__photo offer-card__photo--empty" role="img" aria-label="No photo available">
+              No photo
+            </div>
+          {% endif %}
+
+          <div class="offer-card__body">
+            <h2 class="offer-card__title">
+              <a href="{% url 'offer-detail' offer.id %}">{{ offer.title }}</a>
+            </h2>
+            <p class="muted">
+              {{ offer.shop.name }}{% if offer.shop.area %} · {{ offer.shop.area }}{% endif %}
+            </p>
+
+            <p class="price">
+              <span class="price__now">${{ offer.discounted_price }}</span>
+              {% if offer.original_price %}
+                <s class="price__was" aria-label="Original price ${{ offer.original_price }}">${{ offer.original_price }}</s>
+              {% endif %}
+            </p>
+
+            <dl class="offer-facts">
+              <dt>Pickup</dt>
+              <dd>{{ offer.pickup_window }}</dd>
+              <dt>Available</dt>
+              <dd>{{ offer.free_quantity }} left</dd>
+              <dt>Allergens</dt>
+              <dd>{{ offer.allergens }}</dd>
+            </dl>
+
+            <a class="button button--secondary button--block" href="{% url 'offer-detail' offer.id %}">
+              View details<span class="visually-hidden"> for {{ offer.title }}</span>
+            </a>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>
+{% endblock %}

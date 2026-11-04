@@ -149,6 +149,8 @@ DATABASES = {
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        # LP-14: also compare with display_name, the only name this model stores.
+        'OPTIONS': {'user_attributes': ('email', 'display_name', 'first_name', 'last_name')},
     },
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
