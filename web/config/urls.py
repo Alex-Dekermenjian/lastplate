@@ -7,10 +7,19 @@ https://docs.djangoproject.com/en/5.2/topics/http/urls/
 
 from django.urls import path
 
-from frontend import account_views, health, listing_views, views
+from frontend import account_views, browse_views, health, listing_views, views
 
 urlpatterns = [
     path("", views.home, name="home"),
+
+    # LP-13: Public food browsing (no sign-in).
+    path("offers/", browse_views.browse_offers, name="browse-offers"),
+    path(
+        "offers/<int:listing_id>/",
+        browse_views.offer_detail,
+        name="offer-detail",
+    ),
+
     path("register/", account_views.register, name="register"),
     path("sign-in/", account_views.sign_in, name="sign-in"),
     path("sign-out/", account_views.sign_out, name="sign-out"),

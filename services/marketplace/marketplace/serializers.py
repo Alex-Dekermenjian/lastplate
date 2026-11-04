@@ -136,8 +136,9 @@ class ShopSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-# LP-10 and LP-11: Food listings
-class ListingSerializer(serializers.ModelSerializer):
+# LP-11: How optional listing details are shown. Missing ingredient or
+# allergen information displays "Unknown".
+class ListingDisplayMixin(serializers.Serializer):
 
     ingredients_display = serializers.SerializerMethodField()
     allergens_display = serializers.SerializerMethodField()
@@ -163,6 +164,10 @@ class ListingSerializer(serializers.ModelSerializer):
         if obj.photo:
             return obj.photo.url
         return None
+
+
+# LP-10 and LP-11: Food listings (shop operator view)
+class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
 
     class Meta:
         model = Listing
@@ -240,6 +245,57 @@ class ListingSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
+
+# LP-13: Public marketplace. Only what customers need; never the operator's
+# user ID or sign-in email (the Shop model does not store the email at all).
+class PublicShopSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Shop
+        fields = ["name", "area", "public_contact"]
+        read_only_fields = fields
+
+
+class PublicListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
+    """
+    A browsable offer. The view passes the already-loaded shops in
+    context["shops"] ({shop_id: Shop}), so no query runs per listing.
+    """
+
+    shop = serializers.SerializerMethodField()
+
+    def get_shop(self, obj):
+        shop = self.context["shops"][obj.shop_id]
+        return PublicShopSerializer(shop).data
+
+    class Meta:
+        model = Listing
+        fields = [
+            "id",
+            "title",
+            "description",
+            "category",
+            "photo_display",
+            "ingredients_display",
+            "allergens_display",
+            "original_price",
+            "discounted_price",
+            "free_quantity",
+            "pickup_address",
+            "pickup_start",
+            "pickup_end",
+            "shop",
+        ]
+        read_only_fields = fields
+
+
+class PublicListingDetailSerializer(PublicListingSerializer):
+    """One offer, plus the terms revision a reservation must quote."""
+
+    class Meta(PublicListingSerializer.Meta):
+        fields = [*PublicListingSerializer.Meta.fields, "terms_revision"]
+        read_only_fields = fields
 
 
 # LP-12: Stock adjustment request and history

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}{% if offer %}{{ offer.title }}{% else %}Food offer{% endif %} — LastPlate{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'browse-offers' %}">← All available food</a></p>
+
+{% if unavailable %}
+  <section class="card card--wide">
+    <h1>Food offer</h1>
+    <p class="notice notice--warning" role="alert">{{ unavailable }}</p>
+  </section>
+
+{% elif not_found %}
+  <section class="card card--wide">
+    <h1>This offer isn't available</h1>
+    <p>It may have sold out, finished its pickup time, or been removed by the shop.</p>
+    <a class="button button--primary" href="{% url 'browse-offers' %}">See available food</a>
+  </section>
+
+{% else %}
+  <article class="card card--wide offer-detail">
+    {% if offer.photo_url %}
+      <img class="offer-detail__photo" src="{{ offer.photo_url }}" alt="Photo of {{ offer.title }}">
+    {% endif %}
+
+    <h1>{{ offer.title }}</h1>
+    {% if offer.category %}<p class="muted">{{ offer.category }}</p>{% endif %}
+    {% if offer.description %}<p>{{ offer.description|linebreaksbr }}</p>{% endif %}
+
+    <p class="price">
+      <span class="price__now">${{ offer.discounted_price }}</span>
+      {% if offer.original_price %}
+        <s class="price__was" aria-label="Original price ${{ offer.original_price }}">${{ offer.original_price }}</s>
+      {% endif %}
+      <span class="muted">each, paid at pickup</span>
+    </p>
+
+    <dl class="details">
+      <dt>Available</dt>
+      <dd>{{ offer.free_quantity }} left</dd>
+
+      <dt>Pickup time</dt>
+      <dd>{{ offer.pickup_window }} <span class="muted">(Lebanon time)</span></dd>
+
+      <dt>Pickup address</dt>
+      <dd>{{ offer.pickup_address|default:"Unknown" }}</dd>
+
+      <dt>Ingredients</dt>
+      <dd>{{ offer.ingredients }}</dd>
+
+      <dt>Allergens</dt>
+      <dd>{{ offer.allergens }}</dd>
+    </dl>
+
+    <h2>Shop</h2>
+    <dl class="details">
+      <dt>Name</dt>
+      <dd>{{ offer.shop.name }}</dd>
+
+      <dt>Area</dt>
+      <dd>{{ offer.shop.area|default:"Unknown" }}</dd>
+
+      <dt>Phone</dt>
+      <dd>
+        {% if offer.shop.public_contact %}
+          <a href="tel:{{ offer.shop.public_contact|cut:' ' }}">{{ offer.shop.public_contact }}</a>
+        {% else %}
+          Unknown
+        {% endif %}
+      </dd>
+    </dl>
+
+    <p class="muted">
+      Ingredient and allergen details come from the shop. Ask the shop if you
+      have a serious allergy.
+    </p>
+  </article>
+{% endif %}
+{% endblock %}

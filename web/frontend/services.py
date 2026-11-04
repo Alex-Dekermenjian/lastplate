@@ -317,3 +317,20 @@ def stock_history(access, listing_id):
         f"/api/listings/{listing_id}/stock-adjustments",
         token=access,
     )
+
+
+# LP-13: Public marketplace. No token is sent: these pages need no sign-in.
+def browse_listings():
+    return _call(
+        "marketplace",
+        "GET",
+        "/api/listings",
+    )
+
+
+def listing_offer(listing_id):
+    return _call(
+        "marketplace",
+        "GET",
+        f"/api/listings/{int(listing_id)}",
+    )
