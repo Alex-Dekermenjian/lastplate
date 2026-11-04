@@ -2,6 +2,8 @@
 
 from django.db import migrations, models
 
+from marketplace.migration_repairs import ensure_table_exists
+
 
 class Migration(migrations.Migration):
 
@@ -10,6 +12,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # Older databases may have 0001_initial recorded without this table.
+        ensure_table_exists("Shop"),
         migrations.AddField(
             model_name='shop',
             name='address',

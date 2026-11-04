@@ -7,6 +7,8 @@ Checks, in order:
    frontend reaches the three services over their health APIs.
 3. Each service's database role can connect to its own database and is
    refused by every other service's database.
+4. Marketplace's non-root user can write uploaded photos to their persistent
+   volume, and nowhere else in the application folder.
 
 The stack is left running. Stop it with
     docker compose --env-file compose.env down
@@ -134,6 +136,26 @@ def main():
                 expect(allowed, f"{role} can connect to its own database")
             else:
                 expect(not allowed, f"{role} is refused by lastplate_{target}")
+
+    print("== Photo storage")
+    probe = (
+        "import os, pathlib\n"
+        "media = pathlib.Path('/app/media')\n"
+        "print('volume' if os.stat(media).st_dev != os.stat('/app').st_dev else 'not-a-volume')\n"
+        "print('root' if os.getuid() == 0 else 'non-root')\n"
+        "test = media / '.smoke-check'\n"
+        "test.write_text('x'); test.unlink(); print('writable')\n"
+        "try:\n"
+        "    pathlib.Path('/app/.smoke-check').write_text('x'); print('app-writable')\n"
+        "except PermissionError:\n"
+        "    print('app-protected')\n"
+    )
+    result = compose("exec", "-T", "marketplace", "python", "-c", probe, capture=True, check=False)
+    seen = set(result.stdout.split())
+    expect("volume" in seen, "marketplace: /app/media is a mounted volume")
+    expect("non-root" in seen, "marketplace: runs as a non-root user")
+    expect("writable" in seen, "marketplace: runtime user can write photos")
+    expect("app-protected" in seen, "marketplace: rest of /app is read-only to that user")
 
     if failures:
         print(f"\n{len(failures)} check(s) failed.")

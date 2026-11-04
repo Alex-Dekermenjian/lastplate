@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}Offer not available — LastPlate{% endblock %}
+
+{% block content %}
+<section class="card card--wide">
+  <h1>This offer isn't available</h1>
+  <p>{{ message }}</p>
+  <a class="button button--primary" href="{% url 'workspace' %}">Back to your workspace</a>
+</section>
+{% endblock %}

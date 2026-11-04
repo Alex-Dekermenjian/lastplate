@@ -12,7 +12,8 @@
 <body>
   <header class="site-header">
     <a class="logo" href="{% url 'home' %}">LastPlate</a>
-    <nav class="site-nav" aria-label="Account">
+    <nav class="site-nav" aria-label="Main">
+      <a class="site-nav__link" href="{% url 'browse-offers' %}">Browse food</a>
       {% if request.session.account %}
         <a class="button button--secondary" href="{% url 'workspace' %}">Workspace</a>
         <form method="post" action="{% url 'sign-out' %}">

@@ -33,6 +33,66 @@ OPTIONAL_NUMBER_FIELDS = (
 
 MAX_PHOTO_SIZE = 5 * 1024 * 1024
 
+FIELD_LABELS = {
+    "title": "Food title",
+    "description": "Description",
+    "category": "Category",
+    "original_price": "Original price",
+    "discounted_price": "Discounted price",
+    "total_quantity": "Available quantity",
+    "pickup_address": "Pickup address",
+    "pickup_start": "Pickup starts",
+    "pickup_end": "Pickup ends",
+    "ingredients": "Ingredients",
+    "allergens": "Allergens",
+}
+
+
+def labelled_errors(errors):
+    """Marketplace field errors, keyed by the labels the form shows."""
+    if not isinstance(errors, dict):
+        return {}
+
+    return {
+        FIELD_LABELS.get(field, field.replace("_", " ").capitalize()): (
+            problems if isinstance(problems, list) else [str(problems)]
+        )
+        for field, problems in errors.items()
+    }
+
+
+def photo_refused(response):
+    """Why Marketplace refused a photo, for the message shown to the operator."""
+    problems = response.get("photo") if isinstance(response, dict) else None
+
+    if isinstance(problems, list) and problems:
+        return " ".join(str(problem) for problem in problems)
+
+    return "Please try a different JPEG or PNG."
+
+
+def not_found(request, message):
+    """A readable page when a listing can't be opened; never says whose it is."""
+    return render(
+        request,
+        "frontend/not_found.html",
+        {"message": message},
+        status=404,
+    )
+
+
+def shop_pickup_address(request):
+    """The shop's saved address, offered as a new offer's pickup address."""
+    try:
+        status, shop = authenticated_call(request, services.my_shop)
+    except ServiceUnavailable:
+        return ""
+
+    if status != 200 or not isinstance(shop, dict):
+        return ""
+
+    return shop.get("address") or ""
+
 
 @operator_required
 @require_http_methods(["GET", "POST"])
@@ -40,7 +100,11 @@ def create_listing(request):
     """Create a draft listing, then optionally upload its photo."""
 
     if request.method == "GET":
-        return render(request, "frontend/create_listing.html")
+        return render(
+            request,
+            "frontend/create_listing.html",
+            {"form_values": {"pickup_address": shop_pickup_address(request)}},
+        )
 
     listing_data = {
         field: request.POST.get(field, "").strip()
@@ -107,7 +171,7 @@ def create_listing(request):
             "frontend/create_listing.html",
             {
                 "error": "Please correct the listing details and try again.",
-                "field_errors": response,
+                "field_errors": labelled_errors(response),
                 "form_values": listing_data,
             },
             status=400,
@@ -155,8 +219,9 @@ def create_listing(request):
         if photo_status != 200:
             messages.warning(
                 request,
-                "Your draft was saved, but the photo was not uploaded. "
-                "You can add it later.",
+                "Your draft was saved, but the photo was not uploaded: "
+                f"{photo_refused(photo_response)} "
+                "Use Edit draft to try again.",
             )
             return redirect("workspace")
 
@@ -210,12 +275,13 @@ def edit_listing(request, listing_id):
     )
 
     if listing is None:
-        from django.http import Http404
-        raise Http404("Listing not found.")
+        return not_found(request, "We couldn't find this offer in your shop.")
 
     if listing.get("status") != "DRAFT":
-        from django.http import Http404
-        raise Http404("Only draft listings can be edited.")
+        return not_found(
+            request,
+            "Only drafts can be edited. This offer has already been published.",
+        )
 
     context = {
         "editing": True,
@@ -275,12 +341,11 @@ def edit_listing(request, listing_id):
 
     if update_status == 400:
         context["error"] = "Please correct the listing details."
-        context["field_errors"] = response
+        context["field_errors"] = labelled_errors(response)
         return render(request, template, context, status=400)
 
     if update_status == 404:
-        from django.http import Http404
-        raise Http404("Draft listing not found.")
+        return not_found(request, "We couldn't find this draft in your shop.")
 
     if update_status != 200:
         context["error"] = "We couldn't update your listing."
@@ -294,7 +359,7 @@ def edit_listing(request, listing_id):
     # Save the replacement photo separately.
     if photo:
         try:
-            photo_status, _ = authenticated_call(
+            photo_status, photo_response = authenticated_call(
                 request,
                 services.upload_listing_photo,
                 listing_id,
@@ -311,7 +376,8 @@ def edit_listing(request, listing_id):
         if photo_status != 200:
             messages.warning(
                 request,
-                "Your changes were saved, but the photo was not updated.",
+                "Your changes were saved, but the photo was not updated: "
+                f"{photo_refused(photo_response)}",
             )
             return redirect("workspace")
 
@@ -343,9 +409,18 @@ def publish_listing(request, listing_id):
             "Your food offer has been published successfully!",
         )
     elif status == 400:
+        problems = labelled_errors(
+            response.get("fields") if isinstance(response, dict) else None
+        )
+        details = "; ".join(
+            f"{label}: {' '.join(errors).rstrip('.')}"
+            for label, errors in problems.items()
+        )
         messages.error(
             request,
-            "This listing isn't ready to publish. "
+            f"This offer isn't ready to publish. {details}"
+            if details
+            else "This offer isn't ready to publish. "
             "Please check its required details and pickup window.",
         )
     elif status == 403:
