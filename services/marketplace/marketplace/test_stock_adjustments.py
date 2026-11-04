@@ -533,7 +533,7 @@ class FreeQuantityTests(StockAdjustmentTestCase):
         self.authenticate(10)
 
         self.client.patch(
-            reverse("edit_listing", kwargs={"pk": draft.pk}),
+            reverse("listing_detail", kwargs={"pk": draft.pk}),
             {"free_quantity": 99},
             format="json",
         )

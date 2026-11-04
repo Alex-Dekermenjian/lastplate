@@ -13,7 +13,7 @@ class CreateListingAPITests(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        self.url = reverse("create_listing")
+        self.url = reverse("listings")
         self.payload = {
             "title": "Croissant Box",
             "description": "Fresh pastries",
@@ -113,7 +113,7 @@ class EditListingAPITests(TestCase):
         )
 
         self.url = reverse(
-            "edit_listing",
+            "listing_detail",
             kwargs={"pk": self.listing.pk},
         )
 

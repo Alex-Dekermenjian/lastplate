@@ -266,6 +266,21 @@ Separate cancellation examples starting from T=10, R=2, C=0:
 
 Collection never deducts stock twice.
 
+### Public marketplace rules (implemented in LP-13)
+
+`GET /api/listings` and `GET /api/listings/{id}` need no sign-in and ignore any token sent. An offer is shown only when all of these hold:
+
+- the listing is PUBLISHED (drafts and withdrawn offers are hidden);
+- its shop is APPROVED (a shop rejected later hides its offers straight away);
+- `pickup_end` is in the future (hidden from the exact end time);
+- `stock.free_quantity()` is above 0. It is not recalculated elsewhere, so reserved units will hide an offer once Sprint 2 fills in `committed_quantity()`.
+
+Hidden offers return 404 `{"code": "not_found", "detail": ...}` and are not told apart, so a visitor cannot learn whether a hidden offer is a draft, from a rejected shop, or sold out.
+
+Responses include prices, `free_quantity`, the pickup address and window, the photo path, ingredients/allergens (`Unknown` when missing) and the shop's `name`, `area` and `public_contact`. The detail also includes `terms_revision`. They never include `operator_user_id`, the operator's email, `total_quantity` or the listing status. Shops are loaded in one query per request (two queries in total, however many offers).
+
+The web pages at `/offers/` and `/offers/{id}/` show times in Asia/Beirut and show a friendly message when Marketplace cannot be reached.
+
 ## 10. Transactions, permissions and time
 
 Use database constraints for unique references, case-insensitive email uniqueness, request-key uniqueness and valid local field values.
