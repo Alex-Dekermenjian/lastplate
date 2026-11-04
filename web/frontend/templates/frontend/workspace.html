@@ -1,38 +1,227 @@
+
 {% extends "base.html" %}
 
 {% block title %}Shop workspace — LastPlate{% endblock %}
 
 {% block content %}
+
 <section class="card card--wide">
-  <p class="muted">Signed in as {{ request.session.account.display_name }}</p>
+  <p class="muted">
+    Signed in as {{ request.session.account.display_name }}
+  </p>
+
   {% if unavailable %}
     <h1>Your shop</h1>
-    <p class="notice notice--warning" role="alert">We can't reach the shop service right now, so your shop's status can't be shown. Please refresh in a few minutes.</p>
+    <p class="notice notice--warning" role="alert">
+      We can't reach the shop service right now, so your shop's status can't be shown.
+      Please refresh in a few minutes.
+    </p>
   {% else %}
     <h1>{{ shop.name }}</h1>
+
     <dl class="details">
       <dt>Status</dt>
-      <dd><span class="status status--{{ shop.approval_status }}">{{ status_label }}</span></dd>
+      <dd>
+        <span class="status status--{{ shop.approval_status }}">
+          {{ status_label }}
+        </span>
+      </dd>
     </dl>
+
     <p>{{ status_explanation }}</p>
+
     {% if shop.approval_status == "REJECTED" %}
       <div class="notice notice--error">
         <strong>Reason given:</strong>
-        {% if shop.rejection_reason %}{{ shop.rejection_reason|linebreaksbr }}{% else %}No reason has been recorded yet.{% endif %}
+        {% if shop.rejection_reason %}
+          {{ shop.rejection_reason|linebreaksbr }}
+        {% else %}
+          No reason has been recorded yet.
+        {% endif %}
       </div>
     {% endif %}
 
     <h2>Shop profile</h2>
+
     {% if not shop.profile_complete %}
-      <p class="notice notice--warning">Complete your pickup address, area and shop phone number. Shops need a complete profile before they can publish offers.</p>
+      <p class="notice notice--warning">
+        Complete your pickup address, area and shop phone number.
+        Shops need a complete profile before publishing offers.
+      </p>
     {% endif %}
+
     <dl class="details">
-      <dt>Pickup address</dt><dd>{{ shop.address|default:"Not set" }}</dd>
-      <dt>Area</dt><dd>{{ shop.area|default:"Not set" }}</dd>
-      <dt>Shop phone</dt><dd>{{ shop.public_contact|default:"Not set" }}</dd>
+      <dt>Pickup address</dt>
+      <dd>{{ shop.address|default:"Not set" }}</dd>
+
+      <dt>Area</dt>
+      <dd>{{ shop.area|default:"Not set" }}</dd>
+
+      <dt>Shop phone</dt>
+      <dd>{{ shop.public_contact|default:"Not set" }}</dd>
     </dl>
-    <a class="button button--primary" href="{% url 'shop-profile' %}">Edit shop profile</a>
-    <p class="muted" style="margin-top: 16px;">Approval is a manual onboarding check; it does not certify food safety or business legality.</p>
+
+    <a class="button button--primary"
+       href="{% url 'shop-profile' %}">
+      Edit shop profile
+    </a>
+
+    <p class="muted" style="margin-top: 16px;">
+      Approval is a manual onboarding check;
+      it does not certify food safety or business legality.
+    </p>
   {% endif %}
 </section>
+
+
+{% if not unavailable %}
+<section class="card card--wide" style="margin-top: 24px;">
+
+  <h2>Your food offers</h2>
+
+  <p>
+    <a class="button button--primary"
+       href="{% url 'create-listing' %}">
+      Create food offer
+    </a>
+  </p>
+
+  {% if listings_unavailable %}
+    <p class="notice notice--warning" role="alert">
+      We couldn't load your food offers right now.
+      Please try again later.
+    </p>
+
+  {% elif not listings %}
+    <p class="muted">
+      You haven't created any food offers yet.
+    </p>
+
+  {% else %}
+    <div style="
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+    ">
+
+      {% for listing in listings %}
+        <article style="
+          border: 1px solid #ddd;
+          border-radius: 12px;
+          overflow: hidden;
+          background: white;
+        ">
+
+          {% if listing.photo_display %}
+            <img
+              src="{{ listing.photo_display }}"
+              alt="Photo of {{ listing.title|default:'food offer' }}"
+              style="
+                width: 100%;
+                height: 180px;
+                object-fit: cover;
+                display: block;
+              "
+            >
+          {% else %}
+            <div
+              role="img"
+              aria-label="No food photo available"
+              style="
+                height: 180px;
+                background: #f1f1f1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #777;
+                text-align: center;
+                padding: 16px;
+              "
+            >
+              No photo available
+            </div>
+          {% endif %}
+
+          <div style="padding: 16px;">
+
+            <h3>{{ listing.title|default:"Untitled offer" }}</h3>
+
+            <p class="muted">
+              Status: {{ listing.status }}
+            </p>
+
+            {% if listing.description %}
+              <p>{{ listing.description }}</p>
+            {% endif %}
+
+            <p>
+              <strong>Original price:</strong>
+              {% if listing.original_price %}
+                ${{ listing.original_price }}
+              {% else %}
+                Not set
+              {% endif %}
+            </p>
+
+            <p>
+              <strong>Discounted price:</strong>
+              {% if listing.discounted_price %}
+                ${{ listing.discounted_price }}
+              {% else %}
+                Not set
+              {% endif %}
+            </p>
+
+            <p>
+              <strong>Ingredients:</strong>
+              {{ listing.ingredients_display|default:"Unknown" }}
+            </p>
+
+            <p>
+              <strong>Allergens:</strong>
+              {{ listing.allergens_display|default:"Unknown" }}
+            </p>
+
+            <p>
+              <strong>Available quantity:</strong>
+              {{ listing.total_quantity }}
+            </p>
+
+            {% if listing.status == "DRAFT" %}
+  <div style="margin-top: 16px;">
+    <a class="button button--secondary"
+       href="{% url 'edit-listing' listing.id %}">
+      Edit draft
+    </a>
+
+    {% if shop.approval_status == "APPROVED" and shop.profile_complete %}
+      <form
+        method="post"
+        action="{% url 'publish-listing' listing.id %}"
+        style="margin-top: 12px;"
+      >
+        {% csrf_token %}
+        <button class="button button--primary" type="submit">
+          Publish offer
+        </button>
+      </form>
+    {% else %}
+      <p class="muted">
+        Publishing requires an approved shop and a complete profile.
+      </p>
+    {% endif %}
+  </div>
+{% endif %}
+
+          </div>
+        </article>
+      {% endfor %}
+
+    </div>
+  {% endif %}
+
+</section>
+{% endif %}
+
 {% endblock %}

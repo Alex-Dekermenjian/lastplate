@@ -12,6 +12,7 @@ from django.views.decorators.debug import sensitive_post_parameters, sensitive_v
 from django.views.decorators.http import require_POST
 
 from . import services, tokens
+from .listing_photos import photo_url
 from .forms import RegistrationForm, ShopProfileForm, ShopSetupForm, SignInForm
 from .services import ServiceUnavailable
 
@@ -210,19 +211,66 @@ def sign_out(request):
 
 
 @operator_required
+
 def workspace(request):
     try:
-        status, shop = authenticated_call(request, services.my_shop)
+        status, shop = authenticated_call(
+            request,
+            services.my_shop,
+        )
     except ServiceUnavailable:
         status, shop = None, None
+
     if status == 404:
         return redirect("finish-setup")
+
     if status != 200:
-        return render(request, "frontend/workspace.html", {"unavailable": True})
-    label, explanation = STATUS_EXPLANATIONS.get(shop["approval_status"], (shop["approval_status"], ""))
-    return render(request, "frontend/workspace.html", {
-        "shop": shop, "status_label": label, "status_explanation": explanation,
-    })
+        return render(
+            request,
+            "frontend/workspace.html",
+            {"unavailable": True},
+        )
+
+    label, explanation = STATUS_EXPLANATIONS.get(
+        shop["approval_status"],
+        (shop["approval_status"], ""),
+    )
+
+    # LP-10 and LP-11: Load this operator's listings.
+    try:
+        listings_status, listings = authenticated_call(
+            request,
+            services.my_listings,
+        )
+    except ServiceUnavailable:
+        listings_status, listings = None, None
+
+    listings_unavailable = listings_status != 200
+
+    if listings_unavailable:
+        listings = []
+    else:
+    # Convert Marketplace media paths into browser-accessible URLs.
+        listings = [
+            {
+                **listing,
+                "photo_display": photo_url(listing.get("photo_display")),
+            }
+            for listing in listings
+        ]
+
+    return render(
+        request,
+        "frontend/workspace.html",
+        {
+            "shop": shop,
+            "status_label": label,
+            "status_explanation": explanation,
+            "listings": listings,
+            "listings_unavailable": listings_unavailable,
+        },
+    )
+
 
 
 PROFILE_UNAVAILABLE = "We can't reach the shop service right now, so your changes were not saved. Please try again in a few minutes."

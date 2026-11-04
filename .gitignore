@@ -226,8 +226,14 @@ __marimo__/
 staticfiles/
 media/
 
+
 # Private Docker Compose settings created by scripts/init_dev_env.py
 /compose.env
+
+# Local uploaded Marketplace photos
+/services/marketplace/media/
+
 # Local JWT signing keys created by scripts/init_dev_env.py
 /.keys/
 *.pem
+
