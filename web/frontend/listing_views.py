@@ -8,6 +8,7 @@ from django.views.decorators.http import require_http_methods
 from . import services
 from .account_views import authenticated_call, operator_required
 from .services import ServiceUnavailable
+from .listing_photos import photo_url
 
 
 LISTING_FIELDS = (
@@ -218,7 +219,10 @@ def edit_listing(request, listing_id):
 
     context = {
         "editing": True,
-        "listing": listing,
+        "listing": {
+            **listing,
+            "photo_display": photo_url(listing.get("photo_display")),
+        },
         "listing_id": listing_id,
         "form_values": listing,
     }
@@ -312,4 +316,53 @@ def edit_listing(request, listing_id):
             return redirect("workspace")
 
     messages.success(request, "Your draft listing was updated.")
+    return redirect("workspace")
+
+@operator_required
+@require_http_methods(["POST"])
+def publish_listing(request, listing_id):
+    """Publish a draft through the Marketplace API."""
+
+    try:
+        status, response = authenticated_call(
+            request,
+            services.publish_listing,
+            listing_id,
+        )
+    except ServiceUnavailable:
+        messages.warning(
+            request,
+            "We couldn't confirm whether the offer was published. "
+            "Check its status before trying again.",
+        )
+        return redirect("workspace")
+
+    if status == 200:
+        messages.success(
+            request,
+            "Your food offer has been published successfully!",
+        )
+    elif status == 400:
+        messages.error(
+            request,
+            "This listing isn't ready to publish. "
+            "Please check its required details and pickup window.",
+        )
+    elif status == 403:
+        messages.error(
+            request,
+            "Your shop must be approved and have a complete profile "
+            "before publishing.",
+        )
+    elif status == 404:
+        messages.error(
+            request,
+            "The draft listing could not be found.",
+        )
+    else:
+        messages.error(
+            request,
+            "Publishing was unsuccessful. Please try again.",
+        )
+
     return redirect("workspace")

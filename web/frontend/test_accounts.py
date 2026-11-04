@@ -226,15 +226,39 @@ class ProtectedPageTests(WebAuthTestCase):
         for url in (reverse("sign-in"), reverse("register")):
             self.assertIn("no-store", self.client.get(url)["Cache-Control"])
 
+    
     def test_expired_access_token_is_renewed_once(self):
         self.sign_in_session(access="old-access")
-        with patch_service("my_shop", side_effect=[(401, {}), (200, SHOP)]) as my_shop, \
-                patch_service("refresh", return_value=(200, {"access": "new-access"})) as refresh:
+
+        with patch_service(
+            "my_shop",
+            side_effect=[(401, {}), (200, SHOP)],
+        ) as my_shop, patch_service(
+            "my_listings",
+            return_value=(200, []),
+        ) as my_listings, patch_service(
+            "refresh",
+            return_value=(200, {"access": "new-access"}),
+        ) as refresh:
+
             response = self.client.get(reverse("workspace"))
+
         self.assertContains(response, "Pending review")
+
+        # The expired token should be refreshed only once.
         refresh.assert_called_once_with("refresh-token-1")
-        self.assertEqual(my_shop.call_args_list[-1].args, ("new-access",))
-        self.assertEqual(self.client.session[tokens.ACCESS_TOKEN_KEY], "new-access")
+
+        # Both API calls should use the refreshed access token.
+        self.assertEqual(
+            my_shop.call_args_list[-1].args,
+            ("new-access",),
+        )
+        my_listings.assert_called_once_with("new-access")
+
+        self.assertEqual(
+            self.client.session[tokens.ACCESS_TOKEN_KEY],
+            "new-access",
+        )
 
     def test_rejected_refresh_token_ends_the_session(self):
         key = self.sign_in_session()

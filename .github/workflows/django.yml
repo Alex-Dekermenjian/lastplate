@@ -23,7 +23,7 @@ jobs:
             static: true
           - service: marketplace
             path: services/marketplace
-            static: false
+            static: true
           - service: reservations
             path: services/reservations
             static: false

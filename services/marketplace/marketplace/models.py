@@ -1,4 +1,5 @@
 
+from django.conf import settings
 from django.db import models
 from django.db.models import Q
 
@@ -6,13 +7,16 @@ from .image_validators import validate_listing_photo
 from .upload_paths import listing_photo_upload_path
 
 
-# LP-7 and LP-8: Shop model
+# LP-7, LP-8 and LP-9: Shop model
 class Shop(models.Model):
     """
     A shop operated by a user from the Accounts service.
 
     operator_user_id refers to the Accounts user ID.
     No cross-service ForeignKey is used.
+
+    Shop profile fields are managed by the operator.
+    Approval and review records are managed by authorized team admins.
     """
 
     class ApprovalStatus(models.TextChoices):
@@ -32,7 +36,7 @@ class Shop(models.Model):
     area = models.CharField(max_length=100, blank=True)
     public_contact = models.CharField(max_length=150, blank=True)
 
-    # Shop approval information
+    # LP-9: Shop approval
     approval_status = models.CharField(
         max_length=10,
         choices=ApprovalStatus.choices,
@@ -40,10 +44,26 @@ class Shop(models.Model):
     )
     rejection_reason = models.TextField(blank=True)
 
+    # LP-9: Record who reviewed the shop and when.
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
+    )
+    reviewed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        permissions = [
+            ("review_shop", "Can approve or reject shops"),
+        ]
         constraints = [
             models.CheckConstraint(
                 condition=Q(

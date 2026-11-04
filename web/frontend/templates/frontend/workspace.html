@@ -189,13 +189,30 @@
             </p>
 
             {% if listing.status == "DRAFT" %}
-              <p style="margin-top: 16px;">
-                <a class="button button--secondary"
-                   href="{% url 'edit-listing' listing.id %}">
-                  Edit draft
-                </a>
-              </p>
-            {% endif %}
+  <div style="margin-top: 16px;">
+    <a class="button button--secondary"
+       href="{% url 'edit-listing' listing.id %}">
+      Edit draft
+    </a>
+
+    {% if shop.approval_status == "APPROVED" and shop.profile_complete %}
+      <form
+        method="post"
+        action="{% url 'publish-listing' listing.id %}"
+        style="margin-top: 12px;"
+      >
+        {% csrf_token %}
+        <button class="button button--primary" type="submit">
+          Publish offer
+        </button>
+      </form>
+    {% else %}
+      <p class="muted">
+        Publishing requires an approved shop and a complete profile.
+      </p>
+    {% endif %}
+  </div>
+{% endif %}
 
           </div>
         </article>

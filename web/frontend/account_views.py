@@ -12,6 +12,7 @@ from django.views.decorators.debug import sensitive_post_parameters, sensitive_v
 from django.views.decorators.http import require_POST
 
 from . import services, tokens
+from .listing_photos import photo_url
 from .forms import RegistrationForm, ShopProfileForm, ShopSetupForm, SignInForm
 from .services import ServiceUnavailable
 
@@ -248,6 +249,15 @@ def workspace(request):
 
     if listings_unavailable:
         listings = []
+    else:
+    # Convert Marketplace media paths into browser-accessible URLs.
+        listings = [
+            {
+                **listing,
+                "photo_display": photo_url(listing.get("photo_display")),
+            }
+            for listing in listings
+        ]
 
     return render(
         request,

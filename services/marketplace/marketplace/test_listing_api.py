@@ -296,6 +296,45 @@ class PublishListingAPITests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.listing.refresh_from_db()
         self.assertEqual(self.listing.status, Listing.Status.DRAFT)
+    
+    def test_approved_shop_can_publish_complete_listing(self):
+        # LP-9: Shop must be approved.
+        self.shop.approval_status = Shop.ApprovalStatus.APPROVED
+
+        # LP-8: Shop profile must be complete.
+        self.shop.address = "12 Bliss Street, Beirut"
+        self.shop.area = "Hamra"
+        self.shop.public_contact = "+961 1 234 567"
+        self.shop.save()
+
+        # LP-10: Listing must contain the required publication details.
+        from datetime import timedelta
+        from django.utils import timezone
+
+        start = timezone.now() + timedelta(days=1)
+        end = start + timedelta(hours=2)
+
+        self.listing.title = "Croissant Box"
+        self.listing.description = "Fresh pastries"
+        self.listing.category = "Bakery"
+        self.listing.original_price = "10.00"
+        self.listing.discounted_price = "5.00"
+        self.listing.total_quantity = 5
+        self.listing.pickup_address = "12 Bliss Street, Beirut"
+        self.listing.pickup_start = start
+        self.listing.pickup_end = end
+        self.listing.save()
+
+        self.authenticate(10)
+
+        response = self.client.post(self.url, {}, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.listing.refresh_from_db()
+        self.assertEqual(
+            self.listing.status,
+            Listing.Status.PUBLISHED,
+        )
 
 class MyListingsAPITests(TestCase):
 

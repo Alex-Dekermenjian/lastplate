@@ -270,10 +270,32 @@ def publish_listing(request, pk):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    # Keep successful publication disabled until LP-9 is integrated.
+    # LP-9 is integrated: publish using trusted shop approval
+    # and profile information from the database.
+    try:
+        published = publish_listing_service(
+        listing_id=pk,
+        shop_id=shop.id,
+        shop_approved=shop_approved,
+        profile_complete=profile_complete,
+    )
+    except Listing.DoesNotExist:
+        return Response(
+        {"detail": "Listing not found."},
+        status=status.HTTP_404_NOT_FOUND,
+    )
+    except DjangoValidationError as exc:
+        return Response(
+            {"detail": exc.messages if hasattr(exc, "messages") else str(exc)},
+            status=status.HTTP_400_BAD_REQUEST,
+    )
+
     return Response(
-        {"detail": "Publishing is unavailable until LP-9 is integrated."},
-        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        ListingSerializer(
+            published,
+            context={"request": request},
+        ).data,
+        status=status.HTTP_200_OK,
     )
 
 # --------------------------------------------------

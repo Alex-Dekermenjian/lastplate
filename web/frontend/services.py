@@ -280,3 +280,14 @@ def edit_listing(access, listing_id, listing_data):
         listing_data,
         token=access,
     )
+
+# LP-9 and LP-10: Publish an approved shop's draft listing.
+@sensitive_variables("access")
+def publish_listing(access, listing_id):
+    return _call(
+        "marketplace",
+        "POST",
+        f"/api/listings/{listing_id}/publish",
+        {},
+        token=access,
+    )

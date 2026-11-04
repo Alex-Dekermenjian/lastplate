@@ -106,9 +106,9 @@ Changes from `docs/database-design.md`:
   PyJWT directly.
   - It accepts RS256 only, requires `exp`, `token_type == "access"` and a
     numeric `user_id`.
-  - SimpleJWT's `JWTStatelessUserAuthentication` was not used because it
-    imports Django's auth models, which would add unused user tables to
-    Marketplace.
+  - Shop operators have no accounts in Marketplace. Its Django auth tables
+    (added by LP-9) hold only local team admins, so token callers never map to
+    a local user.
   - Compose mounts only `jwt-public.pem` into Marketplace.
   - Endpoints: `POST /api/shops/` and `GET /api/shops/me/`, shop operators
     only. The owner comes from the token and the status is always PENDING.
@@ -135,8 +135,10 @@ Changes from `docs/database-design.md`:
   checked on every request, which is deliberately not built.
 - Every service still checks role and ownership itself. Example: Marketplace
   checks that the listing's shop has `operator_user_id == token.user_id`.
-- Shop approval is an `is_staff`-only Marketplace endpoint. Each service may
-  keep its own Django admin with a local superuser for debugging.
+- **Shop approval (implemented, LP-9)** happens in Marketplace's own Django
+  admin, by a local team-admin account with the `marketplace.review_shop`
+  permission. There is no approval API, and the token's `is_staff` claim grants
+  nothing here. Rules: `docs/database-design.md`.
 
 ### Token storage in the web frontend (corrected)
 
