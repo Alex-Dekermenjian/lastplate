@@ -296,3 +296,79 @@ class PublishListingAPITests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.listing.refresh_from_db()
         self.assertEqual(self.listing.status, Listing.Status.DRAFT)
+
+class MyListingsAPITests(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.url = reverse("my_listings")
+
+        self.shop = Shop.objects.create(
+            operator_user_id=10,
+            name="Cedar Bakery",
+        )
+        self.other_shop = Shop.objects.create(
+            operator_user_id=20,
+            name="Other Bakery",
+        )
+
+        self.own_listing = Listing.objects.create(
+            shop_id=self.shop.id,
+            title="Croissant Box",
+        )
+        self.other_listing = Listing.objects.create(
+            shop_id=self.other_shop.id,
+            title="Pizza Box",
+        )
+
+    def authenticate(self, user_id, role="SHOP_OPERATOR"):
+        self.client.force_authenticate(
+            user=TokenUser(
+                id=user_id,
+                role=role,
+                is_staff=False,
+            )
+        )
+
+    def test_operator_sees_only_own_listings(self):
+        self.authenticate(10)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(
+            response.data[0]["title"],
+            "Croissant Box",
+        )
+
+    def test_other_operator_sees_only_their_listings(self):
+        self.authenticate(20)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(
+            response.data[0]["title"],
+            "Pizza Box",
+        )
+
+    def test_customer_cannot_view_private_listings(self):
+        self.authenticate(30, role="CUSTOMER")
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_unauthenticated_user_cannot_view_listings(self):
+        response = self.client.get(self.url)
+
+        self.assertIn(response.status_code, [401, 403])
+
+    def test_operator_without_shop_gets_404(self):
+        self.authenticate(40)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 404)

@@ -338,3 +338,35 @@ def upload_listing_photo(request, pk):
         ).data,
         status=status.HTTP_200_OK,
     )
+
+# LP-10 and LP-11: Retrieve the authenticated operator's listings
+@api_view(["GET"])
+@permission_classes([IsAuthenticated, IsShopOperator])
+def my_listings(request):
+    # Identify the shop using the verified JWT identity.
+    shop = Shop.objects.filter(
+        operator_user_id=request.user.id
+    ).first()
+
+    if shop is None:
+        return Response(
+            {"detail": "You have no shop."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Never accept a shop ID from the browser.
+    # Return drafts and published listings owned by this shop only.
+    listings = Listing.objects.filter(
+        shop_id=shop.id
+    ).order_by("-created_at")
+
+    serializer = ListingSerializer(
+        listings,
+        many=True,
+        context={"request": request},
+    )
+
+    return Response(
+        serializer.data,
+        status=status.HTTP_200_OK,
+    )

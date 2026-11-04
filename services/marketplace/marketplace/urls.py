@@ -3,10 +3,8 @@ from django.urls import path
 
 from . import views
 
-
-
 urlpatterns = [
-    # LP-7: Shop endpoints
+    # LP-7 and LP-8: Shop endpoints
     path(
         "shops/",
         views.ShopCreateView.as_view(),
@@ -25,6 +23,11 @@ urlpatterns = [
         name="create_listing",
     ),
     path(
+        "listings/mine",
+        views.my_listings,
+        name="my_listings",
+    ),
+    path(
         "listings/<int:pk>",
         views.edit_listing,
         name="edit_listing",
@@ -34,11 +37,11 @@ urlpatterns = [
         views.publish_listing,
         name="publish_listing",
     ),
-    
+
+    # LP-11: Photo uploads
     path(
         "listings/<int:pk>/photo",
         views.upload_listing_photo,
         name="upload_listing_photo",
     ),
-
 ]

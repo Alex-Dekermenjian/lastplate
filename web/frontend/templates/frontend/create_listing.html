@@ -1,0 +1,164 @@
+
+{% extends "base.html" %}
+
+{% block title %}
+  {% if editing %}Edit food offer{% else %}Create food offer{% endif %} — LastPlate
+{% endblock %}
+
+{% block content %}
+<section class="card card--wide">
+
+  <p class="muted">
+    <a href="{% url 'workspace' %}">Shop workspace</a> /
+    {% if editing %}Edit food offer{% else %}New food offer{% endif %}
+  </p>
+
+  <h1>
+    {% if editing %}Edit your food offer{% else %}Create a food offer{% endif %}
+  </h1>
+
+  <p class="muted">
+    Your food offer will remain a draft until it is published.
+  </p>
+
+  {% if error %}
+    <p class="notice notice--warning" role="alert">{{ error }}</p>
+  {% endif %}
+
+  {% if field_errors %}
+    <div class="notice notice--warning" role="alert">
+      <p>Please check the following errors:</p>
+      <ul>
+        {% for field, errors in field_errors.items %}
+          <li>
+            <strong>{{ field }}:</strong>
+            {{ errors|join:", " }}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <h2>Food details</h2>
+
+    <p>
+      <label for="title">Food title</label>
+      <input id="title" name="title" type="text"
+             maxlength="150" required
+             value="{{ form_values.title|default_if_none:'' }}"
+             placeholder="e.g. Surprise Pastry Box">
+    </p>
+
+    <p>
+      <label for="description">Description</label>
+      <textarea id="description" name="description" rows="4"
+                placeholder="Describe the food.">{{ form_values.description|default_if_none:'' }}</textarea>
+    </p>
+
+    <p>
+      <label for="category">Category</label>
+      <input id="category" name="category" type="text"
+             value="{{ form_values.category|default_if_none:'' }}"
+             placeholder="e.g. Bakery">
+    </p>
+
+    <h2>Pricing and availability</h2>
+
+    <p>
+      <label for="original_price">Original price</label>
+      <input id="original_price" name="original_price"
+             type="number" min="0" step="0.01"
+             value="{{ form_values.original_price|default_if_none:'' }}"
+             placeholder="10.00">
+    </p>
+
+    <p>
+      <label for="discounted_price">Discounted price</label>
+      <input id="discounted_price" name="discounted_price"
+             type="number" min="0" step="0.01"
+             value="{{ form_values.discounted_price|default_if_none:'' }}"
+             placeholder="5.00">
+    </p>
+
+    <p>
+      <label for="total_quantity">Available quantity</label>
+      <input id="total_quantity" name="total_quantity"
+             type="number" min="0" step="1"
+             value="{{ form_values.total_quantity|default_if_none:'' }}"
+             placeholder="5">
+    </p>
+
+    <h2>Pickup information</h2>
+
+    <p>
+      <label for="pickup_address">Pickup address</label>
+      <input id="pickup_address" name="pickup_address"
+             type="text" maxlength="255"
+             value="{{ form_values.pickup_address|default_if_none:'' }}"
+             placeholder="e.g. 12 Bliss Street, Beirut">
+    </p>
+
+    <p>
+      <label for="pickup_start">Pickup starts</label>
+      <input id="pickup_start" name="pickup_start"
+             type="datetime-local"
+             value="{{ form_values.pickup_start|default_if_none:''|slice:':16' }}">
+    </p>
+
+    <p>
+      <label for="pickup_end">Pickup ends</label>
+      <input id="pickup_end" name="pickup_end"
+             type="datetime-local"
+             value="{{ form_values.pickup_end|default_if_none:''|slice:':16' }}">
+    </p>
+
+    <h2>Food safety information</h2>
+
+    <p>
+      <label for="ingredients">Ingredients (optional)</label>
+      <textarea id="ingredients" name="ingredients" rows="3">{{ form_values.ingredients|default_if_none:'' }}</textarea>
+    </p>
+
+    <p>
+      <label for="allergens">Allergens (optional)</label>
+      <textarea id="allergens" name="allergens" rows="3">{{ form_values.allergens|default_if_none:'' }}</textarea>
+    </p>
+
+    <p class="muted">
+      Missing ingredient or allergen information is displayed as "Unknown".
+    </p>
+
+    <h2>Food photo</h2>
+
+    {% if editing and listing.photo_display %}
+      <p>Current photo:</p>
+      <img src="{{ listing.photo_display }}"
+           alt="Current photo of {{ listing.title }}"
+           style="max-width: 240px; border-radius: 12px;">
+    {% endif %}
+
+    <p>
+      <label for="photo">
+        {% if editing %}Replace photo (optional){% else %}Upload photo (optional){% endif %}
+      </label>
+      <input id="photo" name="photo"
+             type="file" accept="image/jpeg,image/png">
+    </p>
+
+    <p class="muted">JPEG or PNG, maximum 5 MB.</p>
+
+    <button class="button button--primary" type="submit">
+      {% if editing %}Save changes{% else %}Save draft{% endif %}
+    </button>
+
+    <a class="button button--secondary" href="{% url 'workspace' %}">
+      Cancel
+    </a>
+
+  </form>
+
+</section>
+{% endblock %}
