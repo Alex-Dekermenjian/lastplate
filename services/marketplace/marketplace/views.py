@@ -22,7 +22,10 @@ from .serializers import (
     ShopCreateSerializer,
     ShopProfileSerializer,
     ShopSerializer,
+    StockAdjustmentRequestSerializer,
+    StockAdjustmentSerializer,
 )
+from .stock_service import StockAdjustmentError, adjust_stock
 
 
 # --------------------------------------------------
@@ -391,4 +394,81 @@ def my_listings(request):
     return Response(
         serializer.data,
         status=status.HTTP_200_OK,
+    )
+
+
+# --------------------------------------------------
+# LP-12: Stock adjustments and their history
+# --------------------------------------------------
+
+def _error(code, detail, http_status, **extra):
+    return Response(
+        {"code": code, "detail": detail, **extra},
+        status=http_status,
+    )
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated, IsShopOperator])
+def listing_stock_adjustments(request, pk):
+    # Ownership comes only from the verified JWT.
+    shop = Shop.objects.filter(
+        operator_user_id=request.user.id
+    ).first()
+
+    if shop is None:
+        return _error(
+            "no_shop",
+            "You have no shop.",
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    if request.method == "GET":
+        listing = Listing.objects.filter(pk=pk, shop_id=shop.id).first()
+
+        if listing is None:
+            return _error(
+                "not_owner",
+                "You do not own this listing.",
+                status.HTTP_403_FORBIDDEN,
+            )
+
+        return Response(
+            StockAdjustmentSerializer(
+                listing.stock_adjustments.all(),
+                many=True,
+            ).data,
+            status=status.HTTP_200_OK,
+        )
+
+    serializer = StockAdjustmentRequestSerializer(data=request.data)
+
+    if not serializer.is_valid():
+        return _error(
+            "invalid",
+            "Check the quantity change and reason.",
+            status.HTTP_400_BAD_REQUEST,
+            fields=serializer.errors,
+        )
+
+    try:
+        listing, adjustment = adjust_stock(
+            listing_id=pk,
+            shop_id=shop.id,
+            quantity_change=serializer.validated_data["quantity_change"],
+            reason=serializer.validated_data["reason"],
+            actor_user_id=request.user.id,
+        )
+    except StockAdjustmentError as exc:
+        return _error(exc.code, exc.detail, exc.http_status)
+
+    return Response(
+        {
+            "adjustment": StockAdjustmentSerializer(adjustment).data,
+            "listing": ListingSerializer(
+                listing,
+                context={"request": request},
+            ).data,
+        },
+        status=status.HTTP_201_CREATED,
     )

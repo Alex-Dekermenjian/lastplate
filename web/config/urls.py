@@ -38,6 +38,13 @@ urlpatterns = [
         name="publish-listing",
     ),
 
+    # LP-12: Stock adjustments.
+    path(
+        "workspace/listings/<int:listing_id>/stock/",
+        listing_views.adjust_stock,
+        name="adjust-stock",
+    ),
+
     path("health/live/", health.live, name="health-live"),
     path("health/ready/", health.ready, name="health-ready"),
 ]

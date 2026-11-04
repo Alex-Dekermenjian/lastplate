@@ -291,3 +291,29 @@ def publish_listing(access, listing_id):
         {},
         token=access,
     )
+
+
+# LP-12: Change a published listing's stock with a reason.
+@sensitive_variables("access")
+def adjust_stock(access, listing_id, quantity_change, reason):
+    return _call(
+        "marketplace",
+        "POST",
+        f"/api/listings/{listing_id}/stock-adjustments",
+        {
+            "quantity_change": quantity_change,
+            "reason": reason,
+        },
+        token=access,
+    )
+
+
+# LP-12: A listing's stock adjustment history, newest first.
+@sensitive_variables("access")
+def stock_history(access, listing_id):
+    return _call(
+        "marketplace",
+        "GET",
+        f"/api/listings/{listing_id}/stock-adjustments",
+        token=access,
+    )

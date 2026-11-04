@@ -171,3 +171,65 @@ class Listing(models.Model):
 
     def __str__(self):
         return self.title
+
+
+# LP-12: Record of every change to a listing's allocated total stock
+class StockAdjustment(models.Model):
+    """
+    One change to Listing.total_quantity, saved in the same transaction
+    as the stock update itself.
+
+    actor_user_id refers to the Accounts user ID. reservation_ref refers
+    to a Reservations reference (Sprint 2). No cross-service ForeignKey.
+    """
+
+    class Kind(models.TextChoices):
+        MANUAL = "MANUAL", "Manual"
+        SHOP_CANCELLATION = "SHOP_CANCELLATION", "Shop cancellation"
+
+    listing = models.ForeignKey(
+        Listing,
+        on_delete=models.PROTECT,
+        related_name="stock_adjustments",
+    )
+    quantity_change = models.IntegerField()
+    reason = models.TextField()
+    kind = models.CharField(
+        max_length=20,
+        choices=Kind.choices,
+        default=Kind.MANUAL,
+    )
+    reservation_ref = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+    )
+    actor_user_id = models.PositiveBigIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~Q(quantity_change=0),
+                name="marketplace_stockadjustment_nonzero_change",
+            ),
+            models.CheckConstraint(
+                condition=~Q(reason=""),
+                name="marketplace_stockadjustment_reason_required",
+            ),
+            models.CheckConstraint(
+                condition=Q(kind__in=["MANUAL", "SHOP_CANCELLATION"]),
+                name="marketplace_stockadjustment_valid_kind",
+            ),
+            # A repeated shop cancellation must not record a second
+            # adjustment for the same reservation.
+            models.UniqueConstraint(
+                fields=["reservation_ref"],
+                condition=Q(kind="SHOP_CANCELLATION"),
+                name="marketplace_stockadjustment_one_per_cancellation",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.quantity_change:+d} on listing {self.listing_id}"

@@ -44,4 +44,11 @@ urlpatterns = [
         views.upload_listing_photo,
         name="upload_listing_photo",
     ),
+
+    # LP-12: Stock adjustments (POST) and their history (GET)
+    path(
+        "listings/<int:pk>/stock-adjustments",
+        views.listing_stock_adjustments,
+        name="listing_stock_adjustments",
+    ),
 ]
