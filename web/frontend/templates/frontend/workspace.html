@@ -183,10 +183,59 @@
               {{ listing.allergens_display|default:"Unknown" }}
             </p>
 
-            <p>
-              <strong>Available quantity:</strong>
-              {{ listing.total_quantity }}
-            </p>
+            {% if listing.status == "PUBLISHED" %}
+              <p>
+                <strong>Available quantity:</strong>
+                {{ listing.free_quantity|default_if_none:listing.total_quantity }}
+                <span class="muted">of {{ listing.total_quantity }} in stock</span>
+              </p>
+
+              <form
+                method="post"
+                action="{% url 'adjust-stock' listing.id %}"
+                style="margin-top: 12px;"
+              >
+                {% csrf_token %}
+                <fieldset style="border: 1px solid #ddd; border-radius: 8px; padding: 12px;">
+                  <legend>Adjust stock</legend>
+
+                  <label for="quantity-change-{{ listing.id }}">
+                    Change in units
+                  </label>
+                  <input
+                    id="quantity-change-{{ listing.id }}"
+                    name="quantity_change"
+                    type="number"
+                    step="1"
+                    required
+                    aria-describedby="quantity-help-{{ listing.id }}"
+                    style="width: 100%;"
+                  >
+                  <p id="quantity-help-{{ listing.id }}" class="muted">
+                    Use 3 to add three units, or -2 to remove two.
+                  </p>
+
+                  <label for="stock-reason-{{ listing.id }}">Reason</label>
+                  <input
+                    id="stock-reason-{{ listing.id }}"
+                    name="reason"
+                    type="text"
+                    maxlength="500"
+                    required
+                    style="width: 100%;"
+                  >
+
+                  <button class="button button--secondary" type="submit" style="margin-top: 8px;">
+                    Update stock
+                  </button>
+                </fieldset>
+              </form>
+            {% else %}
+              <p>
+                <strong>Quantity:</strong>
+                {{ listing.total_quantity }}
+              </p>
+            {% endif %}
 
             {% if listing.status == "DRAFT" %}
   <div style="margin-top: 16px;">

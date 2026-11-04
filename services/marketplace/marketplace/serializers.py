@@ -5,7 +5,8 @@ from django.core.exceptions import ValidationError
 from rest_framework import serializers
 
 from .image_validators import validate_listing_photo
-from .models import Listing, Shop
+from .models import Listing, Shop, StockAdjustment
+from .stock import free_quantity as calculate_free_quantity
 from .validators import validate_listing_data
 
 
@@ -142,6 +143,12 @@ class ListingSerializer(serializers.ModelSerializer):
     allergens_display = serializers.SerializerMethodField()
     photo_display = serializers.SerializerMethodField()
 
+    # LP-12: Units not committed to reservations.
+    free_quantity = serializers.SerializerMethodField()
+
+    def get_free_quantity(self, obj):
+        return calculate_free_quantity(obj)
+
     def get_ingredients_display(self, obj):
         if obj.ingredients and obj.ingredients.strip():
             return obj.ingredients.strip()
@@ -174,6 +181,7 @@ class ListingSerializer(serializers.ModelSerializer):
             "original_price",
             "discounted_price",
             "total_quantity",
+            "free_quantity",
             "pickup_address",
             "pickup_start",
             "pickup_end",
@@ -232,3 +240,36 @@ class ListingSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
+
+# LP-12: Stock adjustment request and history
+class StockAdjustmentRequestSerializer(
+    RejectUnknownFieldsMixin,
+    serializers.Serializer,
+):
+    """
+    Only the change and its reason can be supplied.
+    Listing, actor and kind come from the server.
+    """
+
+    quantity_change = serializers.IntegerField()
+    reason = serializers.CharField(max_length=500)
+
+
+class StockAdjustmentSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = StockAdjustment
+
+        fields = [
+            "id",
+            "listing",
+            "quantity_change",
+            "reason",
+            "kind",
+            "reservation_ref",
+            "actor_user_id",
+            "created_at",
+        ]
+
+        read_only_fields = fields
