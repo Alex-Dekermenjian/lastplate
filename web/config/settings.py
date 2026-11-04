@@ -42,6 +42,9 @@ SERVICE_URLS = {
     "marketplace": os.environ.get("MARKETPLACE_SERVICE_URL", "http://127.0.0.1:8002"),
     "reservations": os.environ.get("RESERVATIONS_SERVICE_URL", "http://127.0.0.1:8003"),
 }
+# The address a visitor's browser uses for Marketplace, which can differ from the
+# service-to-service address above (inside Compose it does).
+MARKETPLACE_PUBLIC_URL = os.environ.get("MARKETPLACE_PUBLIC_URL", "http://127.0.0.1:8002")
 SERVICE_TIMEOUT_SECONDS = 2  # health checks on the status page
 SERVICE_API_TIMEOUT_SECONDS = 8  # API calls; registration hashes a password
 
@@ -65,6 +68,8 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "config.urls"
+
+TEST_RUNNER = "config.test_runner.NoLiveServicesRunner"
 
 TEMPLATES = [
     {

@@ -6,7 +6,8 @@
 #
 # One PostgreSQL server hosts four separate databases, each with its own login
 # role. Its data lives in the lastplate-dev_pgdata volume, which is separate from
-# any PostgreSQL installed on your computer. Never add --volumes (-v) to
+# any PostgreSQL installed on your computer. Uploaded photos live in the
+# lastplate-dev_marketplace_media volume. Never add --volumes (-v) to
 # "docker compose down" unless you intend to delete all local Compose data.
 
 name: lastplate-dev
@@ -95,6 +96,8 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      # Uploaded listing photos survive rebuilding or recreating the container.
+      - marketplace_media:/app/media
     ports:
       - "127.0.0.1:8002:8000"
 
@@ -130,8 +133,12 @@ services:
       ACCOUNTS_SERVICE_URL: http://accounts:8000
       MARKETPLACE_SERVICE_URL: http://marketplace:8000
       RESERVATIONS_SERVICE_URL: http://reservations:8000
+      # Where the visitor's browser reaches Marketplace, for photo links. The
+      # service URLs above only work inside the Compose network.
+      MARKETPLACE_PUBLIC_URL: http://127.0.0.1:8002
     ports:
       - "127.0.0.1:8000:8000"
 
 volumes:
   pgdata:
+  marketplace_media:

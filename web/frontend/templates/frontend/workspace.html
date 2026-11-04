@@ -148,8 +148,19 @@
             <h3>{{ listing.title|default:"Untitled offer" }}</h3>
 
             <p class="muted">
-              Status: {{ listing.status }}
+              Status: {{ listing.status_label }}
             </p>
+
+            {% if listing.visible_to_customers %}
+              <p class="notice notice--success">
+                Customers can see this offer.
+                <a href="{% url 'offer-detail' listing.id %}">View public page</a>
+              </p>
+            {% elif listing.hidden_because %}
+              <p class="notice notice--warning">
+                Hidden from customers: {{ listing.hidden_because }}
+              </p>
+            {% endif %}
 
             {% if listing.description %}
               <p>{{ listing.description }}</p>
@@ -183,6 +194,20 @@
               {{ listing.allergens_display|default:"Unknown" }}
             </p>
 
+            <p>
+              <strong>Pickup address:</strong>
+              {{ listing.pickup_address|default:"Not set" }}
+            </p>
+
+            <p>
+              <strong>Pickup time:</strong>
+              {% if listing.pickup_window %}
+                {{ listing.pickup_window }} <span class="muted">(Lebanon time)</span>
+              {% else %}
+                Not set
+              {% endif %}
+            </p>
+
             {% if listing.status == "PUBLISHED" %}
               <p>
                 <strong>Available quantity:</strong>
@@ -190,7 +215,9 @@
                 <span class="muted">of {{ listing.total_quantity }} in stock</span>
               </p>
 
+              {% if not listing.pickup_ended %}
               <form
+                class="offer-form"
                 method="post"
                 action="{% url 'adjust-stock' listing.id %}"
                 style="margin-top: 12px;"
@@ -230,6 +257,7 @@
                   </button>
                 </fieldset>
               </form>
+              {% endif %}
             {% else %}
               <p>
                 <strong>Quantity:</strong>

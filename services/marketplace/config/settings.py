@@ -64,6 +64,8 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "config.urls"
 
+TEST_RUNNER = "config.test_runner.TemporaryMediaRunner"
+
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",

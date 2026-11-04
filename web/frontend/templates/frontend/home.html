@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}LastPlate — development status{% endblock %}
+{% block title %}LastPlate — surplus food from local shops{% endblock %}
 
 {% block content %}
 <h1>LastPlate</h1>
@@ -9,7 +9,10 @@
   <a class="button button--primary" href="{% url 'browse-offers' %}">Browse available food</a>
 </p>
 
-<h2>Service status</h2>
+<p class="muted">Run a shop? <a href="{% url 'register' %}">Register it</a> to publish your surplus food.</p>
+
+<details class="dev-status">
+  <summary>Service status (for developers)</summary>
 <table>
   <thead>
     <tr><th>Service</th><th>Readiness</th><th>Detail</th></tr>
@@ -20,4 +23,5 @@
     {% endfor %}
   </tbody>
 </table>
+</details>
 {% endblock %}

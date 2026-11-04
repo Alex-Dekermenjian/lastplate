@@ -24,7 +24,7 @@ def photo_url(path):
     if not settings.DEBUG:
         return None
 
-    base = settings.SERVICE_URLS["marketplace"].rstrip("/") + "/"
+    base = settings.MARKETPLACE_PUBLIC_URL.rstrip("/") + "/"
     base_host = urlsplit(base).hostname
 
     # A Docker-internal hostname is not accessible from the browser.

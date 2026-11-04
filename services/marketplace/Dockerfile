@@ -10,6 +10,9 @@ RUN python -m pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 RUN useradd --create-home lastplate
+# Uploaded photos. A new named volume mounted here inherits this ownership, and
+# this is the only part of /app the runtime user can write to.
+RUN mkdir -p media && chown lastplate:lastplate media
 USER lastplate
 
 EXPOSE 8000

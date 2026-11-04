@@ -18,7 +18,9 @@
   </h1>
 
   <p class="muted">
-    Your food offer will remain a draft until it is published.
+    Your food offer stays a draft until you publish it from your workspace. You can
+    save an unfinished draft. To publish, it needs a title, description, category,
+    both prices, a quantity above zero, a pickup address and pickup times.
   </p>
 
   {% if error %}
@@ -39,7 +41,7 @@
     </div>
   {% endif %}
 
-  <form method="post" enctype="multipart/form-data">
+  <form class="offer-form" method="post" enctype="multipart/form-data">
     {% csrf_token %}
 
     <h2>Food details</h2>
@@ -68,7 +70,7 @@
     <h2>Pricing and availability</h2>
 
     <p>
-      <label for="original_price">Original price</label>
+      <label for="original_price">Original price (USD)</label>
       <input id="original_price" name="original_price"
              type="number" min="0" step="0.01"
              value="{{ form_values.original_price|default_if_none:'' }}"
@@ -76,7 +78,7 @@
     </p>
 
     <p>
-      <label for="discounted_price">Discounted price</label>
+      <label for="discounted_price">Discounted price (USD)</label>
       <input id="discounted_price" name="discounted_price"
              type="number" min="0" step="0.01"
              value="{{ form_values.discounted_price|default_if_none:'' }}"
@@ -102,14 +104,14 @@
     </p>
 
     <p>
-      <label for="pickup_start">Pickup starts</label>
+      <label for="pickup_start">Pickup starts (Lebanon time)</label>
       <input id="pickup_start" name="pickup_start"
              type="datetime-local"
              value="{{ form_values.pickup_start|default_if_none:''|slice:':16' }}">
     </p>
 
     <p>
-      <label for="pickup_end">Pickup ends</label>
+      <label for="pickup_end">Pickup ends (Lebanon time)</label>
       <input id="pickup_end" name="pickup_end"
              type="datetime-local"
              value="{{ form_values.pickup_end|default_if_none:''|slice:':16' }}">

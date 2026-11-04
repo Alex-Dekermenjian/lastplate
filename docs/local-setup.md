@@ -11,11 +11,12 @@ open decisions are in [microservices-plan.md](microservices-plan.md).
 | Accounts (`services/accounts`, port 8001) | Email-based user model with roles, its migration, Django admin login, health endpoints; LP-7 APIs: shop-operator registration, RS256 token sign-in, refresh, logout (refresh-token blacklist), `/api/users/me/`, throttling; 9 original tests + health and auth API tests | Web sign-in/registration pages and the Pending shop (rest of LP-7) |
 | Marketplace (`services/marketplace`, port 8002) | Own database, health endpoints; LP-7: verifies Accounts tokens with the public key only, minimal `Shop` (one per operator, Pending), `POST /api/shops/` (idempotent), `GET /api/shops/me/`; LP-8: shop profile (pickup address, area, public contact) via `PATCH /api/shops/me/`; LP-9: team-admin shop review in Django admin (`/admin/`) | Listings, stock (LP-10 to LP-13) |
 | Reservations (`services/reservations`, port 8003) | Runnable empty service, own database, health endpoints | All reservation logic (Sprint 2) |
-| Web frontend (`web`, port 8000) | Server-side sessions; status page; LP-7: shop-operator registration (`/register/`), sign-in (`/sign-in/`), POST sign-out, workspace with shop status (`/workspace/`), finish-shop-setup retry (`/workspace/finish-setup/`); LP-8: shop profile page (`/workspace/profile/`) | Customer pages, offers |
+| Web frontend (`web`, port 8000) | Server-side sessions; home page; LP-7: shop-operator registration (`/register/`), sign-in (`/sign-in/`), POST sign-out, workspace with shop status (`/workspace/`), finish-shop-setup retry (`/workspace/finish-setup/`); LP-8: shop profile page (`/workspace/profile/`); LP-10 and LP-11: create, edit and publish offers with photos; LP-12: stock adjustments; LP-13: public offers (`/offers/`) | Customer accounts, reservations (Sprint 2) |
 | Docker Compose | PostgreSQL with one database and login role per service; all four apps | Production deployment (LP-15) |
 | CI | Checks and tests per service; Compose smoke check | Cross-service feature integration tests |
 
-No feature that a customer or shop would use exists yet.
+Shops can register, get approved, publish offers and manage stock, and visitors can
+browse them. Reservations, collection and customer accounts are not built yet.
 
 Each service exposes:
 - `GET /health/live/` — the process is serving requests.
@@ -64,6 +65,11 @@ This creates random passwords and secret keys in:
 It never overwrites an existing file and never prints a secret. All these files
 are ignored by Git. Never commit or share them, especially the private key.
 
+**Marketplace crashes with `relation "marketplace_listing" does not exist`?** Your
+database is older than the LP-10 merge. Update to the latest code and start the stack
+as usual; `migrate` repairs it and keeps your data. See
+[migration-integration-notes.md](migration-integration-notes.md).
+
 **Already set up before LP-7?** Run the same command once more (step 2 first, to
 install the new packages). It keeps your existing settings and only adds the
 missing key pair. Then rebuild Accounts:
@@ -105,8 +111,9 @@ docker compose --env-file compose.env logs -f accounts
 docker compose --env-file compose.env down
 ```
 
-`down` keeps your data in the `lastplate-dev_pgdata` volume. **Do not add
-`-v` / `--volumes`**: it deletes all four databases. The init script runs only
+`down` keeps your data in the `lastplate-dev_pgdata` volume and uploaded photos in
+`lastplate-dev_marketplace_media`. **Do not add `-v` / `--volumes`**: it deletes all
+four databases and every photo. The init script runs only
 when that volume is first created; changing `compose.env` passwords later
 does not change existing database roles.
 
@@ -190,7 +197,19 @@ foreach ($dir in "services\accounts", "services\marketplace", "services\reservat
 ```
 
 Django creates and then deletes a separate `test_` database per service,
-using that service's own role. Your development data is not touched.
+using that service's own role. Your development data is not touched. Web unit tests
+cannot reach running services, so they give the same result whether or not the stack
+is up, and Marketplace tests save uploads to a temporary folder.
+
+### Integration check against the running stack
+
+This is separate from the unit tests. It drives the running site over HTTP, from
+registration to public browsing, and adds clearly labelled fictional shops and offers
+to your development data:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\sprint1_flow_check.py
+```
 
 The Accounts suite still contains the nine original tests (password hashing,
 email normalisation, case-insensitive uniqueness, administrator flags and

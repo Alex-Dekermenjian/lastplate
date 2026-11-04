@@ -6,12 +6,14 @@ from urllib.parse import urlencode
 from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import sensitive_post_parameters, sensitive_variables
 from django.views.decorators.http import require_POST
 
 from . import services, tokens
+from .browse_views import lebanon_time, pickup_window
 from .listing_photos import photo_url
 from .forms import RegistrationForm, ShopProfileForm, ShopSetupForm, SignInForm
 from .services import ServiceUnavailable
@@ -31,10 +33,43 @@ REGISTRATION_FAILED = "We couldn't complete your registration. Please check your
 OPERATORS_ONLY = "This sign-in is for shop operators. Customer accounts are not available yet."
 
 STATUS_EXPLANATIONS = {
-    "PENDING": ("Pending review", "A LastPlate administrator checks new shops before they can publish offers. You can't publish yet."),
-    "APPROVED": ("Approved", "Your shop is approved. Publishing offers arrives in a later release."),
-    "REJECTED": ("Not approved", "Your shop was not approved. Please contact the LastPlate team."),
+    "PENDING": ("Pending review", "A LastPlate administrator checks new shops before they can publish offers. You can prepare drafts now, but you can't publish yet."),
+    "APPROVED": ("Approved", "Your shop is approved. You can publish food offers below."),
+    "REJECTED": ("Not approved", "Your shop was not approved, so it can't publish offers and any published offers are hidden from customers. Please contact the LastPlate team."),
 }
+
+
+LISTING_STATUS_LABELS = {
+    "DRAFT": "Draft",
+    "PUBLISHED": "Published",
+    "WITHDRAWN": "Withdrawn",
+}
+
+
+def listing_summary(listing, shop):
+    """What the workspace says about an offer, including whether customers see it."""
+    start = lebanon_time(listing.get("pickup_start"))
+    end = lebanon_time(listing.get("pickup_end"))
+    published = listing.get("status") == "PUBLISHED"
+    pickup_ended = end is not None and end <= timezone.now()
+    free = listing.get("free_quantity")
+
+    hidden_because = ""
+    if published:
+        if shop.get("approval_status") != "APPROVED":
+            hidden_because = "your shop isn't approved."
+        elif pickup_ended:
+            hidden_because = "its pickup time has ended."
+        elif free is not None and free <= 0:
+            hidden_because = "it has sold out. Add stock to show it again."
+
+    return {
+        "status_label": LISTING_STATUS_LABELS.get(listing.get("status"), listing.get("status")),
+        "pickup_window": pickup_window(start, end) if start and end else "",
+        "pickup_ended": pickup_ended,
+        "hidden_because": hidden_because,
+        "visible_to_customers": published and not hidden_because,
+    }
 
 
 class SessionEnded(Exception):
@@ -255,6 +290,7 @@ def workspace(request):
             {
                 **listing,
                 "photo_display": photo_url(listing.get("photo_display")),
+                **listing_summary(listing, shop),
             }
             for listing in listings
         ]

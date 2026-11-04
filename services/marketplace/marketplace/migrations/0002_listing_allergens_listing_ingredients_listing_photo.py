@@ -3,6 +3,8 @@
 import marketplace.image_validators
 from django.db import migrations, models
 
+from marketplace.migration_repairs import ensure_table_exists
+
 
 class Migration(migrations.Migration):
 
@@ -11,6 +13,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # Older databases may have 0001_initial recorded without this table.
+        ensure_table_exists("Listing"),
         migrations.AddField(
             model_name='listing',
             name='allergens',

@@ -297,10 +297,10 @@ def publish_listing(request, pk):
         status=status.HTTP_404_NOT_FOUND,
     )
     except DjangoValidationError as exc:
-        return Response(
-            {"detail": exc.messages if hasattr(exc, "messages") else str(exc)},
-            status=status.HTTP_400_BAD_REQUEST,
-    )
+        body = {"detail": exc.messages if hasattr(exc, "messages") else str(exc)}
+        if hasattr(exc, "message_dict"):
+            body["fields"] = exc.message_dict
+        return Response(body, status=status.HTTP_400_BAD_REQUEST)
 
     return Response(
         ListingSerializer(
