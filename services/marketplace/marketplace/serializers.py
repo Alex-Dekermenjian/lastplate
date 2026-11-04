@@ -202,6 +202,22 @@ class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
             "updated_at",
         ]
 
+    # LP-14: Reject, rather than silently drop, unknown and read-only fields
+    # (for example terms_revision, first_reserved_at or free_quantity).
+    def to_internal_value(self, data):
+        writable = {
+            name for name, field in self.fields.items()
+            if not field.read_only
+        }
+        unexpected = sorted(set(data) - writable)
+
+        if unexpected:
+            raise serializers.ValidationError(
+                {name: ["This field is not allowed."] for name in unexpected}
+            )
+
+        return super().to_internal_value(data)
+
     def validate_photo(self, value):
         if value:
             try:
