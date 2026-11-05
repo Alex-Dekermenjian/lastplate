@@ -20,6 +20,8 @@ urlpatterns = [
         browse_views.offer_detail,
         name="offer-detail",
     ),
+    # LP-39: a restaurant's page with everything it has left.
+    path("restaurants/<int:shop_id>/", browse_views.restaurant_detail, name="restaurant-detail"),
 
     # LP-56: one login page and one sign-up page for every kind of account.
     path("login/", account_views.login, name="login"),

@@ -17,7 +17,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .authentication import IsShopOperator
-from .browse import visible_listing, visible_listings
+from .browse import visible_listing, visible_listings, visible_shop
 from .listing_service import (
     save_listing_draft,
     publish_listing as publish_listing_service,
@@ -25,8 +25,11 @@ from .listing_service import (
 from .models import Listing, Shop
 from .photo_service import replace_listing_photo
 from .serializers import (
+    LASTBAG,
     ListingSerializer,
     PublicListingDetailSerializer,
+    PublicShopDetailSerializer,
+    RestaurantOfferSerializer,
     PublicListingSerializer,
     ShopCreateSerializer,
     ShopProfileSerializer,
@@ -529,6 +532,36 @@ def listing_offer(request, pk):
             listing,
             context={"request": request, "shops": {shop.id: shop}},
         ).data,
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def restaurant_page(request, pk):
+    """LP-39: one approved restaurant and everything it has left, LastBags
+    first. Pending, rejected and unknown restaurants are all 404."""
+    shop = visible_shop(pk)
+
+    if shop is None:
+        return _error(
+            "not_found",
+            "This restaurant is not available.",
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    listings = [listing for listing, _shop in visible_listings(shop_id=shop.id)]
+    offers = RestaurantOfferSerializer(
+        listings,
+        many=True,
+        context={"request": request, "shops": {shop.id: shop}},
+    ).data
+    # Stable sort: LastBags first, each group still ending soonest first.
+    offers = sorted(offers, key=lambda offer: offer["kind"] != LASTBAG)
+
+    return Response(
+        {"shop": PublicShopDetailSerializer(shop).data, "offers": offers},
         status=status.HTTP_200_OK,
     )
 

@@ -56,7 +56,7 @@
     <h2>Shop</h2>
     <dl class="details">
       <dt>Name</dt>
-      <dd>{{ offer.shop.name }}</dd>
+      <dd>{% if offer.shop.id %}<a href="{% url 'restaurant-detail' offer.shop.id %}">{{ offer.shop.name }}</a>{% else %}{{ offer.shop.name }}{% endif %}</dd>
 
       <dt>Area</dt>
       <dd>{{ offer.shop.area|default:"Unknown" }}</dd>

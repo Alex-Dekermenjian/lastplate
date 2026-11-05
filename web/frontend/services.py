@@ -342,3 +342,12 @@ def listing_offer(listing_id):
         "GET",
         f"/api/listings/{int(listing_id)}",
     )
+
+
+# LP-39: A restaurant's public page. No token: anyone may open it.
+def restaurant_page(shop_id):
+    return _call(
+        "marketplace",
+        "GET",
+        f"/api/shops/{int(shop_id)}",
+    )
