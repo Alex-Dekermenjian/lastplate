@@ -9,6 +9,7 @@ Passwords and tokens are never logged or put in exception messages.
 import json
 import os
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
@@ -325,6 +326,27 @@ def stock_history(access, listing_id):
         f"/api/listings/{listing_id}/stock-adjustments",
         token=access,
     )
+
+
+# LP-57: Admin API for /console. Marketplace accepts only Admin tokens here.
+@sensitive_variables("access")
+def admin_summary(access):
+    return _call("marketplace", "GET", "/api/admin/summary", token=access)
+
+
+@sensitive_variables("access")
+def admin_shops(access, approval_status):
+    return _call("marketplace", "GET", f"/api/admin/shops?{urlencode({'status': approval_status})}", token=access)
+
+
+@sensitive_variables("access")
+def admin_shop(access, shop_id):
+    return _call("marketplace", "GET", f"/api/admin/shops/{int(shop_id)}", token=access)
+
+
+@sensitive_variables("access")
+def admin_review_shop(access, shop_id, decision):
+    return _call("marketplace", "POST", f"/api/admin/shops/{int(shop_id)}/review", decision, token=access)
 
 
 # LP-13: Public marketplace. No token is sent: these pages need no sign-in.

@@ -133,8 +133,30 @@ It builds the images and then checks three things:
 
 The stack is left running.
 
-## Review a shop (LP-9)
+## Review a restaurant in /console (LP-57)
 
+The LastPlate administrator reviews restaurants on the website itself, at
+http://127.0.0.1:8000/console/. Admin accounts can only be created with a command;
+public sign-up never creates one. Create yours once (it asks for the password twice):
+
+```powershell
+docker compose --env-file compose.env exec accounts python manage.py create_admin --email admin@example.test --name "LastPlate Admin"
+```
+
+1. Log in at http://127.0.0.1:8000/login/ with that account. You land on **/console**,
+   which counts pending and approved restaurants and live offers.
+2. Open **Restaurants**. The **Pending**, **Approved** and **Rejected** tabs list each
+   restaurant; open one to see its full profile.
+3. To approve, tick **I confirmed the applicant represents this restaurant** and press
+   **Approve restaurant**. The profile must be complete.
+4. To reject, write a reason (the owner sees it) and press **Reject restaurant**.
+
+A reviewed restaurant cannot go back to Pending. The console and the Django admin
+below use the same rules (`marketplace/shop_review.py`).
+
+## Review a shop in the Django admin (LP-9, developer backup)
+
+Since LP-57 the Django admin is only a developer backup for /console.
 Shops are approved or rejected in Marketplace's own Django admin. It has its own
 team-admin accounts, separate from Accounts and from shop operators. Create one once:
 

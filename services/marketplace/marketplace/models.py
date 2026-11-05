@@ -52,6 +52,12 @@ class Shop(models.Model):
         on_delete=models.PROTECT,
         related_name="+",
     )
+    # LP-57: an Accounts Admin who reviewed the shop in /console. A review
+    # made in the Django admin sets reviewed_by instead.
+    reviewed_by_user_id = models.PositiveBigIntegerField(
+        null=True,
+        blank=True,
+    )
     reviewed_at = models.DateTimeField(
         null=True,
         blank=True,

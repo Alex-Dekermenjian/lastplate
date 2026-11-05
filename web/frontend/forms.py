@@ -29,6 +29,46 @@ class SignUpForm(forms.Form):
     )
 
 
+class ShopDecisionForm(forms.Form):
+    """LP-57: an admin's decision on a restaurant in /console. Marketplace
+    applies the review rules; the checks here only give quicker feedback."""
+
+    decision = forms.ChoiceField(choices=[("APPROVED", "Approve"), ("REJECTED", "Reject")])
+    identity_confirmed = forms.BooleanField(
+        label="I confirmed the applicant represents this restaurant", required=False,
+    )
+    reason = forms.CharField(
+        label="Reason for rejecting", required=False, max_length=2000,
+        help_text="The restaurant owner sees this.", widget=forms.Textarea(attrs={"rows": 3}),
+    )
+
+    # Marketplace field names → this form's field names.
+    MARKETPLACE_FIELDS = {"identity_confirmed": "identity_confirmed", "rejection_reason": "reason"}
+
+    def clean(self):
+        cleaned = super().clean()
+        decision = cleaned.get("decision")
+        if decision == "APPROVED" and not cleaned.get("identity_confirmed"):
+            self.add_error("identity_confirmed", "Confirm the applicant represents this restaurant before approving.")
+        if decision == "REJECTED" and not cleaned.get("reason"):
+            self.add_error("reason", "Give a reason. The restaurant owner will see it.")
+        return cleaned
+
+    def decision_payload(self):
+        data = self.cleaned_data
+        if data["decision"] == "APPROVED":
+            return {"decision": "APPROVED", "identity_confirmed": data["identity_confirmed"]}
+        return {"decision": "REJECTED", "reason": data["reason"]}
+
+    def add_marketplace_errors(self, body):
+        fields = body.get("fields") if isinstance(body, dict) else None
+        if not isinstance(fields, dict):
+            self.add_error(None, "We couldn't save your decision. Please try again.")
+            return
+        for field, message in fields.items():
+            self.add_error(self.MARKETPLACE_FIELDS.get(field), message)
+
+
 class LoginForm(forms.Form):
     email = forms.EmailField(
         label="Email", max_length=254,
