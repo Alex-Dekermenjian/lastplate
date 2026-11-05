@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Start a new cart? — LastPlate{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h1>Start a new cart?</h1>
+  <p>Your cart from {{ current_shop }} will be cleared. A cart can only hold food from one restaurant.</p>
+
+  <form method="post" action="{% url 'cart-add' offer.id %}{% if back %}?back={{ back|urlencode }}{% endif %}">
+    {% csrf_token %}
+    <input type="hidden" name="start_new" value="1">
+    <button class="button button--primary button--block" type="submit">Start new with {{ offer.title }}</button>
+  </form>
+  <a class="button button--secondary button--block" style="margin-top: 12px;" href="{% url 'cart' %}">Keep my cart</a>
+</section>
+{% endblock %}

@@ -167,6 +167,8 @@ def offer_detail(request, listing_id):
 @require_GET
 def restaurant_detail(request, shop_id):
     """LP-39: a restaurant's page: its details, then its LastBag and items."""
+    from .cart import cart_summary  # cart imports this module
+
     template = "frontend/restaurant.html"
 
     try:
@@ -199,4 +201,8 @@ def restaurant_detail(request, shop_id):
         },
         "lastbags": [offer for offer in offers if offer["is_lastbag"]],
         "items": [offer for offer in offers if not offer["is_lastbag"]],
+        # LP-62: Add buttons for customers and signed-out visitors (who are
+        # asked to log in first); restaurants and the admin never see them.
+        "can_add": request.session.get("account", {}).get("role", "CUSTOMER") == "CUSTOMER",
+        "cart": cart_summary(request),
     })
