@@ -12,6 +12,9 @@ from frontend import account_views, browse_views, health, listing_views, views
 urlpatterns = [
     path("", views.home, name="home"),
 
+    # LP-15: Guided Sprint 1 demonstration (development only).
+    path("demo/", views.demo_guide, name="demo-guide"),
+
     # LP-13: Public food browsing (no sign-in).
     path("offers/", browse_views.browse_offers, name="browse-offers"),
     path(
@@ -20,6 +23,9 @@ urlpatterns = [
         name="offer-detail",
     ),
 
+    # One sign-up: first choose customer or restaurant owner.
+    path("sign-up/", account_views.sign_up, name="sign-up"),
+    path("sign-up/customer/", account_views.customer_sign_up, name="customer-sign-up"),
     path("register/", account_views.register, name="register"),
     path("sign-in/", account_views.sign_in, name="sign-in"),
     path("sign-out/", account_views.sign_out, name="sign-out"),

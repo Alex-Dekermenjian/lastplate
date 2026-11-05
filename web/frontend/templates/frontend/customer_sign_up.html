@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Sign up as a customer — LastPlate{% endblock %}
+
+{% block content %}
+<section class="card">
+  <p class="eyebrow">Customer account</p>
+  <h1>Sign up as a customer</h1>
+  <p class="muted">Browse surplus food from approved local shops, then collect and pay at the shop.</p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "frontend/_form.html" %}
+    <button class="button button--primary button--block" type="submit">Create customer account</button>
+  </form>
+  <p class="muted" style="margin-top: 16px;">Own a restaurant? <a href="{% url 'register' %}">Sign up as a restaurant owner</a> · <a href="{% url 'sign-in' %}">Log in</a></p>
+</section>
+{% endblock %}

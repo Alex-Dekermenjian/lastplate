@@ -199,11 +199,18 @@ class SignInTests(WebAuthTestCase):
         response, _ = self.post(sign_in={"side_effect": ServiceUnavailable("accounts")})
         self.assertContains(response, account_views.SIGN_IN_UNAVAILABLE)
 
-    def test_non_operator_accounts_are_not_signed_in_and_token_is_revoked(self):
+    def test_customers_are_signed_in_and_sent_to_the_food_list(self):
         response, sign_out = self.post(account={"return_value": (200, {**ACCOUNT, "role": "CUSTOMER"})})
-        self.assertContains(response, account_views.OPERATORS_ONLY)
-        sign_out.assert_called_once_with("refresh-token-1")
-        self.assertNotIn(tokens.REFRESH_TOKEN_KEY, self.client.session)
+        self.assertRedirects(response, reverse("browse-offers"), fetch_redirect_response=False)
+        sign_out.assert_not_called()
+        self.assertEqual(self.client.session[account_views.ACCOUNT_KEY]["role"], "CUSTOMER")
+
+    def test_customers_never_follow_next_to_a_shop_page(self):
+        response, _ = self.post(
+            url=f"{self.url}?next={reverse('workspace')}",
+            account={"return_value": (200, {**ACCOUNT, "role": "CUSTOMER"})},
+        )
+        self.assertRedirects(response, reverse("browse-offers"), fetch_redirect_response=False)
 
     def test_post_without_csrf_token_is_rejected(self):
         client = Client(enforce_csrf_checks=True)
@@ -343,3 +350,50 @@ class ServiceClientTests(TestCase):
                 services.my_shop("access-token-1")
         with mock.patch("frontend.services.urlopen", side_effect=HTTPError("u", 401, "x", {}, io.BytesIO(b'{"detail": "no"}'))):
             self.assertEqual(services.sign_in("owner@example.test", PASSWORD), (401, {"detail": "no"}))
+
+
+class SignUpChoiceTests(WebAuthTestCase):
+    def test_sign_up_asks_customer_or_restaurant_owner(self):
+        response = self.client.get(reverse("sign-up"))
+        self.assertContains(response, "I'm a customer")
+        self.assertContains(response, "I'm a restaurant owner")
+        self.assertContains(response, f'href="{reverse("customer-sign-up")}"')
+        self.assertContains(response, f'href="{reverse("register")}"')
+
+
+class CustomerSignUpTests(WebAuthTestCase):
+    url = reverse("customer-sign-up")
+    CUSTOMER = {"id": 9, "email": "maya@example.test", "display_name": "Maya", "role": "CUSTOMER"}
+
+    def data(self):
+        return {"display_name": "Maya", "email": "maya@example.test",
+                "password": PASSWORD, "password_confirm": PASSWORD}
+
+    def test_creates_customer_and_shows_the_food(self):
+        with patch_service("register_customer", return_value=(201, {**TOKENS, "user": self.CUSTOMER})) as create,                 patch_service("register") as operator_sign_up,                 patch_service("create_shop") as create_shop:
+            response = self.client.post(self.url, self.data())
+        self.assertRedirects(response, reverse("browse-offers"), fetch_redirect_response=False)
+        create.assert_called_once_with("Maya", "maya@example.test", PASSWORD)
+        operator_sign_up.assert_not_called()
+        create_shop.assert_not_called()
+        self.assertEqual(self.client.session[account_views.ACCOUNT_KEY]["role"], "CUSTOMER")
+
+    def test_duplicate_email_is_shown_on_the_form(self):
+        with patch_service("register_customer",
+                           return_value=(400, {"email": ["An account with this email already exists."]})):
+            response = self.client.post(self.url, self.data())
+        self.assertContains(response, "An account with this email already exists.")
+        self.assertNotIn(tokens.REFRESH_TOKEN_KEY, self.client.session)
+
+    def test_signed_in_customer_cannot_open_shop_pages(self):
+        session = self.client.session
+        session[tokens.ACCESS_TOKEN_KEY] = "a"
+        session[tokens.REFRESH_TOKEN_KEY] = "r"
+        session[account_views.ACCOUNT_KEY] = self.CUSTOMER
+        session.save()
+        with patch_service("my_shop") as my_shop:
+            for name in ("workspace", "shop-profile", "create-listing"):
+                with self.subTest(name):
+                    response = self.client.get(reverse(name))
+                    self.assertRedirects(response, reverse("browse-offers"), fetch_redirect_response=False)
+        my_shop.assert_not_called()

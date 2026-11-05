@@ -238,3 +238,34 @@ class ThrottleTests(AuthAPITestCase):
             self.assertEqual(self.sign_in(email="a@example.test").status_code, 401)
             self.assertEqual(self.sign_in(email="b@example.test").status_code, 401)
             self.assertEqual(self.sign_in(email="c@example.test").status_code, 429)
+
+
+class CustomerRegistrationTests(AuthAPITestCase):
+    url = reverse("auth-register-customer")
+
+    def test_creates_a_customer_and_signs_them_in(self):
+        response = self.client.post(self.url, registration(display_name="Maya"), format="json")
+
+        self.assertEqual(response.status_code, 201)
+        user = User.objects.get()
+        self.assertEqual(user.role, User.Role.CUSTOMER)
+        self.assertFalse(user.is_staff)
+        self.assertEqual(response.data["user"]["role"], "CUSTOMER")
+        self.assertEqual(AccessToken(response.data["access"])["role"], "CUSTOMER")
+
+    def test_cannot_choose_a_role_or_privileges(self):
+        for field, value in (("role", "SHOP_OPERATOR"), ("is_staff", True), ("is_superuser", True)):
+            with self.subTest(field=field):
+                response = self.client.post(self.url, registration(**{field: value}), format="json")
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.data[field], ["This field is not allowed."])
+        self.assertFalse(User.objects.exists())
+
+    def test_rejects_an_email_already_used_by_a_shop_operator(self):
+        User.objects.create_user(email="owner@example.test", password=PASSWORD, display_name="Shop",
+                                 role=User.Role.SHOP_OPERATOR)
+
+        response = self.client.post(self.url, registration(email="Owner@Example.test"), format="json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(User.objects.get().role, User.Role.SHOP_OPERATOR)

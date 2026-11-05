@@ -4,57 +4,74 @@
 
 {% block content %}
 <section class="browse">
-  <h1>Available food</h1>
-  <p class="muted">
-    Surplus food from approved local shops. Pickup times are in Lebanon time,
-    and you pay the shop when you collect.
-  </p>
+  <header class="page-intro">
+    <p class="eyebrow">Available now</p>
+    <h1>Available food</h1>
+    <p class="lead">
+      Surplus food from approved local shops, at a lower price. Pickup times
+      are in Lebanon time, and you pay the shop when you collect.
+    </p>
+  </header>
+
+  <ol class="steps steps--compact" aria-label="How it works">
+    <li><span class="steps__num">1</span><span><strong>Pick an offer</strong> from a shop near you</span></li>
+    <li><span class="steps__num">2</span><span><strong>Go during the pickup time</strong> shown on the offer</span></li>
+    <li><span class="steps__num">3</span><span><strong>Pay at the shop</strong> when you collect</span></li>
+  </ol>
 
   {% if unavailable %}
     <p class="notice notice--warning" role="alert">{{ unavailable }}</p>
   {% elif not offers %}
-    <p class="notice notice--info">
-      There's no food available right now. Check back later today.
-    </p>
+    <div class="empty-state">
+      <h2>Nothing left for now</h2>
+      <p class="notice notice--info">
+        There's no food available right now. Check back later today.
+      </p>
+    </div>
   {% else %}
+    <p class="result-count">{{ offers|length }} offer{{ offers|length|pluralize }} available</p>
     <ul class="offer-grid" aria-label="Food offers">
       {% for offer in offers %}
         <li class="offer-card">
-          {% if offer.photo_url %}
-            <img class="offer-card__photo" src="{{ offer.photo_url }}" alt="Photo of {{ offer.title }}">
-          {% else %}
-            <div class="offer-card__photo offer-card__photo--empty" role="img" aria-label="No photo available">
-              No photo
-            </div>
-          {% endif %}
+          <a class="offer-card__media" href="{% url 'offer-detail' offer.id %}" tabindex="-1" aria-hidden="true">
+            {% if offer.photo_url %}
+              <img class="offer-card__photo" src="{{ offer.photo_url }}" alt="">
+            {% else %}
+              <div class="offer-card__photo offer-card__photo--empty">No photo</div>
+            {% endif %}
+            {% if offer.discount_percent %}<span class="badge badge--deal">−{{ offer.discount_percent }}%</span>{% endif %}
+            <span class="badge badge--stock">{{ offer.free_quantity }} left</span>
+          </a>
 
           <div class="offer-card__body">
+            <p class="offer-card__shop">
+              {{ offer.shop.name }}{% if offer.shop.area %} · {{ offer.shop.area }}{% endif %}
+            </p>
             <h2 class="offer-card__title">
               <a href="{% url 'offer-detail' offer.id %}">{{ offer.title }}</a>
             </h2>
-            <p class="muted">
-              {{ offer.shop.name }}{% if offer.shop.area %} · {{ offer.shop.area }}{% endif %}
-            </p>
-
-            <p class="price">
-              <span class="price__now">${{ offer.discounted_price }}</span>
-              {% if offer.original_price %}
-                <s class="price__was" aria-label="Original price ${{ offer.original_price }}">${{ offer.original_price }}</s>
-              {% endif %}
-            </p>
 
             <dl class="offer-facts">
               <dt>Pickup</dt>
-              <dd>{{ offer.pickup_window }}</dd>
-              <dt>Available</dt>
-              <dd>{{ offer.free_quantity }} left</dd>
+              <dd>
+                {% if offer.pickup_day %}<span class="chip">{{ offer.pickup_day }}</span>{% endif %}
+                {{ offer.pickup_window }}
+              </dd>
               <dt>Allergens</dt>
               <dd>{{ offer.allergens }}</dd>
             </dl>
 
-            <a class="button button--secondary button--block" href="{% url 'offer-detail' offer.id %}">
-              View details<span class="visually-hidden"> for {{ offer.title }}</span>
-            </a>
+            <div class="offer-card__footer">
+              <p class="price">
+                <span class="price__now">${{ offer.discounted_price }}</span>
+                {% if offer.original_price %}
+                  <s class="price__was" aria-label="Original price ${{ offer.original_price }}">${{ offer.original_price }}</s>
+                {% endif %}
+              </p>
+              <a class="button button--primary" href="{% url 'offer-detail' offer.id %}">
+                View offer<span class="visually-hidden">: {{ offer.title }}</span>
+              </a>
+            </div>
           </div>
         </li>
       {% endfor %}

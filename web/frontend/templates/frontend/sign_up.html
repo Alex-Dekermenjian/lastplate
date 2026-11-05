@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Sign up — LastPlate{% endblock %}
+
+{% block content %}
+<section class="choose">
+  <p class="eyebrow">Create your account</p>
+  <h1>How will you use LastPlate?</h1>
+  <p class="lead">Choose one. You can't change the type of an account later.</p>
+
+  <div class="choose__options">
+    <a class="choice" href="{% url 'customer-sign-up' %}">
+      <span class="choice__icon" aria-hidden="true">🛍️</span>
+      <strong>I'm a customer</strong>
+      <span>Find surplus food from local shops at a lower price, and collect it in person.</span>
+      <span class="choice__cta">Sign up as a customer →</span>
+    </a>
+    <a class="choice" href="{% url 'register' %}">
+      <span class="choice__icon" aria-hidden="true">🥐</span>
+      <strong>I'm a restaurant owner</strong>
+      <span>Sell the food you didn't sell today. Your shop is reviewed before it can publish.</span>
+      <span class="choice__cta">Sign up as a restaurant owner →</span>
+    </a>
+  </div>
+
+  <p class="muted">Already have an account? <a href="{% url 'sign-in' %}">Log in</a></p>
+</section>
+{% endblock %}

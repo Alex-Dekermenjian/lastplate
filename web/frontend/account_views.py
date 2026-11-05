@@ -15,7 +15,7 @@ from django.views.decorators.http import require_POST
 from . import services, tokens
 from .browse_views import lebanon_time, pickup_window
 from .listing_photos import photo_url
-from .forms import RegistrationForm, ShopProfileForm, ShopSetupForm, SignInForm
+from .forms import CustomerRegistrationForm, RegistrationForm, ShopProfileForm, ShopSetupForm, SignInForm
 from .services import ServiceUnavailable
 
 ACCOUNT_KEY = "account"
@@ -30,7 +30,7 @@ REGISTRATION_UNCONFIRMED = (
     "Wait a few minutes, then try signing in with these details. If that fails, register again."
 )
 REGISTRATION_FAILED = "We couldn't complete your registration. Please check your details and try again."
-OPERATORS_ONLY = "This sign-in is for shop operators. Customer accounts are not available yet."
+OPERATORS_ONLY = "Shop pages are for restaurant owners. You are signed in as a customer."
 
 STATUS_EXPLANATIONS = {
     "PENDING": ("Pending review", "A LastPlate administrator checks new shops before they can publish offers. You can prepare drafts now, but you can't publish yet."),
@@ -80,6 +80,15 @@ def signed_in(request):
     return bool(tokens.get_refresh_token(request) and request.session.get(ACCOUNT_KEY))
 
 
+def is_operator(request):
+    return (request.session.get(ACCOUNT_KEY) or {}).get("role") == "SHOP_OPERATOR"
+
+
+def start_page(request):
+    """Where each kind of account lands: shops in their workspace, customers on the food list."""
+    return "workspace" if is_operator(request) else "browse-offers"
+
+
 def operator_required(view):
     """Allow signed-in operators only; never cache; end stale sessions cleanly."""
 
@@ -87,6 +96,10 @@ def operator_required(view):
     def wrapper(request, *args, **kwargs):
         if not signed_in(request):
             return redirect(f"{reverse('sign-in')}?{urlencode({'next': request.get_full_path()})}")
+        if not is_operator(request):
+            # Marketplace refuses customer tokens too; this keeps customers on their own pages.
+            messages.info(request, OPERATORS_ONLY)
+            return redirect("browse-offers")
         try:
             return view(request, *args, **kwargs)
         except SessionEnded:
@@ -128,10 +141,11 @@ def create_pending_shop(request, name):
 
 
 @sensitive_variables("data")
-def register_account(form, data):
+def register_account(form, data, create=None):
     """Create the account. Returns (token_data, account) or None after adding form errors."""
+    create = create or services.register
     try:
-        status, body = services.register(data["display_name"], data["email"], data["password"])
+        status, body = create(data["display_name"], data["email"], data["password"])
     except ServiceUnavailable:
         return recover_unconfirmed_registration(form, data)
     if status == 201:
@@ -167,7 +181,7 @@ def recover_unconfirmed_registration(form, data):
 @never_cache
 def register(request):
     if signed_in(request):
-        return redirect("workspace")
+        return redirect(start_page(request))
     form = RegistrationForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         result = register_account(form, form.cleaned_data)
@@ -193,7 +207,7 @@ def sign_in(request):
     if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
         next_url = ""
     if signed_in(request):
-        return redirect(next_url or "workspace")
+        return redirect(next_url or start_page(request))
 
     form = SignInForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -210,13 +224,36 @@ def sign_in(request):
                 form.add_error(None, INVALID_LOGIN)
             elif account_status != 200:
                 form.add_error(None, SIGN_IN_UNAVAILABLE)
-            elif account["role"] != "SHOP_OPERATOR":
-                revoke(token_data["refresh"])
-                form.add_error(None, OPERATORS_ONLY)
             else:
                 start_session(request, token_data, account)
+                if account["role"] != "SHOP_OPERATOR":
+                    # Customers go to the food list, never to a shop page.
+                    return redirect("browse-offers")
                 return redirect(next_url or "workspace")
     return render(request, "frontend/sign_in.html", {"form": form, "next": next_url})
+
+
+@never_cache
+def sign_up(request):
+    """First step of sign-up: are you a customer or a restaurant owner?"""
+    if signed_in(request):
+        return redirect(start_page(request))
+    return render(request, "frontend/sign_up.html")
+
+
+@sensitive_post_parameters("password", "password_confirm")
+@never_cache
+def customer_sign_up(request):
+    if signed_in(request):
+        return redirect(start_page(request))
+    form = CustomerRegistrationForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        result = register_account(form, form.cleaned_data, create=services.register_customer)
+        if result:
+            start_session(request, *result)
+            messages.success(request, f"Welcome to LastPlate, {result[1]['display_name']}! Here's the food available now.")
+            return redirect("browse-offers")
+    return render(request, "frontend/customer_sign_up.html", {"form": form})
 
 
 def revoke(refresh_token):

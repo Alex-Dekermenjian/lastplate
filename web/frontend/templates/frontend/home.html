@@ -3,25 +3,68 @@
 {% block title %}LastPlate — surplus food from local shops{% endblock %}
 
 {% block content %}
-<h1>LastPlate</h1>
-<p>Surplus food from local shops, at a lower price, collected in person.</p>
-<p>
-  <a class="button button--primary" href="{% url 'browse-offers' %}">Browse available food</a>
-</p>
+<section class="hero">
+  <div class="hero__text">
+    <p class="eyebrow">Beirut · Surplus food, collected in person</p>
+    <h1>Good food from local shops, at a lower price.</h1>
+    <p class="lead">
+      Bakeries and food shops list what they didn't sell today. You pick an
+      offer, collect it during the pickup time and pay at the shop.
+      Less waste, better prices.
+    </p>
+    <div class="hero__actions">
+      <a class="button button--primary button--large" href="{% url 'browse-offers' %}">Browse available food</a>
+      <a class="button button--secondary button--large" href="{% url 'sign-up' %}">Sign up</a>
+    </div>
+  </div>
+  <ul class="hero__facts" aria-label="Why LastPlate">
+    <li><strong>Lower prices</strong><span>Every offer shows the original and the discounted price.</span></li>
+    <li><strong>Approved shops only</strong><span>Each shop is reviewed by the LastPlate team before it can publish.</span></li>
+    <li><strong>Pay at pickup</strong><span>No online payment. You pay the shop when you collect.</span></li>
+  </ul>
+</section>
 
-<p class="muted">Run a shop? <a href="{% url 'register' %}">Register it</a> to publish your surplus food.</p>
+<section class="section">
+  <h2>How it works for customers</h2>
+  <ol class="steps">
+    <li><span class="steps__num">1</span><span><strong>Browse offers</strong>See today's surplus food, prices, allergens and how many are left.</span></li>
+    <li><span class="steps__num">2</span><span><strong>Check pickup</strong>Each offer shows the shop's address and pickup time in Lebanon time.</span></li>
+    <li><span class="steps__num">3</span><span><strong>Collect and pay</strong>Go to the shop during the pickup time and pay there.</span></li>
+  </ol>
+</section>
 
-<details class="dev-status">
-  <summary>Service status (for developers)</summary>
-<table>
-  <thead>
-    <tr><th>Service</th><th>Readiness</th><th>Detail</th></tr>
-  </thead>
-  <tbody>
-    {% for status in statuses %}
-    <tr><td>{{ status.name }}</td><td>{{ status.state }}</td><td>{{ status.detail }}</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
-</details>
+<section class="section split">
+  <div>
+    <h2>For shops</h2>
+    <p class="lead">Turn food you would throw away into revenue, in a few minutes a day.</p>
+    <ul class="checklist">
+      <li>Register your shop and complete your profile</li>
+      <li>Get approved by the LastPlate team</li>
+      <li>Publish offers with photos, ingredients and allergens</li>
+      <li>Adjust stock during the day; every change is recorded</li>
+    </ul>
+    <p class="button-row">
+      <a class="button button--primary" href="{% url 'register' %}">Register your shop</a>
+      <a class="button button--secondary" href="{% url 'sign-in' %}">Shop sign-in</a>
+    </p>
+  </div>
+  <div class="panel">
+    <h3>System status</h3>
+    <p class="muted small">Each part of LastPlate runs as its own service with its own database.</p>
+    <table class="status-table">
+      <thead>
+        <tr><th>Service</th><th>Readiness</th><th>Detail</th></tr>
+      </thead>
+      <tbody>
+        {% for status in statuses %}
+        <tr>
+          <td>{{ status.name }}</td>
+          <td><span class="dot {% if status.state == 'ready' %}dot--ok{% else %}dot--bad{% endif %}"></span>{{ status.state }}</td>
+          <td class="muted small">{{ status.detail }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
 {% endblock %}

@@ -4,6 +4,7 @@
 
 {% block content %}
 <section class="card">
+  <p class="eyebrow">Restaurant owner account</p>
   <h1>Register your shop</h1>
   <p class="muted">Create a shop-operator account. New shops start as Pending until a LastPlate administrator reviews them.</p>
   <form method="post" novalidate>
@@ -11,6 +12,6 @@
     {% include "frontend/_form.html" %}
     <button class="button button--primary button--block" type="submit">Create account</button>
   </form>
-  <p class="muted" style="margin-top: 16px;">Already registered? <a href="{% url 'sign-in' %}">Sign in</a></p>
+  <p class="muted" style="margin-top: 16px;">Here to buy food? <a href="{% url 'customer-sign-up' %}">Sign up as a customer</a> · <a href="{% url 'sign-in' %}">Log in</a></p>
 </section>
 {% endblock %}

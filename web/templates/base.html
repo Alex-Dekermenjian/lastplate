@@ -7,22 +7,26 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Fraunces:opsz,wght@9..144,600&display=swap">
-  <link rel="stylesheet" href="{% static 'css/lastplate.css' %}">
+  <link rel="stylesheet" href="{% static 'css/lastplate.css' %}?v=sprint1-demo">
 </head>
 <body>
   <header class="site-header">
-    <a class="logo" href="{% url 'home' %}">LastPlate</a>
-    <nav class="site-nav" aria-label="Main">
-      <a class="site-nav__link" href="{% url 'browse-offers' %}">Browse food</a>
+    <a class="logo" href="{% url 'home' %}"><span class="logo__mark" aria-hidden="true"></span>LastPlate</a>
+    <nav class="site-nav" aria-label="Account">
+      <a class="nav-link" href="{% url 'browse-offers' %}">Browse food</a>
       {% if request.session.account %}
-        <a class="button button--secondary" href="{% url 'workspace' %}">Workspace</a>
+        {% if request.session.account.role == "SHOP_OPERATOR" %}
+          <a class="button button--secondary" href="{% url 'workspace' %}">Workspace</a>
+        {% else %}
+          <span class="nav-label nav-label--user">Hi, {{ request.session.account.display_name }}</span>
+        {% endif %}
         <form method="post" action="{% url 'sign-out' %}">
           {% csrf_token %}
           <button class="button button--primary" type="submit">Sign out</button>
         </form>
       {% else %}
-        <a class="button button--secondary" href="{% url 'sign-in' %}">Sign in</a>
-        <a class="button button--primary" href="{% url 'register' %}">Register your shop</a>
+        <a class="button button--secondary" href="{% url 'sign-in' %}">Log in</a>
+        <a class="button button--primary" href="{% url 'sign-up' %}">Sign up</a>
       {% endif %}
     </nav>
   </header>
@@ -36,5 +40,9 @@
     {% endif %}
     {% block content %}{% endblock %}
   </main>
+  <footer class="site-footer">
+    <p><strong>LastPlate</strong> · Surplus food from approved local shops in Beirut</p>
+    <p class="muted small">EECE430 project · Pay at pickup · Times shown in Lebanon time</p>
+  </footer>
 </body>
 </html>

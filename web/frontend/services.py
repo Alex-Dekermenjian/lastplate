@@ -162,6 +162,20 @@ def register(display_name, email, password):
 
 
 @sensitive_variables("password")
+def register_customer(display_name, email, password):
+    return _call(
+        "accounts",
+        "POST",
+        "/api/auth/register/customer/",
+        {
+            "display_name": display_name,
+            "email": email,
+            "password": password,
+        },
+    )
+
+
+@sensitive_variables("password")
 def sign_in(email, password):
     return _call(
         "accounts",

@@ -91,16 +91,16 @@ class AnonymousIsBlockedTests(WebAuthTestCase):
 
 class WrongRoleIsBlockedTests(WebAuthTestCase):
 
-    def test_customer_cannot_get_a_workspace_session(self):
+    def test_customer_cannot_reach_the_workspace(self):
         customer = {**ACCOUNT, "role": "CUSTOMER"}
         with patch_service("sign_in", return_value=(200, {"access": "a", "refresh": "r"})), \
-                patch_service("account", return_value=(200, customer)), \
-                patch_service("sign_out", return_value=(200, {})) as sign_out:
+                patch_service("account", return_value=(200, customer)):
             self.client.post(reverse("sign-in"), {"email": "c@example.test", "password": "pw-Local-1"})
 
-        self.assertNotIn(tokens.REFRESH_TOKEN_KEY, self.client.session)
-        sign_out.assert_called_once_with("r")
-        self.assertEqual(self.client.get(reverse("workspace")).status_code, 302)
+        with patch_service("my_shop") as my_shop:
+            response = self.client.get(reverse("workspace"))
+        self.assertRedirects(response, reverse("browse-offers"), fetch_redirect_response=False)
+        my_shop.assert_not_called()
 
 
 class SignedInOperatorTests(WebAuthTestCase):

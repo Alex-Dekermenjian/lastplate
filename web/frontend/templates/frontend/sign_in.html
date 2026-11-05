@@ -5,13 +5,13 @@
 {% block content %}
 <section class="card">
   <h1>Sign in</h1>
-  <p class="muted">Welcome back. Sign in to manage your shop.</p>
+  <p class="muted">Welcome back. Customers go straight to the food; restaurant owners go to their shop workspace.</p>
   <form method="post" novalidate>
     {% csrf_token %}
     {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
     {% include "frontend/_form.html" %}
     <button class="button button--primary button--block" type="submit">Sign in</button>
   </form>
-  <p class="muted" style="margin-top: 16px;">New to LastPlate? <a href="{% url 'register' %}">Register your shop</a></p>
+  <p class="muted" style="margin-top: 16px;">New to LastPlate? <a href="{% url 'sign-up' %}">Sign up</a></p>
 </section>
 {% endblock %}

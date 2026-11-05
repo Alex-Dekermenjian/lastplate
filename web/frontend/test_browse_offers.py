@@ -174,6 +174,24 @@ class BrowseOffersPageTests(TestCase):
             response, "http://127.0.0.1:8002/media/listing_photos/42/photo.jpg"
         )
 
+    @override_settings(
+        DEBUG=True,
+        SERVICE_URLS={**settings.SERVICE_URLS, "marketplace": "http://marketplace:8000"},
+        MARKETPLACE_PUBLIC_URL="http://127.0.0.1:8002",
+    )
+    def test_photo_uses_browser_address_under_docker(self):
+        response, _ = self.browse(
+            return_value=(
+                200,
+                [offer(photo_display="/media/listing_photos/42/photo.jpg")],
+            )
+        )
+
+        self.assertContains(
+            response, "http://127.0.0.1:8002/media/listing_photos/42/photo.jpg"
+        )
+        self.assertNotContains(response, "marketplace:8000")
+
     def test_post_is_not_allowed(self):
         response = self.client.post(self.url)
 

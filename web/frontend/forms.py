@@ -1,15 +1,10 @@
 from django import forms
 
 
-class RegistrationForm(forms.Form):
+class CustomerRegistrationForm(forms.Form):
     display_name = forms.CharField(
         label="Your name", max_length=150,
         widget=forms.TextInput(attrs={"autocomplete": "name"}),
-    )
-    shop_name = forms.CharField(
-        label="Shop name", max_length=150,
-        help_text="As customers will see it. You can complete the rest of your profile later.",
-        widget=forms.TextInput(attrs={"autocomplete": "organization"}),
     )
     email = forms.EmailField(
         label="Email", max_length=254,
@@ -30,6 +25,18 @@ class RegistrationForm(forms.Form):
         if cleaned.get("password") and cleaned.get("password") != cleaned.get("password_confirm"):
             self.add_error("password_confirm", "The passwords do not match.")
         return cleaned
+
+
+class RegistrationForm(CustomerRegistrationForm):
+    """Restaurant-owner sign-up: the customer fields plus the shop name."""
+
+    shop_name = forms.CharField(
+        label="Shop name", max_length=150,
+        help_text="As customers will see it. You can complete the rest of your profile later.",
+        widget=forms.TextInput(attrs={"autocomplete": "organization"}),
+    )
+
+    field_order = ["display_name", "shop_name", "email", "password", "password_confirm"]
 
 
 class SignInForm(forms.Form):

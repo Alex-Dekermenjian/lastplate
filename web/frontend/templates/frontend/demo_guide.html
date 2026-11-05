@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Sprint 1 demo — LastPlate{% endblock %}
+
+{% block content %}
+<header class="page-intro">
+  <p class="eyebrow">Sprint 1 demonstration · LP-7 to LP-15</p>
+  <h1>Sprint 1 demo guide</h1>
+  <p class="lead">
+    Every Sprint 1 story, in order, in one tab. Open each step, show it, then use
+    your browser's Back button (or the <strong>Demo guide</strong> bookmark) to return here.
+    All shops and offers are fictional demo data.
+  </p>
+</header>
+
+<section class="panel demo-accounts">
+  <h2>Demo accounts</h2>
+  <p class="muted small">The password is the one you gave <code>scripts/seed_demo.py</code>. Share it only with the team.</p>
+  <dl class="details">
+    <dt>Customer</dt><dd><code>customer@demo.lastplate.test</code></dd>
+    <dt>Approved bakery</dt><dd><code>cedar@demo.lastplate.test</code></dd>
+    <dt>Approved patisserie</dt><dd><code>sunrise@demo.lastplate.test</code></dd>
+    <dt>Pending shop</dt><dd><code>newshop@demo.lastplate.test</code></dd>
+    <dt>Team admin</dt><dd><code>demo-admin</code> (shop review)</dd>
+  </dl>
+</section>
+
+<ol class="demo-steps">
+  <li class="demo-step">
+    <p class="demo-step__key">LP-7 · Team 3</p>
+    <h2>Register and sign in as a shop operator</h2>
+    <p>Click <strong>Sign up</strong> and choose <strong>I'm a restaurant owner</strong>. Register a shop with a new email each run (for example <code>live1@demo.lastplate.test</code>). The workspace shows <strong>Pending review</strong>. Sign out, then log in again: restaurant owners land in their workspace.</p>
+    <p class="button-row">
+      <a class="button button--primary" href="{% url 'sign-up' %}">Sign up</a>
+      <a class="button button--secondary" href="{% url 'sign-in' %}">Log in</a>
+    </p>
+  </li>
+
+  <li class="demo-step">
+    <p class="demo-step__key">LP-8 · Team 3</p>
+    <h2>Create and update the shop profile</h2>
+    <p>Fill in the pickup address, area and shop phone, then save. A shop needs a complete profile before it can be approved.</p>
+    <p class="button-row"><a class="button button--primary" href="{% url 'shop-profile' %}">Open shop profile</a></p>
+  </li>
+
+  <li class="demo-step">
+    <p class="demo-step__key">LP-9 · Team 3</p>
+    <h2>Approve or reject shop accounts as an administrator</h2>
+    <p>Sign in as <code>demo-admin</code>. Open the new shop (or <strong>Zaatar Corner (demo)</strong>), choose <strong>Approved</strong>, tick the identity check and save. Optional: show that rejecting without a reason is refused. The admin belongs to the Marketplace service.</p>
+    <p class="button-row"><a class="button button--primary" href="{{ admin_url }}">Open shop review</a></p>
+  </li>
+
+  <li class="demo-step">
+    <p class="demo-step__key">LP-10 · Team 2</p>
+    <h2>Create, save drafts and publish food offers</h2>
+    <p>Sign in as <code>cedar@demo.lastplate.test</code>. Publish the <strong>Cinnamon rolls</strong> draft, then create a new offer, save it as a draft and publish it.</p>
+    <p class="button-row">
+      <a class="button button--primary" href="{% url 'workspace' %}">Open workspace</a>
+      <a class="button button--secondary" href="{% url 'create-listing' %}">Create food offer</a>
+    </p>
+  </li>
+
+  <li class="demo-step">
+    <p class="demo-step__key">LP-11 · Team 2</p>
+    <h2>Listing photos and ingredient information</h2>
+    <p>While creating the offer, upload a JPEG or PNG photo and add ingredients and allergens. Customers see both on the offer page.</p>
+    <p class="button-row"><a class="button button--primary" href="{% url 'create-listing' %}">Create offer with photo</a></p>
+  </li>
+
+  <li class="demo-step">
+    <p class="demo-step__key">LP-12 · Team 2</p>
+    <h2>Manage shop offers and adjust available stock</h2>
+    <p>On <strong>Butter croissants</strong>, enter <code>-2</code> in <strong>Adjust stock</strong> with the reason "Two boxes sold at the counter", then click <strong>Update stock</strong>. The stock goes from 6 to 4, and the change is recorded with its reason.</p>
+    <p class="button-row"><a class="button button--primary" href="{% url 'workspace' %}">Open workspace</a></p>
+  </li>
+
+  <li class="demo-step">
+    <p class="demo-step__key">LP-13 · Team 1</p>
+    <h2>Browse available food and view offer details</h2>
+    <p>Sign out, click <strong>Sign up</strong> and choose <strong>I'm a customer</strong> (or log in as <code>customer@demo.lastplate.test</code>). Customers land straight on the food list. The newly published offers appear, the croissants show <strong>4 left</strong>, and the pending shop's food is not listed. Open an offer to show the price, pickup time, address, ingredients and allergens.</p>
+    <p class="button-row">
+      <a class="button button--primary" href="{% url 'customer-sign-up' %}">Sign up as a customer</a>
+      <a class="button button--secondary" href="{% url 'browse-offers' %}">Browse available food</a>
+    </p>
+  </li>
+
+  <li class="demo-step">
+    <p class="demo-step__key">LP-14 · Team 1</p>
+    <h2>Verify account permissions and input validation</h2>
+    <ul class="checklist">
+      <li>Create an offer with a discounted price above the original price: it is refused with a clear message.</li>
+      <li>Sign in as the pending shop: it cannot publish.</li>
+      <li>Signed in as a customer, open the workspace: you are sent back to the food list.</li>
+      <li>Sign out and open the workspace: you are sent to log in.</li>
+    </ul>
+    <p class="button-row"><a class="button button--primary" href="{% url 'workspace' %}">Try the workspace</a></p>
+  </li>
+
+  <li class="demo-step">
+    <p class="demo-step__key">LP-15 · All teams</p>
+    <h2>Integrate, test and deploy the Sprint 1 demonstration</h2>
+    <ul class="checklist">
+      <li>Four services (Accounts, Marketplace, Reservations, Web), each with its own database, all reporting <strong>ready</strong> on the home page.</li>
+      <li>Automated tests for every service run in GitHub Actions, plus a Docker Compose smoke check.</li>
+      <li>One command loads this demo: <code>scripts/seed_demo.py</code>.</li>
+    </ul>
+    <p class="button-row"><a class="button button--primary" href="{% url 'home' %}">Show system status</a></p>
+  </li>
+</ol>
+{% endblock %}

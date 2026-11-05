@@ -10,9 +10,11 @@ DUPLICATE_EMAIL = "An account with this email already exists."
 INVALID_CREDENTIALS = "Email or password is incorrect."
 
 
-class ShopOperatorRegistrationSerializer(serializers.Serializer):
-    """Public shop-operator sign-up. Only these three fields are accepted;
-    the role is always set by the server."""
+class RegistrationSerializer(serializers.Serializer):
+    """Public sign-up. Only these three fields are accepted; the role comes
+    from the subclass, never from the request."""
+
+    role = None
 
     display_name = serializers.CharField(max_length=150)
     email = serializers.EmailField(max_length=254)
@@ -46,10 +48,18 @@ class ShopOperatorRegistrationSerializer(serializers.Serializer):
         try:
             with transaction.atomic():
                 # create_user never sets is_staff or is_superuser.
-                return User.objects.create_user(**validated_data, role=User.Role.SHOP_OPERATOR)
+                return User.objects.create_user(**validated_data, role=self.role)
         except IntegrityError:
             # A concurrent sign-up with the same email won the race.
             raise serializers.ValidationError({"email": [DUPLICATE_EMAIL]})
+
+
+class ShopOperatorRegistrationSerializer(RegistrationSerializer):
+    role = User.Role.SHOP_OPERATOR
+
+
+class CustomerRegistrationSerializer(RegistrationSerializer):
+    role = User.Role.CUSTOMER
 
 
 class UserSerializer(serializers.ModelSerializer):
