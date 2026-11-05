@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Sign up — LastPlate{% endblock %}
+
+{% block content %}
+<section class="auth">
+  <div class="card">
+    <h1>Create your account</h1>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% for error in form.non_field_errors %}
+        <p class="notice notice--error" role="alert">{{ error }}</p>
+      {% endfor %}
+
+      <fieldset class="choice-group{% if form.account_type.errors %} choice-group--error{% endif %}">
+        <legend>{{ form.account_type.label }}</legend>
+        <div class="choice-cards">
+          {% for choice in form.account_type %}
+            <label class="choice-card" for="{{ choice.id_for_label }}">
+              {{ choice.tag }}
+              <svg class="choice-card__icon" aria-hidden="true" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                {% if choice.data.value == "customer" %}<path d="M6 7h12l-1 13H7L6 7z"/><path d="M9 7a3 3 0 0 1 6 0"/>{% else %}<path d="M3 9l2-5h14l2 5"/><path d="M3 9h18"/><path d="M5 9v11h14V9"/><path d="M10 20v-5h4v5"/>{% endif %}
+              </svg>
+              <span class="choice-card__label">{{ choice.choice_label }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        {% for error in form.account_type.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+      </fieldset>
+
+      {% for field in form %}
+        {% if field.name != "account_type" %}
+          <div class="field{% if field.errors %} field--error{% endif %}">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {% if field.help_text %}<p class="help" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>{% endif %}
+            {{ field }}
+            {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+          </div>
+        {% endif %}
+      {% endfor %}
+      <button class="button button--primary button--block" type="submit">Create account</button>
+    </form>
+  </div>
+
+  <p class="auth__switch">Already have an account? <a href="{% url 'login' %}">Log in</a></p>
+</section>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}My account — LastPlate{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h1>{{ account.display_name }}</h1>
+  <p class="muted">{{ account.email }}</p>
+  <p>Orders and saved places are coming soon. For now you can browse food near you.</p>
+  <a class="button button--primary button--block" href="{% url 'browse-offers' %}">Browse available food</a>
+</section>
+{% endblock %}

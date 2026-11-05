@@ -5,9 +5,11 @@ it returns: times in Lebanon local time, "Unknown" for missing ingredient or
 allergen information, and safe photo links.
 """
 
+from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
 
 from django.shortcuts import render
+from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_GET
 
@@ -47,6 +49,19 @@ def pickup_window(start, end):
     return f"{_day(start)}, {start:%H:%M} – {_day(end)}, {end:%H:%M}"
 
 
+def discount_percent(original, discounted):
+    """Whole-number saving, for example 56 for $8.00 down to $3.50, or None."""
+    try:
+        was, now = Decimal(str(original)), Decimal(str(discounted))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+
+    if was <= 0 or now < 0 or now >= was:
+        return None
+
+    return int((was - now) * 100 / was)
+
+
 def _known(value):
     if isinstance(value, str) and value.strip():
         return value.strip()
@@ -72,6 +87,11 @@ def offer_for_display(data):
         "free_quantity": data.get("free_quantity"),
         "pickup_address": data.get("pickup_address") or "",
         "pickup_window": pickup_window(start, end),
+        "pickup_today": start is not None
+        and start.date() == timezone.now().astimezone(LEBANON).date(),
+        "discount_percent": discount_percent(
+            data.get("original_price"), data.get("discounted_price")
+        ),
         "terms_revision": data.get("terms_revision"),
         "shop": {
             "name": shop.get("name") or "",

@@ -1,8 +1,13 @@
-"""Shop-operator registration, sign-in, sign-out and workspace (LP-7)."""
+"""Login, sign-up, sign-out and the shop workspace (LP-7, LP-56).
+
+One login page serves every account; the account's role decides where it lands
+and which pages it may open.
+"""
 
 from functools import wraps
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -15,11 +20,14 @@ from django.views.decorators.http import require_POST
 from . import services, tokens
 from .browse_views import lebanon_time, pickup_window
 from .listing_photos import photo_url
-from .forms import RegistrationForm, ShopProfileForm, ShopSetupForm, SignInForm
+from .forms import LoginForm, ShopProfileForm, ShopSetupForm, SignUpForm
 from .services import ServiceUnavailable
 
 ACCOUNT_KEY = "account"
 PENDING_SHOP_KEY = "pending_shop_name"
+
+CUSTOMER = "CUSTOMER"
+SHOP_OPERATOR = "SHOP_OPERATOR"
 
 INVALID_LOGIN = "Email or password is incorrect."
 TOO_MANY_SIGN_INS = "Too many sign-in attempts. Please wait a minute and try again."
@@ -27,10 +35,11 @@ TOO_MANY_REGISTRATIONS = "Too many registration attempts from this connection. P
 SIGN_IN_UNAVAILABLE = "Sign-in is temporarily unavailable. Please try again in a few minutes."
 REGISTRATION_UNCONFIRMED = (
     "We couldn't reach the account service, so we can't tell whether your account was created. "
-    "Wait a few minutes, then try signing in with these details. If that fails, register again."
+    "Wait a few minutes, then try logging in with these details. If that fails, sign up again."
 )
-REGISTRATION_FAILED = "We couldn't complete your registration. Please check your details and try again."
-OPERATORS_ONLY = "This sign-in is for shop operators. Customer accounts are not available yet."
+REGISTRATION_FAILED = "We couldn't complete your sign-up. Please check your details and try again."
+SHOPS_ONLY = "That page is for restaurant accounts."
+CUSTOMERS_ONLY = "That page is for customer accounts."
 
 STATUS_EXPLANATIONS = {
     "PENDING": ("Pending review", "A LastPlate administrator checks new shops before they can publish offers. You can prepare drafts now, but you can't publish yet."),
@@ -73,28 +82,49 @@ def listing_summary(listing, shop):
 
 
 class SessionEnded(Exception):
-    """The refresh token was rejected; the operator must sign in again."""
+    """The refresh token was rejected; the person must log in again."""
 
 
 def signed_in(request):
     return bool(tokens.get_refresh_token(request) and request.session.get(ACCOUNT_KEY))
 
 
-def operator_required(view):
-    """Allow signed-in operators only; never cache; end stale sessions cleanly."""
+def landing_url(account):
+    """Where an account goes after login, or when it opens a page that isn't for it."""
+    if account.get("is_staff"):
+        return settings.STAFF_ADMIN_URL  # TODO: /console later
+    if account.get("role") == SHOP_OPERATOR:
+        return reverse("workspace")  # TODO: /business later
+    return reverse("home")
 
-    @wraps(view)
-    def wrapper(request, *args, **kwargs):
-        if not signed_in(request):
-            return redirect(f"{reverse('sign-in')}?{urlencode({'next': request.get_full_path()})}")
-        try:
-            return view(request, *args, **kwargs)
-        except SessionEnded:
-            tokens.clear_tokens(request)
-            messages.info(request, "Your session has ended. Please sign in again.")
-            return redirect("sign-in")
 
-    return never_cache(wrapper)
+def role_required(role, refusal):
+    """Allow signed-in accounts with this role only; never cache; end stale
+    sessions cleanly. Anyone else is sent to their own landing page."""
+
+    def decorator(view):
+        @wraps(view)
+        def wrapper(request, *args, **kwargs):
+            if not signed_in(request):
+                return redirect(f"{reverse('login')}?{urlencode({'next': request.get_full_path()})}")
+            account = request.session[ACCOUNT_KEY]
+            if account.get("role") != role:
+                messages.info(request, refusal)
+                return redirect(landing_url(account))
+            try:
+                return view(request, *args, **kwargs)
+            except SessionEnded:
+                tokens.clear_tokens(request)
+                messages.info(request, "Your session has ended. Please log in again.")
+                return redirect("login")
+
+        return never_cache(wrapper)
+
+    return decorator
+
+
+operator_required = role_required(SHOP_OPERATOR, SHOPS_ONLY)
+customer_required = role_required(CUSTOMER, CUSTOMERS_ONLY)
 
 
 def authenticated_call(request, call, *args):
@@ -109,9 +139,13 @@ def authenticated_call(request, call, *args):
     return call(refreshed["access"], *args)
 
 
-def start_session(request, token_data, account):
+def start_session(request, token_data, account, remember=True):
     tokens.store_tokens(request, token_data["access"], token_data["refresh"])
     request.session[ACCOUNT_KEY] = {key: account[key] for key in ("id", "email", "display_name", "role")}
+    if not remember:
+        # Without "Keep me logged in" the session ends when the browser closes.
+        # With it, the session lasts SESSION_COOKIE_AGE, the refresh-token lifetime.
+        request.session.set_expiry(0)
 
 
 def create_pending_shop(request, name):
@@ -131,7 +165,9 @@ def create_pending_shop(request, name):
 def register_account(form, data):
     """Create the account. Returns (token_data, account) or None after adding form errors."""
     try:
-        status, body = services.register(data["display_name"], data["email"], data["password"])
+        status, body = services.register(
+            data["display_name"], data["email"], data["password"], data["account_type"]
+        )
     except ServiceUnavailable:
         return recover_unconfirmed_registration(form, data)
     if status == 201:
@@ -163,39 +199,40 @@ def recover_unconfirmed_registration(form, data):
     return None
 
 
-@sensitive_post_parameters("password", "password_confirm")
+@sensitive_post_parameters("password")
 @never_cache
-def register(request):
+def signup(request):
     if signed_in(request):
-        return redirect("workspace")
-    form = RegistrationForm(request.POST or None)
+        return redirect(landing_url(request.session[ACCOUNT_KEY]))
+    form = SignUpForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         result = register_account(form, form.cleaned_data)
         if result:
-            start_session(request, *result)
-            shop_name = form.cleaned_data["shop_name"]
-            request.session[PENDING_SHOP_KEY] = shop_name
-            if create_pending_shop(request, shop_name):
-                return redirect("workspace")
-            messages.warning(
-                request,
-                "Your account is ready, but we couldn't set up your shop yet. "
-                "Use “Finish shop setup” to try again.",
-            )
-            return redirect("finish-setup")
-    return render(request, "frontend/register.html", {"form": form})
+            token_data, account = result
+            start_session(request, token_data, account)
+            if account["role"] == SHOP_OPERATOR:
+                messages.success(request, "Your account is ready. Now tell us your restaurant's name.")
+                return redirect("finish-setup")
+            messages.success(request, f"Welcome to LastPlate, {account['display_name']}!")
+            return redirect(landing_url(account))
+    return render(request, "frontend/signup.html", {"form": form})
+
+
+def safe_next(request):
+    next_url = request.POST.get("next") or request.GET.get("next") or ""
+    if url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        return next_url
+    return ""
 
 
 @sensitive_post_parameters("password")
 @never_cache
-def sign_in(request):
-    next_url = request.POST.get("next") or request.GET.get("next") or ""
-    if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
-        next_url = ""
+def login(request):
+    next_url = safe_next(request)
     if signed_in(request):
-        return redirect(next_url or "workspace")
+        return redirect(next_url or landing_url(request.session[ACCOUNT_KEY]))
 
-    form = SignInForm(request.POST or None)
+    form = LoginForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         try:
             status, token_data = services.sign_in(form.cleaned_data["email"], form.cleaned_data["password"])
@@ -210,13 +247,18 @@ def sign_in(request):
                 form.add_error(None, INVALID_LOGIN)
             elif account_status != 200:
                 form.add_error(None, SIGN_IN_UNAVAILABLE)
-            elif account["role"] != "SHOP_OPERATOR":
+            elif account.get("is_staff"):
+                # Staff work in the Django admin, which has its own login, so
+                # no web session is kept for them.
                 revoke(token_data["refresh"])
-                form.add_error(None, OPERATORS_ONLY)
+                return redirect(landing_url(account))
+            elif account.get("role") not in (CUSTOMER, SHOP_OPERATOR):
+                revoke(token_data["refresh"])
+                form.add_error(None, SIGN_IN_UNAVAILABLE)
             else:
-                start_session(request, token_data, account)
-                return redirect(next_url or "workspace")
-    return render(request, "frontend/sign_in.html", {"form": form, "next": next_url})
+                start_session(request, token_data, account, remember=form.cleaned_data["remember_me"])
+                return redirect(next_url or landing_url(account))
+    return render(request, "frontend/login.html", {"form": form, "next": next_url})
 
 
 def revoke(refresh_token):
@@ -242,11 +284,16 @@ def sign_out(request):
             "You have signed out of this browser. We couldn't reach the account service to revoke "
             "your sign-in token; it was stored only on our server, has been deleted, and expires within 24 hours.",
         )
-    return redirect("sign-in")
+    return redirect("login")
+
+
+@customer_required
+def my_account(request):
+    """A customer's own account page (LP-56). Only customers may open it."""
+    return render(request, "frontend/my_account.html", {"account": request.session[ACCOUNT_KEY]})
 
 
 @operator_required
-
 def workspace(request):
     try:
         status, shop = authenticated_call(
