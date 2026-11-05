@@ -130,6 +130,31 @@ p { margin: 0 0 12px; }
 .dev-status { margin-top: 32px; color: var(--text-2); }
 .dev-status summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
 
+/* LP-56: login and sign-up */
+.auth { display: grid; gap: 16px; }
+.auth__brand { display: grid; justify-items: center; gap: 8px; padding: 8px 0 4px; text-align: center; }
+.logo__mark--large { width: 56px; height: 56px; border-width: 6px; box-shadow: inset 0 0 0 9px var(--accent); }
+.auth__tagline { margin: 0; color: var(--text-2); }
+.auth__switch { margin: 0; text-align: center; color: var(--text-2); }
+.check { display: flex; align-items: center; gap: 10px; min-height: 44px; margin: -4px 0 16px; }
+.check input { width: 22px; height: 22px; margin: 0; accent-color: var(--btn); }
+.check label { font-weight: 700; }
+.choice-group { margin: 0 0 20px; padding: 0; border: 0; }
+.choice-group legend { margin-bottom: 10px; padding: 0; font-weight: 800; font-size: 17px; }
+.choice-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.choice-card {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; min-height: 120px; padding: 16px 12px; text-align: center; cursor: pointer;
+  background: var(--surface); border: 2px solid var(--border); border-radius: 16px;
+  color: var(--text); font-weight: 800;
+}
+.choice-card input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.choice-card__icon { color: var(--btn); }
+.choice-card:hover { border-color: var(--btn); }
+.choice-card:has(input:checked) { background: var(--tint); border-color: var(--btn); }
+.choice-card:has(input:focus-visible) { outline: 3px solid var(--btn); outline-offset: 2px; }
+.choice-group--error .choice-card { border-color: var(--danger); }
+
 /* Buttons: pills */
 .button {
   display: inline-flex; align-items: center; justify-content: center;

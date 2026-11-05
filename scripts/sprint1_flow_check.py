@@ -133,8 +133,9 @@ def api(method, url, payload=None, token=None):
 def new_operator(browser, label):
     email = f"flowcheck-{label}-{RUN}@example.test"
     shop = f"FLOWCHECK {label} shop {RUN} (fictional)"
-    browser.post(f"{WEB}/register/", {"display_name": f"Flowcheck {label} (fictional)", "shop_name": shop, "email": email,
-                                      "password": OWNER_PASSWORD, "password_confirm": OWNER_PASSWORD})
+    browser.post(f"{WEB}/signup/", {"account_type": "restaurant", "display_name": f"Flowcheck {label} (fictional)",
+                                    "email": email, "password": OWNER_PASSWORD})
+    browser.post(f"{WEB}/workspace/finish-setup/", {"shop_name": shop})
     browser.post(f"{WEB}/workspace/profile/", {"name": shop, "address": "12 Sample Street, Beirut (fictional)", "area": "Hamra",
                                                "public_contact": "+961 1 234 567"})
     _, tokens = api("POST", f"{ACCOUNTS}/api/auth/token/", {"email": email, "password": OWNER_PASSWORD})
@@ -245,7 +246,7 @@ def run():
     check(api("PATCH", f"{MARKET}/api/listings/{listing['id']}", {"title": "x"}, other_token)[0] == 404, "API: cannot edit another shop's draft")
     check(api("POST", f"{MARKET}/api/listings/{lid}/stock-adjustments", {"quantity_change": 1, "reason": "x"}, other_token)[0] == 403, "API: cannot adjust another shop's stock")
     check(api("POST", f"{MARKET}/api/listings", {"title": "x"})[0] == 401, "API: no token is refused")
-    check("/sign-in" in Browser().get(new_offer)[1], "anonymous visitor is sent to sign-in")
+    check("/login" in Browser().get(new_offer)[1], "anonymous visitor is sent to login")
 
     section("Offers that must leave public view")
     owner.post(stock_url, {"quantity_change": "-12", "reason": "Fictional sell-out"}, form_url=workspace)

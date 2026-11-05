@@ -62,7 +62,7 @@ class AnonymousIsBlockedTests(WebAuthTestCase):
             else:
                 response = self.client.get(url)
         self.assertEqual(response.status_code, 302, f"{method.upper()} {url}")
-        self.assertEqual(response["Location"], f"{reverse('sign-in')}?{urlencode({'next': url})}")
+        self.assertEqual(response["Location"], f"{reverse('login')}?{urlencode({'next': url})}")
         services_.assert_none_called(self)
 
     def test_every_protected_page_redirects_to_sign_in_without_calling_services(self):
@@ -83,7 +83,7 @@ class AnonymousIsBlockedTests(WebAuthTestCase):
     def test_public_pages_stay_public(self):
         with patch_service("browse_listings", return_value=(200, [])), \
                 patch_service("listing_offer", return_value=(404, {})):
-            for url in (reverse("browse-offers"), reverse("register"), reverse("sign-in")):
+            for url in (reverse("browse-offers"), reverse("signup"), reverse("login")):
                 with self.subTest(url):
                     self.assertEqual(self.client.get(url).status_code, 200)
             self.assertEqual(self.client.get(reverse("offer-detail", args=[42])).status_code, 404)
@@ -91,16 +91,18 @@ class AnonymousIsBlockedTests(WebAuthTestCase):
 
 class WrongRoleIsBlockedTests(WebAuthTestCase):
 
-    def test_customer_cannot_get_a_workspace_session(self):
+    def test_customer_session_opens_no_shop_page_and_calls_no_service(self):
         customer = {**ACCOUNT, "role": "CUSTOMER"}
         with patch_service("sign_in", return_value=(200, {"access": "a", "refresh": "r"})), \
-                patch_service("account", return_value=(200, customer)), \
-                patch_service("sign_out", return_value=(200, {})) as sign_out:
-            self.client.post(reverse("sign-in"), {"email": "c@example.test", "password": "pw-Local-1"})
+                patch_service("account", return_value=(200, customer)):
+            self.client.post(reverse("login"), {"email": "c@example.test", "password": "pw-Local-1"})
+        self.assertIn(tokens.REFRESH_TOKEN_KEY, self.client.session)
 
-        self.assertNotIn(tokens.REFRESH_TOKEN_KEY, self.client.session)
-        sign_out.assert_called_once_with("r")
-        self.assertEqual(self.client.get(reverse("workspace")).status_code, 302)
+        for method, url in protected_pages():
+            with self.subTest(f"{method.upper()} {url}"), NoServiceCalls() as services_:
+                response = getattr(self.client, method)(url)
+                self.assertRedirects(response, reverse("home"), fetch_redirect_response=False)
+                services_.assert_none_called(self)
 
 
 class SignedInOperatorTests(WebAuthTestCase):

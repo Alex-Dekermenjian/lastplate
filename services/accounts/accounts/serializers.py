@@ -14,6 +14,8 @@ class ShopOperatorRegistrationSerializer(serializers.Serializer):
     """Public shop-operator sign-up. Only these three fields are accepted;
     the role is always set by the server."""
 
+    account_role = User.Role.SHOP_OPERATOR
+
     display_name = serializers.CharField(max_length=150)
     email = serializers.EmailField(max_length=254)
     password = serializers.CharField(write_only=True, trim_whitespace=False, max_length=128)
@@ -46,16 +48,24 @@ class ShopOperatorRegistrationSerializer(serializers.Serializer):
         try:
             with transaction.atomic():
                 # create_user never sets is_staff or is_superuser.
-                return User.objects.create_user(**validated_data, role=User.Role.SHOP_OPERATOR)
+                return User.objects.create_user(**validated_data, role=self.account_role)
         except IntegrityError:
             # A concurrent sign-up with the same email won the race.
             raise serializers.ValidationError({"email": [DUPLICATE_EMAIL]})
 
 
+class CustomerRegistrationSerializer(ShopOperatorRegistrationSerializer):
+    """Public customer sign-up (LP-56). Same three fields and checks; a role
+    sent by the client is still rejected, never used."""
+
+    account_role = User.Role.CUSTOMER
+
+
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "email", "display_name", "role"]
+        # is_staff lets the web send team members to the admin site after login.
+        fields = ["id", "email", "display_name", "role", "is_staff"]
         read_only_fields = fields
 
 

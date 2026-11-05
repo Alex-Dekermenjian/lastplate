@@ -60,8 +60,10 @@ Only `GET /health/live/` and `/health/ready/` (anyone). No business endpoints ye
 | --- | --- | --- | --- |
 | `/` status page | anyone | — | `views.py` `home` |
 | `/offers/`, `/offers/{id}/` (LP-13) | anyone | Shows only what the public Marketplace API returns | `browse_views.py` `browse_offers`, `offer_detail` |
-| `/register/` | anonymous (signed-in → workspace) | Creates an operator account and its shop | `account_views.py` `register` |
-| `/sign-in/` | anonymous | Non-operator accounts are refused and their refresh token revoked; `next` must be same-host | `account_views.py` `sign_in` |
+| `/signup/` (LP-56) | anonymous (signed-in → their landing page) | Creates a customer or restaurant account; any other `account_type` is rejected before Accounts is called, and no role field is ever forwarded | `account_views.py` `signup`; `forms.py` `SignUpForm` |
+| `/login/` (LP-56) | anonymous | One page for every account. Customers land on `/`, operators on `/workspace/`, staff on the Django admin with no web session kept; `next` must be same-host | `account_views.py` `login`, `landing_url` |
+| `/sign-in/`, `/register/` | anyone | Redirect to `/login/` and `/signup/`, keeping the query string | `config/urls.py` |
+| `/account/` (LP-56) | customer | The customer's own name and email | `account_views.py` `my_account` (`customer_required`) |
 | `POST /sign-out/` | anyone (POST + CSRF only) | Revokes and deletes the session's tokens | `account_views.py` `sign_out` |
 | `/workspace/` | operator | Shop and listings from Marketplace using the session's token | `account_views.py` `workspace` (`operator_required`) |
 | `/workspace/finish-setup/` | operator | Creates the caller's shop | `account_views.py` `finish_setup` |
@@ -72,8 +74,9 @@ Only `GET /health/live/` and `/health/ready/` (anyone). No business endpoints ye
 | `POST /workspace/listings/{id}/stock/` (LP-12) | operator (POST only) | Only the change and reason are forwarded | `listing_views.py` `adjust_stock` |
 | `/health/live/`, `/health/ready/` | anyone | — | `health.py` |
 
-Signed-out visitors are redirected to `/sign-in/?next=…` from every operator page before
-any service is called.
+Signed-out visitors are redirected to `/login/?next=…` from every operator or customer page
+before any service is called. A signed-in account with the wrong role is sent to its own
+landing page, also before any service is called.
 
 ## Gaps found and fixed
 

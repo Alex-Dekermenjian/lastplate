@@ -147,12 +147,20 @@ def _call_multipart(
         raise ServiceUnavailable(service) from None
 
 
+REGISTER_PATHS = {
+    "restaurant": "/api/auth/register/",
+    "customer": "/api/auth/register/customer/",
+}
+
+
 @sensitive_variables("password")
-def register(display_name, email, password):
+def register(display_name, email, password, account_type="restaurant"):
+    """Create an account. Only the two public account types exist; the role is
+    chosen by which Accounts endpoint is called, never sent as a field."""
     return _call(
         "accounts",
         "POST",
-        "/api/auth/register/",
+        REGISTER_PATHS[account_type],
         {
             "display_name": display_name,
             "email": email,

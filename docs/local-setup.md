@@ -11,7 +11,7 @@ open decisions are in [microservices-plan.md](microservices-plan.md).
 | Accounts (`services/accounts`, port 8001) | Email-based user model with roles, its migration, Django admin login, health endpoints; LP-7 APIs: shop-operator registration, RS256 token sign-in, refresh, logout (refresh-token blacklist), `/api/users/me/`, throttling; 9 original tests + health and auth API tests | Web sign-in/registration pages and the Pending shop (rest of LP-7) |
 | Marketplace (`services/marketplace`, port 8002) | Own database, health endpoints; LP-7: verifies Accounts tokens with the public key only, minimal `Shop` (one per operator, Pending), `POST /api/shops/` (idempotent), `GET /api/shops/me/`; LP-8: shop profile (pickup address, area, public contact) via `PATCH /api/shops/me/`; LP-9: team-admin shop review in Django admin (`/admin/`) | Listings, stock (LP-10 to LP-13) |
 | Reservations (`services/reservations`, port 8003) | Runnable empty service, own database, health endpoints | All reservation logic (Sprint 2) |
-| Web frontend (`web`, port 8000) | Server-side sessions; home page; LP-7: shop-operator registration (`/register/`), sign-in (`/sign-in/`), POST sign-out, workspace with shop status (`/workspace/`), finish-shop-setup retry (`/workspace/finish-setup/`); LP-8: shop profile page (`/workspace/profile/`); LP-10 and LP-11: create, edit and publish offers with photos; LP-12: stock adjustments; LP-13: public offers (`/offers/`) | Customer accounts, reservations (Sprint 2) |
+| Web frontend (`web`, port 8000) | Server-side sessions; home page; LP-56: one login page (`/login/`) and sign-up for customers and restaurants (`/signup/`), customer account page (`/account/`), POST sign-out, workspace with shop status (`/workspace/`), finish-shop-setup retry (`/workspace/finish-setup/`); LP-8: shop profile page (`/workspace/profile/`); LP-10 and LP-11: create, edit and publish offers with photos; LP-12: stock adjustments; LP-13: public offers (`/offers/`) | Customer accounts, reservations (Sprint 2) |
 | Docker Compose | PostgreSQL with one database and login role per service; all four apps | Production deployment (LP-15) |
 | CI | Checks and tests per service; Compose smoke check | Cross-service feature integration tests |
 
@@ -147,7 +147,8 @@ http://127.0.0.1:8002/admin/, add a user under **Users**, tick **Staff status**,
 add the permission **marketplace | shop | Can approve or reject shops**.
 
 **Pending → Approved:**
-1. Register a shop at http://127.0.0.1:8000/register/. The workspace shows **Pending review**.
+1. Sign up at http://127.0.0.1:8000/signup/, choose **I own a restaurant**, then give the
+   restaurant's name. The workspace shows **Pending review**.
 2. Complete the profile at http://127.0.0.1:8000/workspace/profile/.
 3. At http://127.0.0.1:8002/admin/marketplace/shop/, open the shop, choose **Approved**,
    tick **I confirmed the applicant represents this shop**, and save.
