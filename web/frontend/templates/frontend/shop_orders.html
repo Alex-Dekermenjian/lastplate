@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}New orders — LastPlate{% endblock %}
+{% block header_class %}header-restaurant{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'workspace' %}">← Workspace</a></p>
+
+<section class="card card--wide">
+  <h1>New orders</h1>
+  <p class="muted">Accept each order you can give, or reject it with a reason the customer sees. Times are Lebanon time.</p>
+
+  {% if unavailable %}
+    <p class="notice notice--warning" role="alert">We can't load your orders right now. Please refresh in a few minutes.</p>
+  {% elif not orders %}
+    <p>No new orders right now.</p>
+  {% endif %}
+</section>
+
+{% for order in orders %}
+  <article class="card card--wide order-card" aria-labelledby="order-{{ order.ref }}">
+    <h2 id="order-{{ order.ref }}">{{ order.customer_name|default:"Customer" }}</h2>
+    {% if order.placed_at %}<p class="muted">Ordered {{ order.placed_at|date:"j M, H:i" }}</p>{% endif %}
+
+    <ul class="order-lines">
+      {% for line in order.lines %}
+        <li>
+          <span><strong>{{ line.quantity }} ×</strong> {{ line.title }}</span>
+          <span class="muted">pickup {{ line.pickup_window }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+    <p class="order-total"><span>Cash at pickup</span><strong>${{ order.total }}</strong></p>
+
+    <form method="post" action="{% url 'shop-order-decide' order.ref %}">
+      {% csrf_token %}
+      <input type="hidden" name="decision" value="accept">
+      <button class="button button--primary button--block" type="submit">Accept order</button>
+    </form>
+
+    <form method="post" action="{% url 'shop-order-decide' order.ref %}" class="order-reject">
+      {% csrf_token %}
+      <input type="hidden" name="decision" value="reject">
+      <div class="field">
+        <label for="reason-{{ order.ref }}">Reason for rejecting</label>
+        <p class="help">The customer sees this.</p>
+        <textarea id="reason-{{ order.ref }}" name="reason" rows="2" maxlength="500" required></textarea>
+      </div>
+      <button class="button button--secondary button--block" type="submit">Reject order</button>
+    </form>
+  </article>
+{% endfor %}
+{% endblock %}

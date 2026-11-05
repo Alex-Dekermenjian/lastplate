@@ -173,6 +173,50 @@ class Listing(models.Model):
         return self.title
 
 
+# LP-28 (draft for LP-19): stock held for one order line
+class Allocation(models.Model):
+    """
+    Units of a listing committed to one Reservations order line, identified
+    by reservation_ref (a UUID chosen by Reservations). HELD and CONSUMED
+    count against free stock. An allocation moves only from HELD, so a
+    release can free its units once and never twice
+    (docs/microservices-plan.md section 6).
+    """
+
+    class Status(models.TextChoices):
+        HELD = "HELD", "Held"
+        CONSUMED = "CONSUMED", "Consumed"
+        RELEASED = "RELEASED", "Released"
+        SHOP_CANCELLED = "SHOP_CANCELLED", "Shop cancelled"
+        REJECTED = "REJECTED", "Rejected"
+
+    reservation_ref = models.CharField(max_length=64, unique=True)
+    listing = models.ForeignKey(
+        Listing,
+        on_delete=models.PROTECT,
+        related_name="allocations",
+    )
+    quantity = models.PositiveIntegerField()
+    status = models.CharField(max_length=20, choices=Status.choices)
+    reject_reason = models.CharField(max_length=40, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # Must match stock.COMMITTED_STATUSES.
+    COUNTS_AGAINST_STOCK = (Status.HELD, Status.CONSUMED)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(status__in=["HELD", "CONSUMED", "RELEASED", "SHOP_CANCELLED", "REJECTED"]),
+                name="marketplace_allocation_valid_status",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.reservation_ref}: {self.quantity} of listing {self.listing_id} ({self.status})"
+
+
 # LP-12: Record of every change to a listing's allocated total stock
 class StockAdjustment(models.Model):
     """

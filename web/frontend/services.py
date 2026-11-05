@@ -342,3 +342,19 @@ def listing_offer(listing_id):
         "GET",
         f"/api/listings/{int(listing_id)}",
     )
+
+
+# LP-28: The restaurant's orders in Reservations.
+@sensitive_variables("access")
+def shop_orders(access, status="PENDING"):
+    return _call("reservations", "GET", f"/api/shop/orders?status={status}", token=access)
+
+
+@sensitive_variables("access")
+def accept_order(access, order_ref):
+    return _call("reservations", "POST", f"/api/shop/orders/{order_ref}/accept", {}, token=access)
+
+
+@sensitive_variables("access")
+def reject_order(access, order_ref, reason):
+    return _call("reservations", "POST", f"/api/shop/orders/{order_ref}/reject", {"reason": reason}, token=access)

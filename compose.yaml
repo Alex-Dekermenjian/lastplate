@@ -78,6 +78,7 @@ services:
     build: ./services/marketplace
     environment:
       DJANGO_SECRET_KEY: ${MARKETPLACE_SECRET_KEY:?missing from compose.env}
+      RESERVATIONS_SERVICE_KEY_FILE: /run/lastplate-keys/reservations-to-marketplace.key
       DJANGO_DEBUG: "True"
       DJANGO_ALLOWED_HOSTS: marketplace,127.0.0.1,localhost
       HEALTH_EXPOSE_DETAILS: "True"
@@ -93,6 +94,13 @@ services:
       - type: bind
         source: ./.keys/jwt-public.pem
         target: /run/lastplate-keys/jwt-public.pem
+        read_only: true
+        bind:
+          create_host_path: false
+      # LP-28: the key Reservations must present on /internal/ calls.
+      - type: bind
+        source: ./.keys/reservations-to-marketplace.key
+        target: /run/lastplate-keys/reservations-to-marketplace.key
         read_only: true
         bind:
           create_host_path: false
@@ -114,6 +122,23 @@ services:
       DB_PASSWORD: ${RESERVATIONS_DB_PASSWORD}
       DB_HOST: postgres
       DB_PORT: "5432"
+      # LP-28: verifies Accounts tokens and calls Marketplace's /internal/ API.
+      JWT_PUBLIC_KEY_FILE: /run/lastplate-keys/jwt-public.pem
+      MARKETPLACE_SERVICE_URL: http://marketplace:8000
+      MARKETPLACE_SERVICE_KEY_FILE: /run/lastplate-keys/reservations-to-marketplace.key
+    volumes:
+      - type: bind
+        source: ./.keys/jwt-public.pem
+        target: /run/lastplate-keys/jwt-public.pem
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./.keys/reservations-to-marketplace.key
+        target: /run/lastplate-keys/reservations-to-marketplace.key
+        read_only: true
+        bind:
+          create_host_path: false
     ports:
       - "127.0.0.1:8003:8000"
 

@@ -7,6 +7,7 @@ from django.contrib import admin
 from django.urls import include, path
 
 from config import health
+from marketplace import internal_api
 
 urlpatterns = [
     # LP-9: Shop approval through Django Admin
@@ -14,6 +15,14 @@ urlpatterns = [
 
     # Marketplace APIs
     path("api/", include("marketplace.urls")),
+
+    # LP-28: service-to-service endpoints (service key, Reservations only)
+    path("internal/allocations", internal_api.create_allocation, name="internal-allocations"),
+    path(
+        "internal/allocations/<str:ref>/release",
+        internal_api.release_allocation,
+        name="internal-allocation-release",
+    ),
 
     # Service health checks
     path("health/live/", health.LiveView.as_view(), name="health-live"),

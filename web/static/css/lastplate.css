@@ -275,3 +275,14 @@ p { margin: 0 0 12px; }
 @media (min-width: 431px) {
   .app-column { border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
 }
+
+/* LP-28: the restaurant's new orders */
+.order-card { margin-top: 16px; }
+.order-lines { display: grid; gap: 8px; margin: 12px 0; padding: 0; list-style: none; }
+.order-lines li { display: grid; gap: 2px; padding: 10px 12px; background: var(--tint); border-radius: 12px; }
+.order-total { display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 16px; font-size: 18px; }
+.order-total strong { font-size: 24px; }
+.order-reject { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.order-reject textarea {
+  width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-input); font: inherit;
+}

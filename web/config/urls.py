@@ -8,7 +8,7 @@ https://docs.djangoproject.com/en/5.2/topics/http/urls/
 from django.urls import path
 from django.views.generic import RedirectView
 
-from frontend import account_views, browse_views, health, listing_views, views
+from frontend import account_views, browse_views, health, listing_views, order_views, views
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -33,6 +33,10 @@ urlpatterns = [
     path("workspace/", account_views.workspace, name="workspace"),
     path("workspace/finish-setup/", account_views.finish_setup, name="finish-setup"),
     path("workspace/profile/", account_views.shop_profile, name="shop-profile"),
+
+    # LP-28: the restaurant accepts or rejects new orders.
+    path("workspace/orders/", order_views.new_orders, name="shop-orders"),
+    path("workspace/orders/<uuid:order_ref>/decide/", order_views.decide_order, name="shop-order-decide"),
 
     # LP-10 and LP-11: Listing management.
     path(
