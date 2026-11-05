@@ -117,6 +117,23 @@ def read_key_file(setting, default_path):
 JWT_PUBLIC_KEY = read_key_file("JWT_PUBLIC_KEY_FILE", BASE_DIR.parent.parent / ".keys" / "jwt-public.pem")
 
 
+def read_optional_key(setting, default_path):
+    """A service key from the file named by `setting`, else `default_path`.
+    Missing means "not configured": internal calls are then refused."""
+    try:
+        return Path(os.environ.get(setting) or default_path).read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+# LP-28: one key per service allowed to call /internal/ endpoints.
+INTERNAL_SERVICE_KEYS = {
+    "reservations": read_optional_key(
+        "RESERVATIONS_SERVICE_KEY_FILE", BASE_DIR.parent.parent / ".keys" / "reservations-to-marketplace.key"
+    ),
+}
+
+
 # Database: this service's own PostgreSQL database and database user.
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 

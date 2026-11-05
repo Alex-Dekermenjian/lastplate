@@ -15,6 +15,7 @@ SERVICE_CALLS = (
     "register", "sign_in", "account", "refresh", "sign_out", "create_shop", "my_shop",
     "update_shop", "my_listings", "create_listing", "upload_listing_photo", "edit_listing",
     "publish_listing", "adjust_stock", "stock_history",
+    "shop_orders", "accept_order", "reject_order",
 )
 
 DRAFT = {"id": 42, "title": "Croissant Box", "status": "DRAFT", "photo_display": None}

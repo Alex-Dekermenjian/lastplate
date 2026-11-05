@@ -65,6 +65,8 @@
        href="{% url 'shop-profile' %}">
       Edit shop profile
     </a>
+    {# LP-28: until LP-23 puts new orders on the Today screen. #}
+    <a class="button button--secondary" href="{% url 'shop-orders' %}">New orders</a>
 
     <p class="muted" style="margin-top: 16px;">
       Approval is a manual onboarding check;

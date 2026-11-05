@@ -34,6 +34,7 @@ from .serializers import (
     StockAdjustmentRequestSerializer,
     StockAdjustmentSerializer,
 )
+from .stock import with_committed
 from .stock_service import StockAdjustmentError, adjust_stock
 
 
@@ -390,7 +391,7 @@ def my_listings(request):
 
     # Never accept a shop ID from the browser.
     # Return drafts and published listings owned by this shop only.
-    listings = Listing.objects.filter(
+    listings = with_committed(Listing.objects).filter(
         shop_id=shop.id
     ).order_by("-created_at")
 

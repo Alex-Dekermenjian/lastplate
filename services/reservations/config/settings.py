@@ -35,6 +35,26 @@ ALLOWED_HOSTS = [
 # Readiness responses name the connected database only when this is enabled.
 HEALTH_EXPOSE_DETAILS = os.environ.get("HEALTH_EXPOSE_DETAILS", "False").lower() == "true"
 
+KEY_DIR = BASE_DIR.parent.parent / ".keys"
+
+
+def read_key(setting, default_path):
+    """A key from the file named by `setting`, else `default_path`, or ""."""
+    try:
+        return Path(os.environ.get(setting) or default_path).read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+# LP-28: Accounts' RS256 public key, to verify access tokens. An empty key
+# makes every token invalid rather than stopping the service from starting.
+JWT_PUBLIC_KEY = read_key("JWT_PUBLIC_KEY_FILE", KEY_DIR / "jwt-public.pem")
+
+# LP-28: how Reservations calls Marketplace's /internal/ endpoints.
+MARKETPLACE_SERVICE_URL = os.environ.get("MARKETPLACE_SERVICE_URL", "http://127.0.0.1:8002")
+MARKETPLACE_SERVICE_KEY = read_key("MARKETPLACE_SERVICE_KEY_FILE", KEY_DIR / "reservations-to-marketplace.key")
+SERVICE_API_TIMEOUT_SECONDS = 5
+
 
 # Application definition
 # Users live in the Accounts service, so Django's auth and admin apps are not
@@ -54,12 +74,12 @@ ROOT_URLCONF = "config.urls"
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-# JSON-only API. Token verification is planned (see docs/microservices-plan.md);
-# until then no request is authenticated and API views deny access unless they
-# explicitly allow it, as the health endpoints do.
+# JSON-only API. Callers are identified by Accounts access tokens (LP-28);
+# API views deny access unless they explicitly allow it, as the health
+# endpoints do.
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_AUTHENTICATION_CLASSES": ["reservations.authentication.AccessTokenAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "UNAUTHENTICATED_USER": None,
 }

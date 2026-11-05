@@ -163,6 +163,30 @@ The admin refuses approval when the profile is incomplete or the confirmation bo
 unticked, and refuses rejection without a reason. Rules:
 [database-design.md](database-design.md).
 
+## Accept or reject an order (LP-28, draft until LP-19)
+
+Orders live in Reservations; each order line holds its stock in Marketplace (an
+allocation). Reservations calls Marketplace's `/internal/allocations` endpoints with
+its own key, `.keys/reservations-to-marketplace.key`. **Already set up before LP-28?**
+Run `scripts\init_dev_env.py` once more to create that key, then rebuild:
+`docker compose --env-file compose.env up -d --build --wait`.
+
+Checkout is LP-19. Until then, create a demo order for a published listing
+(`--line LISTING_ID:QUANTITY`, repeatable, one restaurant only):
+
+```powershell
+docker compose --env-file compose.env exec reservations python manage.py create_demo_order --customer-id 1 --line 2:1
+```
+
+The restaurant opens **Workspace → New orders** (http://127.0.0.1:8000/workspace/orders/)
+and presses **Accept order**, or writes a reason and presses **Reject order**. Rejecting
+puts the food back on sale exactly once. If Marketplace was unreachable at that moment,
+the order stays rejected and the release is finished by:
+
+```powershell
+docker compose --env-file compose.env exec reservations python manage.py retry_releases
+```
+
 ## 6. Run one service outside Docker
 
 Useful for debugging. Stop that service's container, keep PostgreSQL in

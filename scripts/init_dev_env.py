@@ -27,6 +27,8 @@ POSTGRES_HOST_PORT = "55432"
 KEY_DIR = ROOT / ".keys"
 PRIVATE_KEY = KEY_DIR / "jwt-private.pem"
 PUBLIC_KEY = KEY_DIR / "jwt-public.pem"
+# LP-28: Reservations' key for Marketplace's /internal/ endpoints.
+SERVICE_KEYS = [KEY_DIR / "reservations-to-marketplace.key"]
 
 
 def read_env(path):
@@ -93,6 +95,17 @@ def write_service_env(name, folder, values):
     write_new(path, lines)
 
 
+def ensure_service_keys():
+    """LP-28: one random key per calling service pair, created once and
+    never replaced. Running this script again adds a key that is missing."""
+    for path in SERVICE_KEYS:
+        if path.exists():
+            print(f"kept existing {path.relative_to(ROOT)}")
+            continue
+        KEY_DIR.mkdir(exist_ok=True)
+        write_new(path, [secrets.token_urlsafe(48)])
+
+
 def ensure_jwt_keys():
     """Create the Accounts RS256 key pair once; never replace an existing key."""
     if PRIVATE_KEY.exists() and PUBLIC_KEY.exists():
@@ -137,6 +150,7 @@ def main():
     args = parser.parse_args()
 
     ensure_jwt_keys()
+    ensure_service_keys()
     if args.keys_only:
         return
     values = compose_values()
