@@ -2,7 +2,9 @@
    Contrast notes (WCAG AA, 4.5:1 for text):
    - White on --btn is 5.7:1 and on --discount 4.8:1, so both may carry text.
    - --accent is only 3.1:1 against white, so it is used for decoration
-     (indicators, borders), never for text. Focus rings use --btn instead. */
+     (the logo ring, indicators, borders), never for text. Focus rings use --btn.
+   - --btn-hover is 7:1 on --tint and on --bg, so the "Today" tag and the
+     "Available now" label may carry small text. */
 :root {
   --accent: #F2652A;
   --btn: #B8410F;
@@ -17,6 +19,7 @@
   --danger: #B42318;
   --danger-tint: #FDECEC;
   --surface: #FFFFFF;
+  --shadow: 0 6px 20px rgba(58, 32, 22, 0.08);
 
   --radius-input: 12px;
   --radius-card: 22px;
@@ -35,10 +38,15 @@ body {
 a { color: var(--btn); font-weight: 700; }
 a:hover { color: var(--btn-hover); }
 h1, h2 { font-family: var(--font); font-weight: 800; line-height: 1.2; margin: 0 0 8px; }
-h1 { font-size: 28px; }
+h1 { font-size: 30px; }
 h2 { font-size: 21px; }
 p { margin: 0 0 12px; }
 .muted { color: var(--text-2); }
+.eyebrow {
+  margin: 0 0 6px; color: var(--btn-hover);
+  font-size: 13px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.lead { color: var(--text-2); font-size: 17px; }
 :focus-visible { outline: 3px solid var(--btn); outline-offset: 2px; }
 
 /* Phone-width column: on a laptop the app sits in the middle like a phone. */
@@ -55,8 +63,15 @@ p { margin: 0 0 12px; }
   padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
 }
 .logo {
-  display: inline-flex; align-items: center; min-height: 44px;
-  font: 900 22px/1 var(--font); color: var(--btn); text-decoration: none;
+  display: inline-flex; align-items: center; gap: 10px; min-height: 44px;
+  font: 900 24px/1 var(--font); color: var(--text); text-decoration: none;
+}
+/* The logo mark: a dark brown outer ring, an orange inner ring and a light centre. */
+.logo__mark {
+  flex: none; width: 26px; height: 26px; border-radius: 50%;
+  border: 3px solid var(--text);
+  background: var(--bg);
+  box-shadow: inset 0 0 0 4px var(--accent);
 }
 .site-nav { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .site-nav form { margin: 0; }
@@ -71,6 +86,8 @@ p { margin: 0 0 12px; }
 .header-restaurant .logo,
 .header-restaurant .site-nav__link,
 .header-restaurant a { color: #FFFFFF; }
+/* The brown outer ring would vanish on the brown header, so it turns white there. */
+.header-restaurant .logo__mark { border-color: #FFFFFF; }
 
 /* Cards */
 .card {
@@ -78,6 +95,20 @@ p { margin: 0 0 12px; }
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card);
 }
 .card--wide { max-width: 100%; }
+
+/* "How it works" steps */
+.steps { display: grid; gap: 10px; margin: 20px 0 0; padding: 0; list-style: none; }
+.step {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  color: var(--text-2);
+}
+.step strong { color: var(--text); }
+.step__number {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--btn); color: #FFFFFF; font-size: 14px; font-weight: 800;
+}
 
 /* Forms */
 .field { margin-bottom: 16px; }
@@ -133,14 +164,18 @@ p { margin: 0 0 12px; }
 
 /* Badges and prices */
 .badge {
-  display: inline-flex; align-items: center; padding: 4px 12px; border-radius: var(--radius-pill);
-  background: var(--tint); color: var(--btn); font-size: 14px; font-weight: 700;
+  display: inline-flex; align-items: center; padding: 2px 10px; border-radius: var(--radius-pill);
+  background: var(--tint); color: var(--btn-hover); font-size: 14px; font-weight: 800;
 }
 .price-old { color: var(--text-2); text-decoration: line-through; }
-.price-new { color: var(--btn); font-size: 22px; font-weight: 800; }
+.price-new { color: var(--text); font-size: 24px; font-weight: 800; }
 .discount-badge {
   display: inline-flex; align-items: center; padding: 2px 10px; border-radius: var(--radius-pill);
   background: var(--discount); color: #FFFFFF; font-size: 14px; font-weight: 800;
+}
+.stock-badge {
+  display: inline-flex; align-items: center; padding: 2px 10px; border-radius: var(--radius-pill);
+  background: var(--surface); color: var(--text); font-size: 14px; font-weight: 800;
 }
 
 /* LP-13: Public offer browsing */
@@ -148,29 +183,45 @@ p { margin: 0 0 12px; }
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
+.offer-count { margin: 24px 0 0; color: var(--text-2); font-weight: 700; }
 .offer-grid {
   display: grid; grid-template-columns: 1fr; gap: 16px;
-  margin: 24px 0 0; padding: 0; list-style: none;
+  margin: 12px 0 0; padding: 0; list-style: none;
 }
 .offer-card {
   display: flex; flex-direction: column; overflow: hidden;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card);
+  transition: box-shadow 0.15s ease;
 }
-.offer-card__photo { width: 100%; height: 180px; object-fit: cover; display: block; }
+.offer-card:hover { box-shadow: var(--shadow); }
+.offer-card__media { position: relative; }
+.offer-card__media .discount-badge { position: absolute; top: 12px; left: 12px; }
+.offer-card__media .stock-badge { position: absolute; top: 12px; right: 12px; }
+.offer-card__photo { width: 100%; height: 190px; object-fit: cover; display: block; }
 .offer-card__photo--empty {
   display: flex; align-items: center; justify-content: center;
   background: var(--tint); color: var(--text-2);
 }
-.offer-card__body { display: flex; flex-direction: column; flex: 1; padding: 16px; }
-.offer-card__body .button { margin-top: auto; }
-.offer-card__title { font-size: 20px; margin-bottom: 4px; }
+.offer-card__body { display: flex; flex-direction: column; flex: 1; padding: 16px 18px 18px; }
+.offer-card__shop {
+  margin: 0 0 4px; color: var(--text-2);
+  font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.offer-card__title { font-size: 21px; margin-bottom: 10px; }
 .offer-card__title a { color: var(--text); text-decoration: none; }
 .offer-card__title a:hover { text-decoration: underline; }
-.offer-facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0 0 16px; font-size: 15px; }
+.offer-card__footer {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border);
+}
+.offer-card__footer .price { margin: 0; }
+.offer-card__footer .button { min-height: 48px; padding: 10px 20px; }
+.offer-facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0 0 14px; font-size: 15px; }
 .offer-facts dt { color: var(--text-2); }
 .offer-facts dd { margin: 0; }
+.offer-facts .badge { margin-right: 6px; }
 .price { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
-.price__now { font-size: 22px; font-weight: 800; color: var(--btn); }
+.price__now { font-size: 24px; font-weight: 800; color: var(--text); }
 .price__was { color: var(--text-2); }
 .offer-detail__photo { width: 100%; max-height: 360px; object-fit: cover; border-radius: var(--radius-input); margin-bottom: 16px; }
 .offer-detail .details dd { overflow-wrap: anywhere; }

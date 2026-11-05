@@ -1,11 +1,15 @@
 """LP-13: Public pages for browsing food offers and viewing offer details."""
 
+from datetime import datetime, timezone as dt_timezone
+from unittest.mock import patch
+
 from django.conf import settings
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils.html import escape
 
 from .browse_views import UNAVAILABLE_MESSAGE as MESSAGE
+from .browse_views import discount_percent
 from .services import ServiceUnavailable
 from .test_accounts import patch_service
 
@@ -113,6 +117,26 @@ class BrowseOffersPageTests(TestCase):
         )
 
         self.assertContains(response, "<dd>Unknown</dd>", html=True)
+
+    def test_card_shows_discount_and_offer_count(self):
+        response, _ = self.browse(return_value=(200, [offer()]))
+
+        # $10.00 down to $4.50 is 55% off.
+        self.assertContains(response, "-55%")
+        self.assertContains(response, "1 offer available")
+
+    def test_today_pill_only_for_pickups_today(self):
+        # 10:00 UTC on 5 Nov is 12:00 in Beirut, the same day as the pickup.
+        same_day = datetime(2026, 11, 5, 10, 0, tzinfo=dt_timezone.utc)
+        next_day = datetime(2026, 11, 6, 10, 0, tzinfo=dt_timezone.utc)
+
+        with patch("frontend.browse_views.timezone.now", return_value=same_day):
+            response, _ = self.browse(return_value=(200, [offer()]))
+        self.assertContains(response, '<span class="badge">Today</span>', html=True)
+
+        with patch("frontend.browse_views.timezone.now", return_value=next_day):
+            response, _ = self.browse(return_value=(200, [offer()]))
+        self.assertNotContains(response, ">Today<")
 
     def test_no_offers_shows_a_message(self):
         response, _ = self.browse(return_value=(200, []))
@@ -253,3 +277,22 @@ class OfferDetailPageTests(TestCase):
 
         self.assertNotContains(response, "owner@example.test")
         self.assertNotContains(response, "987654")
+
+
+class DiscountPercentTests(TestCase):
+
+    def test_whole_percent_saved(self):
+        self.assertEqual(discount_percent("8.00", "3.50"), 56)
+        self.assertEqual(discount_percent("10.00", "4.50"), 55)
+
+    def test_no_discount_for_bad_or_missing_prices(self):
+        for original, discounted in [
+            (None, "4.50"),
+            ("10.00", None),
+            ("abc", "4.50"),
+            ("0", "0"),
+            ("5.00", "5.00"),
+            ("5.00", "6.00"),
+        ]:
+            with self.subTest(original=original, discounted=discounted):
+                self.assertIsNone(discount_percent(original, discounted))

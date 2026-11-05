@@ -12,7 +12,7 @@
 <body>
   <div class="app-column">
     <header class="site-header {% block header_class %}{% endblock %}">
-      <a class="logo" href="{% url 'home' %}">LastPlate</a>
+      <a class="logo" href="{% url 'home' %}"><span class="logo__mark" aria-hidden="true"></span>LastPlate</a>
       <nav class="site-nav" aria-label="Main">
         <a class="site-nav__link" href="{% url 'browse-offers' %}">Browse food</a>
         {% if request.session.account %}
