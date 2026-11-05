@@ -82,6 +82,7 @@ Changes from `docs/database-design.md`:
 - Accounts issues JWTs with `djangorestframework-simplejwt`. **Implemented
   (LP-7, Accounts part):**
   - `POST /api/auth/register/` (shop operators only);
+  - `POST /api/auth/register/customer/` (customers only, LP-56);
   - `POST /api/auth/token/`;
   - `POST /api/auth/token/refresh/`;
   - `POST /api/auth/logout/` (blacklists the refresh token);

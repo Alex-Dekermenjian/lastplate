@@ -6,6 +6,7 @@ https://docs.djangoproject.com/en/5.2/topics/http/urls/
 """
 
 from django.urls import path
+from django.views.generic import RedirectView
 
 from frontend import account_views, browse_views, health, listing_views, views
 
@@ -20,9 +21,14 @@ urlpatterns = [
         name="offer-detail",
     ),
 
-    path("register/", account_views.register, name="register"),
-    path("sign-in/", account_views.sign_in, name="sign-in"),
+    # LP-56: one login page and one sign-up page for every kind of account.
+    path("login/", account_views.login, name="login"),
+    path("signup/", account_views.signup, name="signup"),
     path("sign-out/", account_views.sign_out, name="sign-out"),
+    path("account/", account_views.my_account, name="my-account"),
+    # Old addresses from LP-7; ?next= and other query strings are kept.
+    path("sign-in/", RedirectView.as_view(pattern_name="login", query_string=True), name="sign-in"),
+    path("register/", RedirectView.as_view(pattern_name="signup", query_string=True), name="register"),
 
     path("workspace/", account_views.workspace, name="workspace"),
     path("workspace/finish-setup/", account_views.finish_setup, name="finish-setup"),

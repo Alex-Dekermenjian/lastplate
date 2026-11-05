@@ -18,7 +18,7 @@ class ShopProfilePageTests(WebAuthTestCase):
 
     def test_requires_sign_in_and_sends_no_store(self):
         response = self.client.get(self.url)
-        self.assertRedirects(response, f"{reverse('sign-in')}?next=%2Fworkspace%2Fprofile%2F", fetch_redirect_response=False)
+        self.assertRedirects(response, f"{reverse('login')}?next=%2Fworkspace%2Fprofile%2F", fetch_redirect_response=False)
         self.sign_in_session()
         with patch_service("my_shop", return_value=(200, COMPLETE_SHOP)):
             self.assertIn("no-store", self.client.get(self.url)["Cache-Control"])

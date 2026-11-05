@@ -49,7 +49,7 @@ class RegistrationTests(AuthAPITestCase):
         self.assertTrue(user.check_password(PASSWORD))
         self.assertEqual(
             response.data["user"],
-            {"id": user.id, "email": "owner@example.test", "display_name": "Cedar Crumb Bakery", "role": "SHOP_OPERATOR"},
+            {"id": user.id, "email": "owner@example.test", "display_name": "Cedar Crumb Bakery", "role": "SHOP_OPERATOR", "is_staff": False},
         )
         self.assertEqual(AccessToken(response.data["access"])["user_id"], str(user.id))
         self.assertNotIn(PASSWORD, response.content.decode())

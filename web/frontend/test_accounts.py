@@ -17,8 +17,8 @@ SHOP = {"id": 3, "operator_user_id": 7, "name": "Cedar Crumb Bakery", "approval_
 
 
 def registration(**overrides):
-    data = {"display_name": "Owner", "shop_name": "Cedar Crumb Bakery", "email": "owner@example.test",
-            "password": PASSWORD, "password_confirm": PASSWORD}
+    data = {"account_type": "restaurant", "display_name": "Owner", "email": "owner@example.test",
+            "password": PASSWORD}
     data.update(overrides)
     return data
 
@@ -43,12 +43,12 @@ class WebAuthTestCase(TestCase):
 
 
 class RegistrationTests(WebAuthTestCase):
-    url = reverse("register")
+    url = reverse("signup")
 
     def test_form_has_csrf_token_and_all_fields(self):
         response = self.client.get(self.url)
         self.assertContains(response, "csrfmiddlewaretoken")
-        for name in ("display_name", "shop_name", "email", "password", "password_confirm"):
+        for name in ("account_type", "display_name", "email", "password"):
             self.assertContains(response, f'name="{name}"')
 
     def test_post_without_csrf_token_is_rejected(self):
@@ -57,43 +57,48 @@ class RegistrationTests(WebAuthTestCase):
             self.assertEqual(client.post(self.url, registration()).status_code, 403)
         register.assert_not_called()
 
-    def test_success_creates_pending_shop_and_shows_workspace(self):
+    def test_restaurant_sign_up_renews_session_and_asks_for_the_shop_name(self):
         old_key = self.client.session.session_key
         with patch_service("register", return_value=(201, {**TOKENS, "user": ACCOUNT})) as register, \
-                patch_service("create_shop", return_value=(201, SHOP)) as create_shop:
+                patch_service("create_shop") as create_shop:
             response = self.client.post(self.url, registration())
 
-        self.assertRedirects(response, reverse("workspace"), fetch_redirect_response=False)
-        register.assert_called_once_with("Owner", "owner@example.test", PASSWORD)
-        create_shop.assert_called_once_with("access-token-1", "Cedar Crumb Bakery")
+        self.assertRedirects(response, reverse("finish-setup"), fetch_redirect_response=False)
+        register.assert_called_once_with("Owner", "owner@example.test", PASSWORD, "restaurant")
+        create_shop.assert_not_called()
         session = self.client.session
         self.assertNotEqual(session.session_key, old_key)
         self.assertEqual(session[tokens.REFRESH_TOKEN_KEY], "refresh-token-1")
-        self.assertNotIn(account_views.PENDING_SHOP_KEY, session)
         cookie = self.client.cookies[settings.SESSION_COOKIE_NAME].value
         self.assertNotIn("token", cookie)
 
-        with patch_service("my_shop", return_value=(200, SHOP)):
+        with patch_service("my_shop", return_value=(404, {})):
+            page = self.client.get(reverse("finish-setup"))
+        self.assertContains(page, "Now tell us your restaurant&#x27;s name.")
+        self.assert_no_secrets(page)
+
+        with patch_service("create_shop", return_value=(201, SHOP)) as create_shop:
+            done = self.client.post(reverse("finish-setup"), {"shop_name": "Cedar Crumb Bakery"})
+        create_shop.assert_called_once_with("access-token-1", "Cedar Crumb Bakery")
+        self.assertRedirects(done, reverse("workspace"), fetch_redirect_response=False)
+
+        with patch_service("my_shop", return_value=(200, SHOP)), patch_service("my_listings", return_value=(200, [])):
             workspace = self.client.get(reverse("workspace"))
         self.assertContains(workspace, "Cedar Crumb Bakery")
         self.assertContains(workspace, "Pending review")
-        self.assert_no_secrets(workspace)
 
     def test_local_validation_keeps_safe_input_but_never_passwords(self):
         with patch_service("register") as register:
-            response = self.client.post(self.url, registration(password_confirm="Different-password-91"))
+            response = self.client.post(self.url, registration(email="not-an-email"))
         register.assert_not_called()
-        self.assertContains(response, "The passwords do not match.")
-        self.assertContains(response, 'value="owner@example.test"')
-        self.assertContains(response, 'value="Cedar Crumb Bakery"')
+        self.assertContains(response, "Enter a valid email address.")
+        self.assertContains(response, 'value="Owner"')
         self.assertNotContains(response, PASSWORD)
-        self.assertNotContains(response, "Different-password-91")
 
     def test_accounts_validation_errors_are_shown_on_fields(self):
         errors = {"email": ["An account with this email already exists."], "password": ["This password is too common."]}
-        with patch_service("register", return_value=(400, errors)), patch_service("create_shop") as create_shop:
+        with patch_service("register", return_value=(400, errors)):
             response = self.client.post(self.url, registration())
-        create_shop.assert_not_called()
         self.assertContains(response, "An account with this email already exists.")
         self.assertContains(response, "This password is too common.")
         self.assertNotContains(response, PASSWORD)
@@ -107,19 +112,16 @@ class RegistrationTests(WebAuthTestCase):
     def test_timeout_is_recovered_only_by_signing_in_with_the_same_details(self):
         with patch_service("register", side_effect=ServiceUnavailable("accounts")), \
                 patch_service("sign_in", return_value=(200, TOKENS)) as sign_in, \
-                patch_service("account", return_value=(200, ACCOUNT)), \
-                patch_service("create_shop", return_value=(201, SHOP)):
+                patch_service("account", return_value=(200, ACCOUNT)):
             response = self.client.post(self.url, registration())
         sign_in.assert_called_once_with("owner@example.test", PASSWORD)
-        self.assertRedirects(response, reverse("workspace"), fetch_redirect_response=False)
+        self.assertRedirects(response, reverse("finish-setup"), fetch_redirect_response=False)
         self.assertEqual(self.client.session[account_views.ACCOUNT_KEY]["id"], 7)
 
     def test_timeout_then_failed_sign_in_does_not_continue(self):
         with patch_service("register", side_effect=ServiceUnavailable("accounts")), \
-                patch_service("sign_in", return_value=(401, {"detail": "Email or password is incorrect."})), \
-                patch_service("create_shop") as create_shop:
+                patch_service("sign_in", return_value=(401, {"detail": "Email or password is incorrect."})):
             response = self.client.post(self.url, registration())
-        create_shop.assert_not_called()
         self.assertContains(response, escape(account_views.REGISTRATION_FAILED))
         self.assertNotContains(response, "already exists")
         self.assertNotIn(tokens.REFRESH_TOKEN_KEY, self.client.session)
@@ -131,26 +133,6 @@ class RegistrationTests(WebAuthTestCase):
         self.assertContains(response, "can&#x27;t tell whether your account was created")
         self.assertNotIn(tokens.REFRESH_TOKEN_KEY, self.client.session)
 
-    def test_shop_failure_keeps_account_and_retry_finishes_setup(self):
-        with patch_service("register", return_value=(201, {**TOKENS, "user": ACCOUNT})), \
-                patch_service("create_shop", side_effect=ServiceUnavailable("marketplace")):
-            response = self.client.post(self.url, registration())
-        self.assertRedirects(response, reverse("finish-setup"), fetch_redirect_response=False)
-        self.assertEqual(self.client.session[account_views.ACCOUNT_KEY]["id"], 7)
-        self.assertEqual(self.client.session[account_views.PENDING_SHOP_KEY], "Cedar Crumb Bakery")
-
-        with patch_service("my_shop", return_value=(404, {})):
-            page = self.client.get(reverse("finish-setup"))
-        self.assertContains(page, "couldn&#x27;t set up your shop yet")
-        self.assertContains(page, 'value="Cedar Crumb Bakery"')
-
-        # The retry calls Marketplace's idempotent endpoint; a 200 means the shop already existed.
-        with patch_service("create_shop", return_value=(200, SHOP)) as create_shop:
-            done = self.client.post(reverse("finish-setup"), {"shop_name": "Cedar Crumb Bakery"})
-        create_shop.assert_called_once_with("access-token-1", "Cedar Crumb Bakery")
-        self.assertRedirects(done, reverse("workspace"), fetch_redirect_response=False)
-        self.assertNotIn(account_views.PENDING_SHOP_KEY, self.client.session)
-
     def test_finish_setup_retry_failure_is_explained(self):
         self.sign_in_session()
         with patch_service("create_shop", side_effect=ServiceUnavailable("marketplace")):
@@ -159,7 +141,7 @@ class RegistrationTests(WebAuthTestCase):
 
 
 class SignInTests(WebAuthTestCase):
-    url = reverse("sign-in")
+    url = reverse("login")
 
     def post(self, data=None, url=None, **service_returns):
         defaults = {"sign_in": {"return_value": (200, TOKENS)}, "account": {"return_value": (200, ACCOUNT)}}
@@ -199,11 +181,11 @@ class SignInTests(WebAuthTestCase):
         response, _ = self.post(sign_in={"side_effect": ServiceUnavailable("accounts")})
         self.assertContains(response, account_views.SIGN_IN_UNAVAILABLE)
 
-    def test_non_operator_accounts_are_not_signed_in_and_token_is_revoked(self):
+    def test_customer_accounts_land_on_the_home_page(self):
         response, sign_out = self.post(account={"return_value": (200, {**ACCOUNT, "role": "CUSTOMER"})})
-        self.assertContains(response, account_views.OPERATORS_ONLY)
-        sign_out.assert_called_once_with("refresh-token-1")
-        self.assertNotIn(tokens.REFRESH_TOKEN_KEY, self.client.session)
+        self.assertRedirects(response, reverse("home"), fetch_redirect_response=False)
+        sign_out.assert_not_called()
+        self.assertEqual(self.client.session[account_views.ACCOUNT_KEY]["role"], "CUSTOMER")
 
     def test_post_without_csrf_token_is_rejected(self):
         client = Client(enforce_csrf_checks=True)
@@ -215,7 +197,7 @@ class ProtectedPageTests(WebAuthTestCase):
         for name in ("workspace", "finish-setup"):
             with self.subTest(name=name):
                 response = self.client.get(reverse(name))
-                self.assertRedirects(response, f"{reverse('sign-in')}?next={reverse(name).replace('/', '%2F')}", fetch_redirect_response=False)
+                self.assertRedirects(response, f"{reverse('login')}?next={reverse(name).replace('/', '%2F')}", fetch_redirect_response=False)
 
     def test_pages_send_no_store(self):
         self.sign_in_session()
@@ -223,7 +205,7 @@ class ProtectedPageTests(WebAuthTestCase):
             for url in (reverse("workspace"),):
                 self.assertIn("no-store", self.client.get(url)["Cache-Control"])
         self.client = Client()
-        for url in (reverse("sign-in"), reverse("register")):
+        for url in (reverse("login"), reverse("signup")):
             self.assertIn("no-store", self.client.get(url)["Cache-Control"])
 
     
@@ -264,7 +246,7 @@ class ProtectedPageTests(WebAuthTestCase):
         key = self.sign_in_session()
         with patch_service("my_shop", return_value=(401, {})), patch_service("refresh", return_value=(401, {})):
             response = self.client.get(reverse("workspace"))
-        self.assertRedirects(response, reverse("sign-in"), fetch_redirect_response=False)
+        self.assertRedirects(response, reverse("login"), fetch_redirect_response=False)
         self.assertFalse(Session.objects.filter(session_key=key).exists())
 
     def test_operator_without_shop_is_sent_to_finish_setup(self):
@@ -313,7 +295,7 @@ class SignOutTests(WebAuthTestCase):
         sign_out.assert_called_once_with("refresh-token-1")
         self.assertFalse(Session.objects.filter(session_key=key).exists())
         self.assertContains(response, "You have signed out.")
-        self.assertRedirects(self.client.get(reverse("workspace")), f"{reverse('sign-in')}?next=%2Fworkspace%2F", fetch_redirect_response=False)
+        self.assertRedirects(self.client.get(reverse("workspace")), f"{reverse('login')}?next=%2Fworkspace%2F", fetch_redirect_response=False)
 
     def test_service_failure_still_clears_session_and_says_so(self):
         key = self.sign_in_session()

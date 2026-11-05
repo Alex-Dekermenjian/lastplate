@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Log in — LastPlate{% endblock %}
+
+{% block content %}
+<section class="auth">
+  <div class="auth__brand">
+    <span class="logo__mark logo__mark--large" aria-hidden="true"></span>
+    <p class="auth__tagline">Great food, rescued before closing time.</p>
+  </div>
+
+  <div class="card">
+    <h1>Log in</h1>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+      {% for error in form.non_field_errors %}
+        <p class="notice notice--error" role="alert">{{ error }}</p>
+      {% endfor %}
+      {% for field in form %}
+        {% if field.name == "remember_me" %}
+          <div class="check">
+            {{ field }}
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          </div>
+        {% else %}
+          <div class="field{% if field.errors %} field--error{% endif %}">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+          </div>
+        {% endif %}
+      {% endfor %}
+      <button class="button button--primary button--block" type="submit">Log in</button>
+    </form>
+  </div>
+
+  <p class="auth__switch">New here? <a href="{% url 'signup' %}">Sign up</a></p>
+</section>
+{% endblock %}

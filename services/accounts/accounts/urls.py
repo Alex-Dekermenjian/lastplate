@@ -5,6 +5,7 @@ from . import views
 
 urlpatterns = [
     path("auth/register/", views.ShopOperatorRegisterView.as_view(), name="auth-register"),
+    path("auth/register/customer/", views.CustomerRegisterView.as_view(), name="auth-register-customer"),
     path("auth/token/", views.SignInView.as_view(), name="auth-token"),
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="auth-token-refresh"),
     # Sign-out: blacklists the refresh token so it cannot obtain new access

@@ -5,7 +5,12 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .serializers import ShopOperatorRegistrationSerializer, SignInSerializer, UserSerializer
+from .serializers import (
+    CustomerRegistrationSerializer,
+    ShopOperatorRegistrationSerializer,
+    SignInSerializer,
+    UserSerializer,
+)
 from .throttles import SignInEmailThrottle
 
 
@@ -14,9 +19,10 @@ class ShopOperatorRegisterView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "auth_register"
+    serializer_class = ShopOperatorRegistrationSerializer
 
     def post(self, request):
-        serializer = ShopOperatorRegistrationSerializer(data=request.data)
+        serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         refresh = SignInSerializer.get_token(user)
@@ -28,6 +34,12 @@ class ShopOperatorRegisterView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class CustomerRegisterView(ShopOperatorRegisterView):
+    """LP-56: customer sign-up. Shares the registration throttle."""
+
+    serializer_class = CustomerRegistrationSerializer
 
 
 class SignInView(TokenObtainPairView):

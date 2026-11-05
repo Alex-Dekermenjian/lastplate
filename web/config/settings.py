@@ -45,6 +45,9 @@ SERVICE_URLS = {
 # The address a visitor's browser uses for Marketplace, which can differ from the
 # service-to-service address above (inside Compose it does).
 MARKETPLACE_PUBLIC_URL = os.environ.get("MARKETPLACE_PUBLIC_URL", "http://127.0.0.1:8002")
+# Where LastPlate team members (staff) land after logging in: the Django admin
+# where shops are reviewed (LP-9). TODO: our own /console page later.
+STAFF_ADMIN_URL = os.environ.get("STAFF_ADMIN_URL", f"{MARKETPLACE_PUBLIC_URL}/admin/")
 SERVICE_TIMEOUT_SECONDS = 2  # health checks on the status page
 SERVICE_API_TIMEOUT_SECONDS = 8  # API calls; registration hashes a password
 
