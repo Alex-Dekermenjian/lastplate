@@ -26,18 +26,20 @@ class AllocationAPITestCase(APITestCase):
         self.shop = make_shop()
         self.listing = make_listing(self.shop, total_quantity=5)
 
-    def allocate(self, ref="line-1", quantity=2, listing=None, **headers):
-        data = {"reservation_ref": ref, "listing_id": (listing or self.listing).pk, "quantity": quantity}
-        return self.client.post(reverse("internal-allocations"), data, format="json", **(headers or RESERVATIONS))
+    def allocate(self, ref="line-1", quantity=2, listing=None, lines=None, **headers):
+        lines = lines or [{"reservation_ref": ref, "listing_id": (listing or self.listing).pk, "quantity": quantity}]
+        return self.client.post(reverse("internal-allocations"), {"lines": lines}, format="json",
+                                **(headers or RESERVATIONS))
 
     def release(self, ref="line-1", listing=None, **headers):
         return self.client.post(reverse("internal-allocation-release", args=[ref]),
                                 {"listing_id": (listing or self.listing).pk}, format="json",
                                 **(headers or RESERVATIONS))
 
-    def free(self):
-        self.listing.refresh_from_db()
-        return free_quantity(self.listing)
+    def free(self, listing=None):
+        listing = listing or self.listing
+        listing.refresh_from_db()
+        return free_quantity(listing)
 
 
 class AllocateTests(AllocationAPITestCase):
@@ -46,12 +48,13 @@ class AllocateTests(AllocationAPITestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["status"], "HELD")
-        self.assertEqual(response.data["unit_price"], "4.50")
-        self.assertEqual(response.data["shop_id"], self.shop.id)
-        self.assertEqual(response.data["shop_operator_user_id"], self.shop.operator_user_id)
+        self.assertEqual(response.data["shop"], {"id": self.shop.id, "name": "Cedar Bakery",
+                                                 "address": "12 Bliss Street, Beirut",
+                                                 "operator_user_id": self.shop.operator_user_id})
+        self.assertEqual(response.data["lines"][0]["unit_price"], "4.50")
         self.assertEqual(self.free(), 3)
 
-    def test_a_retry_returns_the_same_allocation(self):
+    def test_a_retry_returns_the_same_allocations(self):
         self.allocate()
         response = self.allocate()
 
@@ -59,13 +62,52 @@ class AllocateTests(AllocationAPITestCase):
         self.assertEqual(Allocation.objects.count(), 1)
         self.assertEqual(self.free(), 3)
 
-    def test_not_enough_stock_is_a_stored_rejection(self):
-        response = self.allocate(quantity=6)
+    def test_all_lines_are_held_together(self):
+        bread = make_listing(self.shop, total_quantity=1)
+        response = self.allocate(lines=[
+            {"reservation_ref": "a", "listing_id": self.listing.pk, "quantity": 2},
+            {"reservation_ref": "b", "listing_id": bread.pk, "quantity": 1},
+        ])
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual([line["status"] for line in response.data["lines"]], ["HELD", "HELD"])
+        self.assertEqual((self.free(), self.free(bread)), (3, 0))
+
+    def test_one_short_line_fails_the_whole_order_and_holds_nothing(self):
+        bread = make_listing(self.shop, total_quantity=1)
+        lines = [
+            {"reservation_ref": "a", "listing_id": self.listing.pk, "quantity": 2},
+            {"reservation_ref": "b", "listing_id": bread.pk, "quantity": 2},
+        ]
+        response = self.allocate(lines=lines)
 
         self.assertEqual(response.status_code, 409)
-        self.assertEqual(response.data["reject_reason"], "not_enough_stock")
+        self.assertEqual(response.data["status"], "REJECTED")
+        self.assertEqual([line["reject_reason"] for line in response.data["lines"]],
+                         ["other_line_failed", "not_enough_stock"])
+        self.assertEqual((self.free(), self.free(bread)), (5, 1))
+        # The stored answer is repeated, never re-evaluated.
+        self.assertEqual(self.allocate(lines=lines).status_code, 409)
+
+    def test_the_same_listing_on_two_lines_counts_once(self):
+        response = self.allocate(lines=[
+            {"reservation_ref": "a", "listing_id": self.listing.pk, "quantity": 3},
+            {"reservation_ref": "b", "listing_id": self.listing.pk, "quantity": 3},
+        ])
+        self.assertEqual(response.status_code, 409)
         self.assertEqual(self.free(), 5)
-        self.assertEqual(self.allocate(quantity=6).status_code, 409)
+
+    def test_two_restaurants_or_reused_refs_are_refused(self):
+        other = make_listing(make_shop(operator_user_id=2, name="Olive Tree"))
+        two_shops = [{"reservation_ref": "a", "listing_id": self.listing.pk, "quantity": 1},
+                     {"reservation_ref": "b", "listing_id": other.pk, "quantity": 1}]
+        self.assertEqual(self.allocate(lines=two_shops).status_code, 409)
+
+        self.allocate(ref="a")
+        mixed = [{"reservation_ref": "a", "listing_id": self.listing.pk, "quantity": 2},
+                 {"reservation_ref": "new", "listing_id": self.listing.pk, "quantity": 1}]
+        self.assertEqual(self.allocate(lines=mixed).status_code, 409)
+        self.assertEqual(self.free(), 3)
 
     def test_closed_offers_are_rejected(self):
         ended = timezone.now() - timedelta(hours=1)
@@ -79,12 +121,11 @@ class AllocateTests(AllocationAPITestCase):
             with self.subTest(reason):
                 response = self.allocate(ref=f"ref-{reason}", listing=listing)
                 self.assertEqual(response.status_code, 409)
-                self.assertEqual(response.data["reject_reason"], reason)
+                self.assertEqual(response.data["lines"][0]["reject_reason"], reason)
 
     def test_held_stock_hides_a_sold_out_offer_from_browsing(self):
         self.allocate(quantity=5)
         self.assertEqual(self.client.get(reverse("listings")).json(), [])
-
 
 class ReleaseTests(AllocationAPITestCase):
     def test_release_frees_the_units_exactly_once(self):
@@ -148,8 +189,8 @@ class ConcurrentAllocationTests(TransactionTestCase):
 
         def order(n):
             client = APIClient()
-            response = client.post(reverse("internal-allocations"),
-                                   {"reservation_ref": f"par-{n}", "listing_id": listing.pk, "quantity": 1},
+            line = {"reservation_ref": f"par-{n}", "listing_id": listing.pk, "quantity": 1}
+            response = client.post(reverse("internal-allocations"), {"lines": [line]},
                                    format="json", **RESERVATIONS)
             statuses.append(response.status_code)
             connection.close()

@@ -1,27 +1,45 @@
-"""LP-28 (draft for LP-19): a customer's order from one restaurant.
+"""LP-28, shaped to LP-19: a customer's order from one restaurant.
 
-LP-19 owns creating orders at checkout and may extend these models; LP-28
-needs them to let the restaurant accept or reject. Other services' data is
-referred to by ID only (customer, shop, listings).
+LP-19 (checkout) creates orders from a one-restaurant cart (LP-62); LP-28
+lets the restaurant accept or reject them. Field and status names follow
+LP-19 and LP-22 in Jira; agree any change with both card owners.
 
-Each order line holds its own stock in Marketplace (an Allocation whose
-reservation_ref is the line's allocation_ref).
+- Line items (offer, quantity, price), each with its own stock hold in
+  Marketplace (an Allocation whose reservation_ref is allocation_ref).
+- One pickup code and one cash total per order.
+- Starts as Placed / cash due.
+
+Other services' data is referred to by ID only (customer, shop, listings).
 """
 
+import secrets
 import uuid
 
 from django.db import models
 from django.db.models import Q
 
+# No 0/O or 1/I, so a code read aloud at the counter can't be confused.
+PICKUP_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+PICKUP_CODE_LENGTH = 6
+
+
+def new_pickup_code():
+    return "".join(secrets.choice(PICKUP_CODE_ALPHABET) for _ in range(PICKUP_CODE_LENGTH))
+
 
 class Order(models.Model):
     class Status(models.TextChoices):
-        # New order; its stock is held; waiting for the restaurant.
-        PENDING = "PENDING", "Waiting for the restaurant"
+        # LP-22's timeline: Placed → Accepted → Ready → Collected, or Rejected.
+        PLACED = "PLACED", "Placed"
         ACCEPTED = "ACCEPTED", "Accepted"
-        REJECTED = "REJECTED", "Rejected by the restaurant"
-        CANCELLED = "CANCELLED", "Cancelled by the customer"
+        READY = "READY", "Ready"
         COLLECTED = "COLLECTED", "Collected"
+        REJECTED = "REJECTED", "Rejected"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    class PaymentStatus(models.TextChoices):
+        CASH_DUE = "CASH_DUE", "Cash due at pickup"
+        PAID = "PAID", "Paid"
 
     class SyncState(models.TextChoices):
         SYNCED = "SYNCED", "Marketplace agrees"
@@ -32,11 +50,21 @@ class Order(models.Model):
     ref = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     customer_user_id = models.PositiveBigIntegerField()
     customer_name = models.CharField(max_length=150, blank=True)
+    # LP-19: the same checkout submitted twice creates one order.
+    request_key = models.CharField(max_length=64)
+
     shop_id = models.PositiveBigIntegerField()
-    shop_name = models.CharField(max_length=150, blank=True)
+    shop_name = models.CharField(max_length=150)
+    shop_address = models.CharField(max_length=255, blank=True)
     # Snapshot from Marketplace: only this restaurant account may decide.
     shop_operator_user_id = models.PositiveBigIntegerField()
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PLACED)
+    payment_method = models.CharField(max_length=10, default="CASH", editable=False)
+    payment_status = models.CharField(max_length=10, choices=PaymentStatus.choices, default=PaymentStatus.CASH_DUE)
+    pickup_code = models.CharField(max_length=PICKUP_CODE_LENGTH, unique=True, default=new_pickup_code)
+    total = models.DecimalField(max_digits=10, decimal_places=2)
+
     sync_state = models.CharField(max_length=20, choices=SyncState.choices, default=SyncState.SYNCED)
     rejection_reason = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -47,14 +75,18 @@ class Order(models.Model):
         ordering = ["created_at", "id"]
         indexes = [models.Index(fields=["shop_operator_user_id", "status"])]
         constraints = [
+            models.UniqueConstraint(
+                fields=["customer_user_id", "request_key"], name="reservations_order_one_per_request_key",
+            ),
             models.CheckConstraint(
-                condition=Q(status__in=["PENDING", "ACCEPTED", "REJECTED", "CANCELLED", "COLLECTED"]),
+                condition=Q(status__in=["PLACED", "ACCEPTED", "READY", "COLLECTED", "REJECTED", "CANCELLED"]),
                 name="reservations_order_valid_status",
             ),
             models.CheckConstraint(
                 condition=~Q(status="REJECTED") | ~Q(rejection_reason=""),
                 name="reservations_order_rejection_has_reason",
             ),
+            models.CheckConstraint(condition=Q(total__gte=0), name="reservations_order_total_not_negative"),
         ]
 
     def __str__(self):

@@ -9,7 +9,7 @@ from .test_lp14_permissions import NoServiceCalls
 
 REF = "6f1c2a8e-1b7d-4e43-9a52-3a0f9d1e2b11"
 ORDER = {
-    "ref": REF, "customer_name": "Rami", "status": "PENDING", "rejection_reason": "",
+    "ref": REF, "customer_name": "Rami", "status": "PLACED", "payment_status": "CASH_DUE", "rejection_reason": "",
     "created_at": "2026-11-05T14:00:00Z", "decided_at": None, "total": "14.00",
     "lines": [
         {"listing_id": 42, "title": "Croissant Box", "unit_price": "4.50", "quantity": 2,

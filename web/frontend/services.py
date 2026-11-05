@@ -346,7 +346,7 @@ def listing_offer(listing_id):
 
 # LP-28: The restaurant's orders in Reservations.
 @sensitive_variables("access")
-def shop_orders(access, status="PENDING"):
+def shop_orders(access, status="PLACED"):
     return _call("reservations", "GET", f"/api/shop/orders?status={status}", token=access)
 
 

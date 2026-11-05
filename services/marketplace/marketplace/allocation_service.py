@@ -1,9 +1,13 @@
-"""LP-28 (draft for LP-19): hold and release stock for order lines.
+"""LP-28 and LP-19: hold and release stock for an order's lines.
 
-Every call is idempotent on reservation_ref and runs under the listing's row
-lock, so concurrent orders cannot oversell and a repeated release frees the
-units only once (docs/microservices-plan.md section 6).
+An order's lines are held together: every listing is locked (in id order, so
+two checkouts can't deadlock), every line is checked, and either all lines
+are HELD or all are stored as REJECTED with the reason. Storing the outcome
+makes a repeated request get the same answer. A release frees a line's units
+only once (docs/microservices-plan.md section 6).
 """
+
+from collections import defaultdict
 
 from django.db import transaction
 from django.utils import timezone
@@ -13,45 +17,75 @@ from .stock import free_quantity
 
 Status = Allocation.Status
 
+# Stored on the lines that were fine when another line made the order fail.
+OTHER_LINE_FAILED = "other_line_failed"
+
 
 class AllocationConflict(Exception):
-    """The request contradicts the stored allocation (for example another listing)."""
+    """The request contradicts what is stored (for example another listing)."""
 
 
-def allocate(reservation_ref, listing_id, quantity, now=None):
-    """Return (allocation, created). A new allocation is HELD when the listing
-    is open, its shop approved and enough is free; otherwise it is stored as
-    REJECTED with a reason, so a retry always gets the same answer."""
+def _line_problem(listing, shop, wanted, now):
+    if listing.status != Listing.Status.PUBLISHED:
+        return "not_published"
+    if shop is None or shop.approval_status != Shop.ApprovalStatus.APPROVED:
+        return "shop_not_approved"
+    if listing.pickup_end is None or listing.pickup_end <= now:
+        return "pickup_ended"
+    if free_quantity(listing) < wanted:
+        return "not_enough_stock"
+    return ""
+
+
+def allocate_lines(lines, now=None):
+    """lines: [{"reservation_ref", "listing_id", "quantity"}, ...] from one shop.
+
+    Returns (allocations, created). All allocations are HELD, or all REJECTED.
+    A repeat of the same request returns the stored allocations unchanged.
+    Raises Listing.DoesNotExist or AllocationConflict.
+    """
     now = now or timezone.now()
+    refs = [line["reservation_ref"] for line in lines]
+    if len(set(refs)) != len(refs):
+        raise AllocationConflict("Each line needs its own reference.")
+
     with transaction.atomic():
-        listing = Listing.objects.select_for_update().filter(pk=listing_id).first()
-        if listing is None:
+        listing_ids = sorted({line["listing_id"] for line in lines})
+        listings = {listing.pk: listing for listing in
+                    Listing.objects.select_for_update().filter(pk__in=listing_ids).order_by("pk")}
+        if len(listings) != len(listing_ids):
             raise Listing.DoesNotExist
-        existing = Allocation.objects.filter(reservation_ref=reservation_ref).first()
-        if existing is not None:
-            if existing.listing_id != listing.pk:
-                raise AllocationConflict("This reference belongs to another listing.")
-            return existing, False
 
-        reason = ""
-        shop = Shop.objects.filter(pk=listing.shop_id).first()
-        if listing.status != Listing.Status.PUBLISHED:
-            reason = "not_published"
-        elif shop is None or shop.approval_status != Shop.ApprovalStatus.APPROVED:
-            reason = "shop_not_approved"
-        elif listing.pickup_end is None or listing.pickup_end <= now:
-            reason = "pickup_ended"
-        elif free_quantity(listing) < quantity:
-            reason = "not_enough_stock"
+        existing = {a.reservation_ref: a for a in Allocation.objects.filter(reservation_ref__in=refs)}
+        if existing:
+            if len(existing) != len(refs) or any(
+                existing[line["reservation_ref"]].listing_id != line["listing_id"] for line in lines
+            ):
+                raise AllocationConflict("These references were used for a different order.")
+            return [existing[ref] for ref in refs], False
 
-        allocation = Allocation.objects.create(
-            reservation_ref=reservation_ref,
-            listing=listing,
-            quantity=quantity,
-            status=Status.REJECTED if reason else Status.HELD,
-            reject_reason=reason,
-        )
-        return allocation, True
+        if len({listing.shop_id for listing in listings.values()}) != 1:
+            raise AllocationConflict("All lines must come from one restaurant.")
+        shop = Shop.objects.filter(pk=next(iter(listings.values())).shop_id).first()
+
+        # The same listing on two lines counts once, with the summed quantity.
+        wanted = defaultdict(int)
+        for line in lines:
+            wanted[line["listing_id"]] += line["quantity"]
+        problems = {pk: _line_problem(listings[pk], shop, qty, now) for pk, qty in wanted.items()}
+        failed = any(problems.values())
+
+        allocations = [
+            Allocation.objects.create(
+                reservation_ref=line["reservation_ref"],
+                listing=listings[line["listing_id"]],
+                quantity=line["quantity"],
+                status=Status.REJECTED if failed else Status.HELD,
+                reject_reason=(problems[line["listing_id"]] or OTHER_LINE_FAILED) if failed else "",
+            )
+            for line in lines
+        ]
+        return allocations, True
 
 
 def release(reservation_ref, listing_id):

@@ -1,12 +1,13 @@
-"""LP-28 development helper: create a PENDING order so the restaurant's
+"""LP-28 development helper: create a Placed order so the restaurant's
 Accept / Reject flow can be tried before checkout (LP-19) exists.
 
     python manage.py create_demo_order --customer-id 12 --customer-name "Rami" --line 5:2 --line 6:1
 
 Each --line is LISTING_ID:QUANTITY; all lines must be from one restaurant.
-Stock is held in Marketplace exactly as a real order would hold it. This is
-not the checkout: LP-19 replaces it with the customer's own order endpoint,
-which must save the order before contacting Marketplace.
+Stock for all lines is held together in Marketplace, as LP-19 requires: if one
+line is short, nothing is held. This is not the checkout: LP-19 replaces it
+with the customer's order endpoint, which must also save the order before
+contacting Marketplace (docs/microservices-plan.md section 6).
 """
 
 import uuid
@@ -30,7 +31,7 @@ def parse_line(text):
 
 
 class Command(BaseCommand):
-    help = "Create a demo PENDING order (development only, until LP-19)."
+    help = "Create a demo Placed order (development only, until LP-19)."
 
     def add_arguments(self, parser):
         parser.add_argument("--customer-id", type=int, required=True)
@@ -38,42 +39,45 @@ class Command(BaseCommand):
         parser.add_argument("--line", action="append", required=True, type=parse_line)
 
     def handle(self, *args, **options):
-        held = []
+        lines = [
+            {"reservation_ref": str(uuid.uuid4()), "listing_id": listing_id, "quantity": quantity}
+            for listing_id, quantity in options["line"]
+        ]
         try:
-            for listing_id, quantity in options["line"]:
-                ref = uuid.uuid4()
-                status, body = marketplace.allocate(ref, listing_id, quantity)
-                if status not in (200, 201) or body.get("status") != "HELD":
-                    raise CommandError(f"Listing {listing_id} could not be held: "
-                                       f"{body.get('reject_reason') or body.get('detail') or status}.")
-                held.append((ref, body))
-            if len({body["shop_id"] for _, body in held}) != 1:
-                raise CommandError("All lines must come from one restaurant.")
-        except (CommandError, marketplace.MarketplaceUnavailable) as error:
-            for ref, body in held:
-                marketplace.release(ref, body["listing_id"])
-            if isinstance(error, CommandError):
-                raise
-            raise CommandError("Marketplace could not be reached.")
+            status, body = marketplace.allocate(lines)
+        except marketplace.MarketplaceUnavailable:
+            raise CommandError("Marketplace could not be reached; nothing was ordered.")
+        if status not in (200, 201) or body.get("status") != "HELD":
+            reasons = ", ".join(
+                f"listing {line['listing_id']}: {line['reject_reason']}"
+                for line in body.get("lines", []) if line.get("reject_reason")
+            )
+            raise CommandError(f"Nothing was held ({reasons or body.get('detail') or status}).")
 
-        first = held[0][1]
+        shop = body["shop"]
+        held = body["lines"]
         with transaction.atomic():
             order = Order.objects.create(
                 customer_user_id=options["customer_id"],
                 customer_name=options["customer_name"],
-                shop_id=first["shop_id"],
-                shop_name=first["shop_name"],
-                shop_operator_user_id=first["shop_operator_user_id"],
+                request_key=f"demo-{uuid.uuid4()}",
+                shop_id=shop["id"],
+                shop_name=shop["name"],
+                shop_address=shop["address"],
+                shop_operator_user_id=shop["operator_user_id"],
+                total=sum((Decimal(line["unit_price"]) * line["quantity"] for line in held), Decimal("0")),
             )
-            for ref, body in held:
+            for line in held:
                 OrderLine.objects.create(
                     order=order,
-                    listing_id=body["listing_id"],
-                    allocation_ref=ref,
-                    title=body["title"],
-                    unit_price=Decimal(body["unit_price"]),
-                    quantity=body["quantity"],
-                    pickup_start=body["pickup_start"],
-                    pickup_end=body["pickup_end"],
+                    listing_id=line["listing_id"],
+                    allocation_ref=line["reservation_ref"],
+                    title=line["title"],
+                    unit_price=Decimal(line["unit_price"]),
+                    quantity=line["quantity"],
+                    pickup_start=line["pickup_start"],
+                    pickup_end=line["pickup_end"],
                 )
-        self.stdout.write(self.style.SUCCESS(f"Created order {order.ref} for {first['shop_name']}."))
+        self.stdout.write(self.style.SUCCESS(
+            f"Created order {order.ref} for {shop['name']}: ${order.total}, pickup code {order.pickup_code}."
+        ))

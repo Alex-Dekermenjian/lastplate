@@ -45,11 +45,10 @@ def _post(path, payload):
         raise MarketplaceUnavailable from None
 
 
-def allocate(allocation_ref, listing_id, quantity):
-    return _post(
-        "/internal/allocations",
-        {"reservation_ref": str(allocation_ref), "listing_id": listing_id, "quantity": quantity},
-    )
+def allocate(lines):
+    """Hold stock for all of an order's lines together, or for none.
+    lines: [{"reservation_ref", "listing_id", "quantity"}, ...]"""
+    return _post("/internal/allocations", {"lines": lines})
 
 
 def release(allocation_ref, listing_id):

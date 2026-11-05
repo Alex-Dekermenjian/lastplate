@@ -20,6 +20,7 @@ ALREADY = {
     Status.ACCEPTED: "This order was already accepted.",
     Status.REJECTED: "This order was already rejected.",
     Status.CANCELLED: "The customer cancelled this order, so it can't be accepted or rejected.",
+    Status.READY: "This order was already accepted and is ready.",
     Status.COLLECTED: "This order was already collected.",
 }
 REASON_REQUIRED = "Give a reason. The customer will see it."
@@ -37,7 +38,7 @@ class DecisionRefused(Exception):
 
 
 def decide(order_ref, operator_user_id, decision, reason=""):
-    """Accept or reject a PENDING order of this restaurant. Returns the order."""
+    """Accept or reject a Placed order of this restaurant. Returns the order."""
     reason = (reason or "").strip()
     if decision == Status.REJECTED and not reason:
         raise DecisionRefused("reason_required", REASON_REQUIRED)
@@ -50,7 +51,7 @@ def decide(order_ref, operator_user_id, decision, reason=""):
         )
         if order is None:
             raise OrderNotFound
-        if order.status != Status.PENDING:
+        if order.status != Status.PLACED:
             raise DecisionRefused("already_decided", ALREADY.get(order.status, "This order can't be changed."))
 
         order.status = decision

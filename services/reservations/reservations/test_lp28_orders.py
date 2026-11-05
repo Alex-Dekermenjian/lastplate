@@ -4,19 +4,20 @@ click or a race makes only one transition."""
 
 import threading
 import time
+import uuid
 from decimal import Decimal
 from unittest import mock
 
 import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from django.db import connection
+from django.db import IntegrityError, connection, transaction
 from django.test import TransactionTestCase, override_settings
 from django.urls import reverse
 from rest_framework.test import APIClient, APITestCase
 
 from . import marketplace
-from .models import Order, OrderLine
+from .models import PICKUP_CODE_ALPHABET, PICKUP_CODE_LENGTH, Order, OrderLine
 from .order_service import ALREADY, REASON_REQUIRED, retry_pending_releases
 
 _key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -34,8 +35,9 @@ def token(user_id=OWNER, role="SHOP_OPERATOR"):
 
 
 def make_order(**overrides):
-    fields = {"customer_user_id": CUSTOMER, "customer_name": "Rami", "shop_id": 3, "shop_name": "Cedar Bakery",
-              "shop_operator_user_id": OWNER, **overrides}
+    fields = {"customer_user_id": CUSTOMER, "customer_name": "Rami", "request_key": str(uuid.uuid4()),
+              "shop_id": 3, "shop_name": "Cedar Bakery", "shop_address": "12 Bliss Street, Beirut",
+              "shop_operator_user_id": OWNER, "total": Decimal("14.00"), **overrides}
     order = Order.objects.create(**fields)
     OrderLine.objects.create(order=order, listing_id=42, title="Croissant Box", unit_price=Decimal("4.50"),
                              quantity=2)
@@ -119,7 +121,7 @@ class RejectTests(OrderAPITestCase):
             response = self.reject(reason)
             self.assertEqual(response.status_code, 400)
             self.assertEqual(response.data["detail"], REASON_REQUIRED)
-        self.assertEqual(self.refresh().status, Order.Status.PENDING)
+        self.assertEqual(self.refresh().status, Order.Status.PLACED)
 
     def test_reject_stores_the_reason_and_releases_each_line_once(self):
         with released() as release:
@@ -159,7 +161,7 @@ class PermissionTests(OrderAPITestCase):
             self.assertEqual(self.accept().status_code, 404)
             self.assertEqual(self.reject().status_code, 404)
         release.assert_not_called()
-        self.assertEqual(self.refresh().status, Order.Status.PENDING)
+        self.assertEqual(self.refresh().status, Order.Status.PLACED)
 
     def test_customers_and_admins_are_refused(self):
         for role in ("CUSTOMER", "ADMIN"):
@@ -167,7 +169,7 @@ class PermissionTests(OrderAPITestCase):
             with self.subTest(role=role):
                 self.assertEqual(self.accept().status_code, 403)
                 self.assertEqual(self.client.get(reverse("shop-orders")).status_code, 403)
-        self.assertEqual(self.refresh().status, Order.Status.PENDING)
+        self.assertEqual(self.refresh().status, Order.Status.PLACED)
 
     def test_no_token_or_a_forged_token(self):
         forged = jwt.encode({"token_type": "access", "exp": int(time.time()) + 900, "user_id": str(OWNER),
@@ -175,7 +177,29 @@ class PermissionTests(OrderAPITestCase):
         for credentials in ({}, {"HTTP_AUTHORIZATION": f"Bearer {forged}"}):
             self.client.credentials(**credentials)
             self.assertEqual(self.accept().status_code, 401)
-        self.assertEqual(self.refresh().status, Order.Status.PENDING)
+        self.assertEqual(self.refresh().status, Order.Status.PLACED)
+
+class OrderShapeTests(OrderAPITestCase):
+    """LP-19's order format, which LP-28 builds on."""
+
+    def test_a_new_order_is_placed_with_cash_due_and_one_pickup_code(self):
+        order = self.refresh()
+        self.assertEqual(order.status, Order.Status.PLACED)
+        self.assertEqual(order.payment_status, Order.PaymentStatus.CASH_DUE)
+        self.assertEqual(order.payment_method, "CASH")
+        self.assertEqual(len(order.pickup_code), PICKUP_CODE_LENGTH)
+        self.assertTrue(set(order.pickup_code) <= set(PICKUP_CODE_ALPHABET))
+        self.assertEqual(order.lines.count(), 2)
+
+    def test_one_order_per_customer_request_key(self):
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            make_order(request_key=self.order.request_key)
+        make_order(request_key=self.order.request_key, customer_user_id=CUSTOMER + 1)
+
+    def test_the_restaurant_never_sees_the_pickup_code(self):
+        response = self.client.get(reverse("shop-orders"))
+        self.assertNotIn(self.order.pickup_code, response.content.decode())
+        self.assertEqual(response.data[0]["payment_status"], "CASH_DUE")
 
 
 @override_settings(JWT_PUBLIC_KEY=PUBLIC_KEY)

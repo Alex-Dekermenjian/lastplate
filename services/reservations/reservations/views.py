@@ -1,6 +1,6 @@
 """LP-28: the restaurant's orders API.
 
-GET  /api/shop/orders?status=PENDING        this restaurant's orders
+GET  /api/shop/orders?status=PLACED         this restaurant's orders
 POST /api/shop/orders/<ref>/accept
 POST /api/shop/orders/<ref>/reject          {"reason": "..."}
 
@@ -29,14 +29,12 @@ class OrderLineSerializer(serializers.ModelSerializer):
 
 class ShopOrderSerializer(serializers.ModelSerializer):
     lines = OrderLineSerializer(many=True, read_only=True)
-    total = serializers.SerializerMethodField()
-
-    def get_total(self, order):
-        return str(sum((line.unit_price * line.quantity for line in order.lines.all()), 0))
 
     class Meta:
         model = Order
-        fields = ["ref", "customer_name", "status", "rejection_reason", "created_at", "decided_at", "lines", "total"]
+        # Never the pickup code: the customer shows it and the restaurant types it in (LP-24).
+        fields = ["ref", "customer_name", "status", "payment_status", "total", "rejection_reason",
+                  "created_at", "decided_at", "lines"]
         read_only_fields = fields
 
 
@@ -47,7 +45,7 @@ class RejectSerializer(serializers.Serializer):
 @api_view(["GET"])
 @permission_classes(RESTAURANT_ONLY)
 def shop_orders(request):
-    wanted = request.query_params.get("status", Order.Status.PENDING).upper()
+    wanted = request.query_params.get("status", Order.Status.PLACED).upper()
     if wanted not in Order.Status.values:
         return Response({"code": "invalid", "detail": "Unknown status."}, status=status.HTTP_400_BAD_REQUEST)
     orders = (
