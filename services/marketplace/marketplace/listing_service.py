@@ -5,19 +5,23 @@ from .models import Listing
 from .serializers import ListingSerializer
 from django.core.exceptions import ValidationError
 
-from .validators import validate_listing_data
+from .validators import (
+    required_for_publication,
+    validate_listing_data,
+)
 from django.core.exceptions import PermissionDenied
 
 
-def save_listing_draft(data, shop_id):
+def save_listing_draft(data, shop_id, shop=None):
     """
     Save a private draft belonging to a shop.
 
     The caller must authenticate the operator and verify
-    shop ownership before calling this function.
+    shop ownership before calling this function. The shop, when given,
+    names a LastBag that has no title (LP-38).
     """
 
-    serializer = ListingSerializer(data=data)
+    serializer = ListingSerializer(data=data, context={"shop": shop})
     serializer.is_valid(raise_exception=True)
 
     with transaction.atomic():
@@ -34,20 +38,11 @@ def validate_listing_for_publication(listing):
     required before publication.
     """
 
-    errors = {}
-
-    required_fields = (
-        "title",
-        "description",
-        "category",
-        "pickup_address",
+    # LP-38: A LastBag and a specific item need different details.
+    errors = required_for_publication(
+        listing.kind,
+        lambda field: getattr(listing, field, ""),
     )
-
-    for field in required_fields:
-        value = getattr(listing, field, "")
-
-        if not str(value or "").strip():
-            errors[field] = "This field is required."
 
     try:
         validate_listing_data(
@@ -57,6 +52,7 @@ def validate_listing_for_publication(listing):
             pickup_start=listing.pickup_start,
             pickup_end=listing.pickup_end,
             publishing=True,
+            kind=listing.kind,
         )
     except ValidationError as exc:
         errors.update(exc.message_dict)

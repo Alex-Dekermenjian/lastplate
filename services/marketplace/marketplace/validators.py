@@ -3,6 +3,39 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 
+# LP-38: Listing kinds. Kept here as plain strings so validation does not
+# depend on the model.
+LASTBAG = "LASTBAG"
+ITEM = "ITEM"
+
+# What each kind of offer needs before it can be published. A LastBag has no
+# exact ingredients, description or category: customers see what is usually
+# inside and what it may contain. Its title is filled in by the server.
+REQUIRED_TO_PUBLISH = {
+    ITEM: ("title", "description", "category", "pickup_address"),
+    LASTBAG: ("title", "pickup_address", "typical_contents", "allergens"),
+}
+
+REQUIRED_MESSAGES = {
+    "typical_contents": "Describe what's usually inside the bag.",
+    "allergens": "List what the bag may contain, for example gluten, milk, sesame.",
+}
+
+
+def required_for_publication(kind, value_of):
+    """Missing required fields for this kind of offer, as {field: message}.
+
+    value_of(field) returns the field's current value.
+    """
+    errors = {}
+
+    for field in REQUIRED_TO_PUBLISH.get(kind, REQUIRED_TO_PUBLISH[ITEM]):
+        if not str(value_of(field) or "").strip():
+            errors[field] = REQUIRED_MESSAGES.get(field, "This field is required.")
+
+    return errors
+
+
 def validate_listing_data(
     original_price,
     discounted_price,
@@ -10,6 +43,7 @@ def validate_listing_data(
     pickup_start,
     pickup_end,
     publishing=False,
+    kind=ITEM,
 ):
     errors = {}
 
@@ -35,7 +69,9 @@ def validate_listing_data(
         and discounted_price >= original_price
     ):
         errors["discounted_price"] = (
-            "Discounted price must be less than original price."
+            "Your price must be less than the bag's worth."
+            if kind == LASTBAG
+            else "Discounted price must be less than original price."
         )
 
     # Stock validation

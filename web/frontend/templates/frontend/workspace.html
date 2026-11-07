@@ -145,6 +145,7 @@
 
           <div style="padding: 16px;">
 
+            {% if listing.kind == "LASTBAG" %}<p class="offer-card__kind"><span class="lastbag-badge">LastBag · surprise</span></p>{% endif %}
             <h3>{{ listing.title|default:"Untitled offer" }}</h3>
 
             <p class="muted">
@@ -162,12 +163,17 @@
               </p>
             {% endif %}
 
-            {% if listing.description %}
+            {% if listing.kind == "LASTBAG" %}
+              <p>
+                <strong>What's usually inside:</strong>
+                {{ listing.typical_contents|default:"Not set" }}
+              </p>
+            {% elif listing.description %}
               <p>{{ listing.description }}</p>
             {% endif %}
 
             <p>
-              <strong>Original price:</strong>
+              <strong>{% if listing.kind == "LASTBAG" %}Worth:{% else %}Original price:{% endif %}</strong>
               {% if listing.original_price %}
                 ${{ listing.original_price }}
               {% else %}
@@ -176,7 +182,7 @@
             </p>
 
             <p>
-              <strong>Discounted price:</strong>
+              <strong>{% if listing.kind == "LASTBAG" %}Your price:{% else %}Discounted price:{% endif %}</strong>
               {% if listing.discounted_price %}
                 ${{ listing.discounted_price }}
               {% else %}
@@ -184,13 +190,15 @@
               {% endif %}
             </p>
 
+            {% if listing.kind != "LASTBAG" %}
             <p>
               <strong>Ingredients:</strong>
               {{ listing.ingredients_display|default:"Unknown" }}
             </p>
+            {% endif %}
 
             <p>
-              <strong>Allergens:</strong>
+              <strong>{% if listing.kind == "LASTBAG" %}May contain:{% else %}Allergens:{% endif %}</strong>
               {{ listing.allergens_display|default:"Unknown" }}
             </p>
 

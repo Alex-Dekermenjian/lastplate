@@ -26,6 +26,27 @@ LISTING_FIELDS = (
     "allergens",
 )
 
+# LP-38: A LastBag (surprise bag) has no title, description, category or exact
+# ingredients. Its worth is original_price and its price discounted_price.
+LASTBAG = "LASTBAG"
+ITEM = "ITEM"
+
+LASTBAG_FIELDS = (
+    "typical_contents",
+    "original_price",
+    "discounted_price",
+    "allergens",
+    "total_quantity",
+    "pickup_address",
+    "pickup_start",
+    "pickup_end",
+)
+
+FIELDS_BY_KIND = {
+    LASTBAG: LASTBAG_FIELDS,
+    ITEM: LISTING_FIELDS,
+}
+
 OPTIONAL_NUMBER_FIELDS = (
     "original_price",
     "discounted_price",
@@ -46,16 +67,48 @@ FIELD_LABELS = {
     "pickup_end": "Pickup ends",
     "ingredients": "Ingredients",
     "allergens": "Allergens",
+    "typical_contents": "What's usually inside",
+}
+
+LASTBAG_LABELS = {
+    **FIELD_LABELS,
+    "typical_contents": "What's usually inside",
+    "original_price": "Worth",
+    "discounted_price": "Your price",
+    "allergens": "May contain (allergens)",
+    "kind": "Offer type",
 }
 
 
-def labelled_errors(errors):
+def offer_kind(value):
+    """LASTBAG or ITEM; anything else is treated as a specific item."""
+    return LASTBAG if str(value or "").upper() == LASTBAG else ITEM
+
+
+def listing_data_from(post, kind):
+    """The fields this kind of offer sends to Marketplace.
+
+    An item sends exactly what it did in LP-10. Empty numbers and times are
+    left out, so a draft can be unfinished.
+    """
+    data = {field: post.get(field, "").strip() for field in FIELDS_BY_KIND[kind]}
+
+    for field in (*OPTIONAL_NUMBER_FIELDS, "pickup_start", "pickup_end"):
+        if field in data and not data[field]:
+            del data[field]
+
+    return data
+
+
+def labelled_errors(errors, kind=ITEM):
     """Marketplace field errors, keyed by the labels the form shows."""
     if not isinstance(errors, dict):
         return {}
 
+    labels = LASTBAG_LABELS if kind == LASTBAG else FIELD_LABELS
+
     return {
-        FIELD_LABELS.get(field, field.replace("_", " ").capitalize()): (
+        labels.get(field, field.replace("_", " ").capitalize()): (
             problems if isinstance(problems, list) else [str(problems)]
         )
         for field, problems in errors.items()
@@ -109,47 +162,37 @@ def create_listing(request):
         return render(
             request,
             "frontend/create_listing.html",
-            {"form_values": {"pickup_address": shop_pickup_address(request)}},
+            {
+                "kind": offer_kind(request.GET.get("kind")),
+                "form_values": {"pickup_address": shop_pickup_address(request)},
+            },
         )
 
-    listing_data = {
-        field: request.POST.get(field, "").strip()
-        for field in LISTING_FIELDS
-    }
+    # LP-38: The form says whether this is a LastBag or a specific item.
+    kind = offer_kind(request.POST.get("kind"))
+    listing_data = listing_data_from(request.POST, kind)
+    form_values = dict(listing_data)
 
-    for field in OPTIONAL_NUMBER_FIELDS:
-        if not listing_data[field]:
-            del listing_data[field]
+    if kind == LASTBAG:
+        listing_data["kind"] = LASTBAG
 
-    for field in ("pickup_start", "pickup_end"):
-        if not listing_data[field]:
-            del listing_data[field]
+    def form_page(status, **context):
+        return render(
+            request,
+            "frontend/create_listing.html",
+            {"kind": kind, "form_values": form_values, **context},
+            status=status,
+        )
 
     photo = request.FILES.get("photo")
 
     # Check the photo before creating the listing.
     if photo:
         if photo.size > MAX_PHOTO_SIZE:
-            return render(
-                request,
-                "frontend/create_listing.html",
-                {
-                    "error": "The photo must be 5 MB or smaller.",
-                    "form_values": listing_data,
-                },
-                status=400,
-            )
+            return form_page(400, error="The photo must be 5 MB or smaller.")
 
         if photo.content_type not in ("image/jpeg", "image/png"):
-            return render(
-                request,
-                "frontend/create_listing.html",
-                {
-                    "error": "Upload a JPEG or PNG photo.",
-                    "form_values": listing_data,
-                },
-                status=400,
-            )
+            return form_page(400, error="Upload a JPEG or PNG photo.")
 
     try:
         status, response = authenticated_call(
@@ -158,40 +201,25 @@ def create_listing(request):
             listing_data,
         )
     except ServiceUnavailable:
-        return render(
-            request,
-            "frontend/create_listing.html",
-            {
-                "error": (
-                    "We couldn't confirm whether your draft was saved. "
-                    "Please check your workspace before trying again."
-                ),
-                "form_values": listing_data,
-            },
-            status=503,
+        return form_page(
+            503,
+            error=(
+                "We couldn't confirm whether your draft was saved. "
+                "Please check your workspace before trying again."
+            ),
         )
 
     if status == 400:
-        return render(
-            request,
-            "frontend/create_listing.html",
-            {
-                "error": "Please correct the listing details and try again.",
-                "field_errors": labelled_errors(response),
-                "form_values": listing_data,
-            },
-            status=400,
+        return form_page(
+            400,
+            error="Please correct the listing details and try again.",
+            field_errors=labelled_errors(response, kind),
         )
 
     if status != 201:
-        return render(
-            request,
-            "frontend/create_listing.html",
-            {
-                "error": "We couldn't save your food offer. Please try again.",
-                "form_values": listing_data,
-            },
-            status=status if 400 <= status < 600 else 502,
+        return form_page(
+            status if 400 <= status < 600 else 502,
+            error="We couldn't save your food offer. Please try again.",
         )
 
     # The draft has been created successfully.
@@ -290,8 +318,12 @@ def edit_listing(request, listing_id):
             "Only drafts can be edited. This offer has already been published.",
         )
 
+    # LP-38: Editing a draft keeps its kind; the form never sends it.
+    kind = offer_kind(listing.get("kind"))
+
     context = {
         "editing": True,
+        "kind": kind,
         "listing": {
             **listing,
             "photo_display": photo_url(listing.get("photo_display")),
@@ -303,18 +335,7 @@ def edit_listing(request, listing_id):
     if request.method == "GET":
         return render(request, template, context)
 
-    listing_data = {
-        field: request.POST.get(field, "").strip()
-        for field in LISTING_FIELDS
-    }
-
-    for field in OPTIONAL_NUMBER_FIELDS:
-        if not listing_data[field]:
-            del listing_data[field]
-
-    for field in ("pickup_start", "pickup_end"):
-        if not listing_data[field]:
-            del listing_data[field]
+    listing_data = listing_data_from(request.POST, kind)
 
     context["form_values"] = {
         **listing,
@@ -348,7 +369,7 @@ def edit_listing(request, listing_id):
 
     if update_status == 400:
         context["error"] = "Please correct the listing details."
-        context["field_errors"] = labelled_errors(response)
+        context["field_errors"] = labelled_errors(response, kind)
         return render(request, template, context, status=400)
 
     if update_status == 404:

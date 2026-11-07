@@ -303,6 +303,30 @@ p { margin: 0 0 12px; }
 .offer-detail__photo { width: 100%; max-height: 360px; object-fit: cover; border-radius: var(--radius-input); margin-bottom: 16px; }
 .offer-detail .details dd { overflow-wrap: anywhere; }
 
+/* LP-38: LastBag (surprise bag). White on --btn is 5.7:1. */
+.lastbag-badge {
+  display: inline-flex; align-items: center; padding: 2px 10px; border-radius: var(--radius-pill);
+  background: var(--btn); color: #FFFFFF; font-size: 14px; font-weight: 800;
+}
+.offer-card--lastbag, .offer-detail--lastbag { border: 2px solid var(--btn); }
+.offer-card__kind { margin: 0 0 8px; }
+.typical-contents { color: var(--text-2); }
+.may-contain { color: var(--btn-hover); font-weight: 700; }
+.price--lastbag .price__was { font-weight: 700; }
+.price--lastbag .price__now { color: var(--discount); }
+.kind-switch {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 0 0 16px; padding: 4px;
+  background: var(--tint); border-radius: var(--radius-input);
+}
+.kind-switch a {
+  display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 12px;
+  border-radius: 10px; color: var(--text-2); text-align: center; text-decoration: none; font-weight: 800;
+}
+.kind-switch a[aria-current="page"] { background: var(--surface); color: var(--btn); box-shadow: var(--shadow); }
+.kind-fixed { margin: 0 0 16px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.offer-form__photo { display: block; max-width: 240px; border-radius: var(--radius-input); }
+
 /* Bottom bars: stick to the bottom of the phone column. */
 .bottom-bar-customer,
 .bottom-bar-restaurant {

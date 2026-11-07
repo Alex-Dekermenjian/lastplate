@@ -214,6 +214,7 @@ def create_listing(request):
     listing = save_listing_draft(
         data=request.data,
         shop_id=shop.id,
+        shop=shop,
     )
 
     return Response(
@@ -279,6 +280,7 @@ def edit_listing(request, pk):
         listing,
         data=request.data,
         partial=True,
+        context={"shop": shop},
     )
     serializer.is_valid(raise_exception=True)
     serializer.save()
