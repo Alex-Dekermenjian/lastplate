@@ -8,7 +8,7 @@ https://docs.djangoproject.com/en/5.2/topics/http/urls/
 from django.urls import path
 from django.views.generic import RedirectView
 
-from frontend import account_views, browse_views, console_views, health, listing_views, views
+from frontend import account_views, browse_views, cart, console_views, health, listing_views, views
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -22,6 +22,11 @@ urlpatterns = [
     ),
     # LP-39: a restaurant's page with everything it has left.
     path("restaurants/<int:shop_id>/", browse_views.restaurant_detail, name="restaurant-detail"),
+
+    # LP-62: the customer's cart (one restaurant, kept in the session).
+    path("cart/", cart.view_cart, name="cart"),
+    path("cart/add/<int:listing_id>/", cart.add_to_cart, name="cart-add"),
+    path("cart/update/<int:listing_id>/", cart.update_cart, name="cart-update"),
 
     # LP-56: one login page and one sign-up page for every kind of account.
     path("login/", account_views.login, name="login"),

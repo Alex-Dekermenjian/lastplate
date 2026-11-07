@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Your cart — LastPlate{% endblock %}
+
+{% block content %}
+<section class="card card--wide">
+  <h1>Your cart</h1>
+
+  {% if unavailable %}
+    <p class="notice notice--warning" role="alert">We can't load your cart right now. Please try again in a few minutes.</p>
+  {% elif not lines %}
+    <p>Your cart is empty.</p>
+    <a class="button button--primary button--block" href="{% url 'browse-offers' %}">Browse available food</a>
+  {% else %}
+    <p class="muted">
+      From <a href="{% url 'restaurant-detail' cart.shop_id %}">{{ cart.shop_name }}</a>.
+      Nothing is reserved until you check out.
+    </p>
+
+    <ul class="cart-lines">
+      {% for line in lines %}
+        <li class="cart-line{% if not line.available %} cart-line--gone{% endif %}">
+          <div class="cart-line__info">
+            <strong>{{ line.title }}</strong>
+            {% if line.available %}
+              <span class="muted">${{ line.discounted_price }} each · pickup {{ line.pickup_window }}</span>
+            {% else %}
+              <span class="cart-line__gone">No longer available</span>
+            {% endif %}
+          </div>
+
+          {% if line.available %}
+            <div class="cart-line__qty">
+              <form method="post" action="{% url 'cart-update' line.id %}">
+                {% csrf_token %}
+                <button class="qty-button" type="submit" name="action" value="decrease"
+                        {% if line.quantity <= 1 %}disabled{% endif %}
+                        aria-label="One less {{ line.title }}">−</button>
+              </form>
+              <span class="cart-line__count" aria-label="Quantity">{{ line.quantity }}</span>
+              <form method="post" action="{% url 'cart-update' line.id %}">
+                {% csrf_token %}
+                <button class="qty-button" type="submit" name="action" value="increase"
+                        {% if line.at_most %}disabled{% endif %}
+                        aria-label="One more {{ line.title }}">+</button>
+              </form>
+            </div>
+            <span class="cart-line__price">${{ line.line_total }}</span>
+          {% endif %}
+
+          <form method="post" action="{% url 'cart-update' line.id %}">
+            {% csrf_token %}
+            <button class="link-button" type="submit" name="action" value="remove">Remove<span class="visually-hidden"> {{ line.title }}</span></button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+
+    <p class="cart-total">
+      <span>Total, paid in cash at pickup</span>
+      <strong>${{ total }}</strong>
+    </p>
+
+    {# LP-19 turns this into the real checkout. #}
+    <button class="button button--primary button--block" type="button" disabled>Checkout</button>
+    <p class="help" style="text-align: center;">Ordering opens soon.</p>
+  {% endif %}
+</section>
+{% endblock %}
