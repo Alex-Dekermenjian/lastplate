@@ -168,8 +168,25 @@ class Listing(models.Model):
         PUBLISHED = "PUBLISHED", "Published"
         WITHDRAWN = "WITHDRAWN", "Withdrawn"
 
+    # LP-38: A LastBag is a surprise bag; an item is one specific food.
+    class Kind(models.TextChoices):
+        LASTBAG = "LASTBAG", "LastBag (surprise)"
+        ITEM = "ITEM", "Specific item"
+
     # Numeric reference to a Shop in Marketplace
     shop_id = models.PositiveBigIntegerField()
+
+    kind = models.CharField(
+        max_length=10,
+        choices=Kind.choices,
+        default=Kind.ITEM,
+        # Also a database default, so rows written without a kind (for
+        # example by code from before LP-38) are specific items.
+        db_default=Kind.ITEM,
+    )
+    # LP-38: What a LastBag usually holds. Customers never see exact
+    # contents for a bag, only this. Required to publish a LastBag.
+    typical_contents = models.TextField(blank=True, default="", db_default="")
 
     title = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
@@ -233,6 +250,18 @@ class Listing(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(kind__in=["LASTBAG", "ITEM"]),
+                name="marketplace_listing_valid_kind",
+            ),
+        ]
+
+    @property
+    def is_lastbag(self):
+        return self.kind == self.Kind.LASTBAG
 
     def __str__(self):
         return self.title

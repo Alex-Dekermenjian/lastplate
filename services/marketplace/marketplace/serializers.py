@@ -7,7 +7,7 @@ from rest_framework import serializers
 from .image_validators import validate_listing_photo
 from .models import Listing, Shop, StockAdjustment
 from .stock import free_quantity as calculate_free_quantity
-from .validators import validate_listing_data
+from .validators import LASTBAG as LASTBAG_KIND, validate_listing_data
 
 
 # LP-8: Public contact must be a valid phone number.
@@ -301,6 +301,22 @@ class ListingDisplayMixin(serializers.Serializer):
         return None
 
 
+# LP-38: LastBags
+KIND_IS_FIXED = (
+    "An offer can't change between LastBag and specific item. "
+    "Create a new offer instead."
+)
+
+
+def lastbag_title(shop):
+    category = getattr(shop, "category", "")
+
+    if category and category != Shop.Category.OTHER:
+        return f"{category} surprise bag"
+
+    return "Surprise bag"
+
+
 # LP-10 and LP-11: Food listings (shop operator view)
 class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
 
@@ -309,9 +325,11 @@ class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
 
         fields = [
             "id",
+            "kind",
             "title",
             "description",
             "category",
+            "typical_contents",
             "photo",
             "photo_display",
             "ingredients",
@@ -363,9 +381,21 @@ class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
+        # LP-38: A draft stays the kind it was created as.
+        if (
+            self.instance is not None
+            and "kind" in attrs
+            and attrs["kind"] != self.instance.kind
+        ):
+            raise serializers.ValidationError(
+                {"kind": [KIND_IS_FIXED]}
+            )
+
         data = {}
 
         fields = [
+            "kind",
+            "title",
             "original_price",
             "discounted_price",
             "total_quantity",
@@ -389,11 +419,17 @@ class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
                 pickup_start=data["pickup_start"],
                 pickup_end=data["pickup_end"],
                 publishing=False,
+                kind=data["kind"],
             )
         except ValidationError as exc:
             raise serializers.ValidationError(
                 exc.message_dict
             )
+
+        # LP-38: The LastBag form has no title, so the bag is named after
+        # the restaurant's category, for example "Bakery surprise bag".
+        if data["kind"] == LASTBAG_KIND and not (data["title"] or "").strip():
+            attrs["title"] = lastbag_title(self.context.get("shop"))
 
         return attrs
 
@@ -439,6 +475,13 @@ class PublicListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
 
     shop = serializers.SerializerMethodField()
 
+    # LP-38: Customers never see a LastBag's exact contents, only what it
+    # usually holds (typical_contents).
+    def get_ingredients_display(self, obj):
+        if obj.kind == LASTBAG_KIND:
+            return "Changes daily"
+        return super().get_ingredients_display(obj)
+
     def get_shop(self, obj):
         shop = self.context["shops"][obj.shop_id]
         return PublicShopCardSerializer(shop).data
@@ -447,9 +490,11 @@ class PublicListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
         model = Listing
         fields = [
             "id",
+            "kind",
             "title",
             "description",
             "category",
+            "typical_contents",
             "photo_display",
             "ingredients_display",
             "allergens_display",

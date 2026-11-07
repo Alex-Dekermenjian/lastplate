@@ -19,22 +19,30 @@
   </section>
 
 {% else %}
-  <article class="card card--wide offer-detail">
+  <article class="card card--wide offer-detail{% if offer.is_lastbag %} offer-detail--lastbag{% endif %}">
     {% if offer.photo_url %}
       <img class="offer-detail__photo" src="{{ offer.photo_url }}" alt="Photo of {{ offer.title }}">
     {% endif %}
 
-    <h1>{{ offer.title }}</h1>
-    {% if offer.category %}<p class="muted">{{ offer.category }}</p>{% endif %}
-    {% if offer.description %}<p>{{ offer.description|linebreaksbr }}</p>{% endif %}
+    {% if offer.is_lastbag %}
+      <p class="offer-card__kind"><span class="lastbag-badge">LastBag · surprise</span></p>
+      <h1>{{ offer.title }}</h1>
+      <p class="typical-contents">Usually: {{ offer.typical_contents|default:"a mix of today's food" }}. Contents change daily.</p>
+      <p class="may-contain">May contain: {{ offer.allergens }}</p>
+      {% include "frontend/_lastbag_price.html" with paid_at_pickup=True %}
+    {% else %}
+      <h1>{{ offer.title }}</h1>
+      {% if offer.category %}<p class="muted">{{ offer.category }}</p>{% endif %}
+      {% if offer.description %}<p>{{ offer.description|linebreaksbr }}</p>{% endif %}
 
-    <p class="price">
-      <span class="price__now">${{ offer.discounted_price }}</span>
-      {% if offer.original_price %}
-        <s class="price__was" aria-label="Original price ${{ offer.original_price }}">${{ offer.original_price }}</s>
-      {% endif %}
-      <span class="muted">each, paid at pickup</span>
-    </p>
+      <p class="price">
+        <span class="price__now">${{ offer.discounted_price }}</span>
+        {% if offer.original_price %}
+          <s class="price__was" aria-label="Original price ${{ offer.original_price }}">${{ offer.original_price }}</s>
+        {% endif %}
+        <span class="muted">each, paid at pickup</span>
+      </p>
+    {% endif %}
 
     <dl class="details">
       <dt>Available</dt>
@@ -46,11 +54,13 @@
       <dt>Pickup address</dt>
       <dd>{{ offer.pickup_address|default:"Unknown" }}</dd>
 
-      <dt>Ingredients</dt>
-      <dd>{{ offer.ingredients }}</dd>
+      {% if not offer.is_lastbag %}
+        <dt>Ingredients</dt>
+        <dd>{{ offer.ingredients }}</dd>
 
-      <dt>Allergens</dt>
-      <dd>{{ offer.allergens }}</dd>
+        <dt>Allergens</dt>
+        <dd>{{ offer.allergens }}</dd>
+      {% endif %}
     </dl>
 
     <h2>Shop</h2>
@@ -72,7 +82,7 @@
     </dl>
 
     <p class="muted">
-      Ingredient and allergen details come from the shop. Ask the shop if you
+      {% if offer.is_lastbag %}What's inside a LastBag changes daily. What it may contain comes{% else %}Ingredient and allergen details come{% endif %} from the shop. Ask the shop if you
       have a serious allergy.
     </p>
   </article>

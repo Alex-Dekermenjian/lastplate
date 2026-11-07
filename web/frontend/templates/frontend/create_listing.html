@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 
 {% block title %}
@@ -17,10 +16,34 @@
     {% if editing %}Edit your food offer{% else %}Create a food offer{% endif %}
   </h1>
 
+  {% comment %} LP-38: A new offer is either a LastBag (surprise bag) or a
+  specific item. A draft keeps the kind it was created as. {% endcomment %}
+  {% if editing %}
+    <p class="kind-fixed">
+      {% if kind == "LASTBAG" %}
+        <span class="lastbag-badge">LastBag · surprise</span>
+      {% else %}
+        <span class="badge">Specific item</span>
+      {% endif %}
+    </p>
+  {% else %}
+    <nav class="kind-switch" aria-label="Type of offer">
+      <a href="{% url 'create-listing' %}?kind=LASTBAG"{% if kind == "LASTBAG" %} aria-current="page"{% endif %}>LastBag (surprise)</a>
+      <a href="{% url 'create-listing' %}?kind=ITEM"{% if kind != "LASTBAG" %} aria-current="page"{% endif %}>Specific item</a>
+    </nav>
+  {% endif %}
+
   <p class="muted">
     Your food offer stays a draft until you publish it from your workspace. You can
-    save an unfinished draft. To publish, it needs a title, description, category,
-    both prices, a quantity above zero, a pickup address and pickup times.
+    save an unfinished draft.
+    {% if kind == "LASTBAG" %}
+      To publish a LastBag, it needs what's usually inside, what it may contain,
+      its worth and a lower price, a quantity above zero, a pickup address and
+      pickup times. Customers see what's usually inside, never the exact contents.
+    {% else %}
+      To publish, it needs a title, description, category, both prices, a
+      quantity above zero, a pickup address and pickup times.
+    {% endif %}
   </p>
 
   {% if error %}
@@ -44,54 +67,100 @@
   <form class="offer-form" method="post" enctype="multipart/form-data">
     {% csrf_token %}
 
-    <h2>Food details</h2>
+    {% if kind == "LASTBAG" %}
+      {% if not editing %}<input type="hidden" name="kind" value="LASTBAG">{% endif %}
 
-    <p>
-      <label for="title">Food title</label>
-      <input id="title" name="title" type="text"
-             maxlength="150" required
-             value="{{ form_values.title|default_if_none:'' }}"
-             placeholder="e.g. Surprise Pastry Box">
-    </p>
+      <h2>Your LastBag</h2>
 
-    <p>
-      <label for="description">Description</label>
-      <textarea id="description" name="description" rows="4"
-                placeholder="Describe the food.">{{ form_values.description|default_if_none:'' }}</textarea>
-    </p>
+      <p>
+        <label for="typical_contents">What's usually inside</label>
+        <textarea id="typical_contents" name="typical_contents" rows="3"
+                  placeholder="e.g. Croissants, man'oushe, a loaf of bread">{{ form_values.typical_contents|default_if_none:'' }}</textarea>
+      </p>
 
-    <p>
-      <label for="category">Category</label>
-      <input id="category" name="category" type="text"
-             value="{{ form_values.category|default_if_none:'' }}"
-             placeholder="e.g. Bakery">
-    </p>
+      <div class="form-row">
+        <p>
+          <label for="original_price">Worth ($)</label>
+          <input id="original_price" name="original_price"
+                 type="number" min="0" step="0.01"
+                 value="{{ form_values.original_price|default_if_none:'' }}"
+                 placeholder="15.00">
+        </p>
 
-    <h2>Pricing and availability</h2>
+        <p>
+          <label for="discounted_price">Your price ($)</label>
+          <input id="discounted_price" name="discounted_price"
+                 type="number" min="0" step="0.01"
+                 value="{{ form_values.discounted_price|default_if_none:'' }}"
+                 placeholder="5.00">
+        </p>
+      </div>
 
-    <p>
-      <label for="original_price">Original price (USD)</label>
-      <input id="original_price" name="original_price"
-             type="number" min="0" step="0.01"
-             value="{{ form_values.original_price|default_if_none:'' }}"
-             placeholder="10.00">
-    </p>
+      <p>
+        <label for="allergens">May contain (allergens)</label>
+        <input id="allergens" name="allergens" type="text"
+               value="{{ form_values.allergens|default_if_none:'' }}"
+               placeholder="e.g. Gluten, milk, sesame">
+      </p>
 
-    <p>
-      <label for="discounted_price">Discounted price (USD)</label>
-      <input id="discounted_price" name="discounted_price"
-             type="number" min="0" step="0.01"
-             value="{{ form_values.discounted_price|default_if_none:'' }}"
-             placeholder="5.00">
-    </p>
+      <p>
+        <label for="total_quantity">Quantity</label>
+        <input id="total_quantity" name="total_quantity"
+               type="number" min="0" step="1"
+               value="{{ form_values.total_quantity|default_if_none:'' }}"
+               placeholder="3">
+      </p>
 
-    <p>
-      <label for="total_quantity">Available quantity</label>
-      <input id="total_quantity" name="total_quantity"
-             type="number" min="0" step="1"
-             value="{{ form_values.total_quantity|default_if_none:'' }}"
-             placeholder="5">
-    </p>
+    {% else %}
+      <h2>Food details</h2>
+
+      <p>
+        <label for="title">Food title</label>
+        <input id="title" name="title" type="text"
+               maxlength="150" required
+               value="{{ form_values.title|default_if_none:'' }}"
+               placeholder="e.g. 6 butter croissants">
+      </p>
+
+      <p>
+        <label for="description">Description</label>
+        <textarea id="description" name="description" rows="4"
+                  placeholder="Describe the food.">{{ form_values.description|default_if_none:'' }}</textarea>
+      </p>
+
+      <p>
+        <label for="category">Category</label>
+        <input id="category" name="category" type="text"
+               value="{{ form_values.category|default_if_none:'' }}"
+               placeholder="e.g. Bakery">
+      </p>
+
+      <h2>Pricing and availability</h2>
+
+      <p>
+        <label for="original_price">Original price (USD)</label>
+        <input id="original_price" name="original_price"
+               type="number" min="0" step="0.01"
+               value="{{ form_values.original_price|default_if_none:'' }}"
+               placeholder="10.00">
+      </p>
+
+      <p>
+        <label for="discounted_price">Discounted price (USD)</label>
+        <input id="discounted_price" name="discounted_price"
+               type="number" min="0" step="0.01"
+               value="{{ form_values.discounted_price|default_if_none:'' }}"
+               placeholder="5.00">
+      </p>
+
+      <p>
+        <label for="total_quantity">Available quantity</label>
+        <input id="total_quantity" name="total_quantity"
+               type="number" min="0" step="1"
+               value="{{ form_values.total_quantity|default_if_none:'' }}"
+               placeholder="5">
+      </p>
+    {% endif %}
 
     <h2>Pickup information</h2>
 
@@ -117,34 +186,35 @@
              value="{{ form_values.pickup_end|default_if_none:''|slice:':16' }}">
     </p>
 
-    <h2>Food safety information</h2>
+    {% if kind != "LASTBAG" %}
+      <h2>Food safety information</h2>
 
-    <p>
-      <label for="ingredients">Ingredients (optional)</label>
-      <textarea id="ingredients" name="ingredients" rows="3">{{ form_values.ingredients|default_if_none:'' }}</textarea>
-    </p>
+      <p>
+        <label for="ingredients">Ingredients (optional)</label>
+        <textarea id="ingredients" name="ingredients" rows="3">{{ form_values.ingredients|default_if_none:'' }}</textarea>
+      </p>
 
-    <p>
-      <label for="allergens">Allergens (optional)</label>
-      <textarea id="allergens" name="allergens" rows="3">{{ form_values.allergens|default_if_none:'' }}</textarea>
-    </p>
+      <p>
+        <label for="allergens">Allergens (optional)</label>
+        <textarea id="allergens" name="allergens" rows="3">{{ form_values.allergens|default_if_none:'' }}</textarea>
+      </p>
 
-    <p class="muted">
-      Missing ingredient or allergen information is displayed as "Unknown".
-    </p>
+      <p class="muted">
+        Missing ingredient or allergen information is displayed as "Unknown".
+      </p>
+    {% endif %}
 
-    <h2>Food photo</h2>
+    <h2>{% if kind == "LASTBAG" %}Photo{% else %}Food photo{% endif %}</h2>
 
     {% if editing and listing.photo_display %}
       <p>Current photo:</p>
-      <img src="{{ listing.photo_display }}"
-           alt="Current photo of {{ listing.title }}"
-           style="max-width: 240px; border-radius: 12px;">
+      <img class="offer-form__photo" src="{{ listing.photo_display }}"
+           alt="Current photo of {{ listing.title }}">
     {% endif %}
 
     <p>
       <label for="photo">
-        {% if editing %}Replace photo (optional){% else %}Upload photo (optional){% endif %}
+        {% if editing %}Replace photo (optional){% else %}Add photo (optional){% endif %}
       </label>
       <input id="photo" name="photo"
              type="file" accept="image/jpeg,image/png">

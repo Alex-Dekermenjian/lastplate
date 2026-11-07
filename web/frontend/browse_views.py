@@ -74,13 +74,20 @@ def offer_for_display(data):
     end = lebanon_time(data.get("pickup_end"))
     shop = data.get("shop") if isinstance(data.get("shop"), dict) else {}
 
+    # LP-38: A LastBag shows what it usually holds, never exact contents.
+    is_lastbag = data.get("kind") == "LASTBAG"
+
     return {
         "id": data.get("id"),
-        "title": data.get("title") or "Food offer",
+        "is_lastbag": is_lastbag,
+        "typical_contents": (data.get("typical_contents") or "").strip()
+        if is_lastbag
+        else "",
+        "title": data.get("title") or ("Surprise bag" if is_lastbag else "Food offer"),
         "description": data.get("description") or "",
         "category": data.get("category") or "",
         "photo_url": photo_url(data.get("photo_display")),
-        "ingredients": _known(data.get("ingredients_display")),
+        "ingredients": "" if is_lastbag else _known(data.get("ingredients_display")),
         "allergens": _known(data.get("allergens_display")),
         "original_price": data.get("original_price"),
         "discounted_price": data.get("discounted_price"),

@@ -1,0 +1,7 @@
+{% comment %} LP-38: A LastBag's price: "Worth $15.00, yours for $5.00". Its worth is
+original_price and its price discounted_price. {% endcomment %}
+<p class="price price--lastbag">
+  <span class="price__was">Worth <s>${{ offer.original_price }}</s>,</span>
+  <span class="price__now">yours for ${{ offer.discounted_price }}</span>
+  {% if paid_at_pickup %}<span class="muted">each, paid at pickup</span>{% endif %}
+</p>
