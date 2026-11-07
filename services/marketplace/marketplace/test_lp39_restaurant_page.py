@@ -28,7 +28,7 @@ class RestaurantPageTests(MarketplaceTestCase):
         shop = response.json()["shop"]
         self.assertEqual(shop, {
             "id": self.shop.id, "name": "Cedar Bakery", "area": "Hamra", "public_contact": "+961 1 234 567",
-            "address": "12 Bliss Street, Beirut", "category": "", "photo_display": None,
+            "address": "12 Bliss Street, Beirut", "category": "Other", "photo_display": None,
         })
         offers = response.json()["offers"]
         self.assertEqual([o["id"] for o in offers], [soon.id, later.id])

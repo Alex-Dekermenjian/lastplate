@@ -409,8 +409,8 @@ class PublicShopSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-# LP-39: A restaurant's own page. Category and photo arrive with LP-37; until
-# then they are empty.
+# LP-39: A restaurant's own page, with the category and cover photo the
+# owner gave in their LP-37 request (category is "Other" unless chosen).
 class PublicShopDetailSerializer(PublicShopSerializer):
 
     address = serializers.CharField(read_only=True)
