@@ -25,7 +25,7 @@ Each Jira card contains its work, completion checks and dependencies. Card IDs i
 - Proposed personas: customer, bakery owner and bakery employee. Their detailed needs still require research.
 - Customers have their own accounts.
 - Owners and employees use the shop-operator permission type. This release provides one operator account per shop; separate employee accounts are outside scope.
-- A project administrator uses Django's built-in admin to review shop registration. New shops start Pending. Only Approved shops with complete profiles can publish.
+- The LastPlate administrator (Admin role, created only with the `create_admin` command) reviews shop registration at `/console` on the website. Django's built-in admin remains a developer backup. New shops start Pending. Only Approved shops with complete profiles can publish.
 - Approval is a manual onboarding control; it does not certify food safety or business legality.
 
 ## Core rules

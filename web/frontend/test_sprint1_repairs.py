@@ -12,7 +12,7 @@ from django.utils import timezone
 from . import services
 from .listing_photos import photo_url
 from .services import ServiceUnavailable
-from .test_accounts import WebAuthTestCase, patch_service
+from .test_accounts import ApprovedShopMixin, WebAuthTestCase, patch_service
 from .test_shop_profile import COMPLETE_SHOP
 
 
@@ -64,7 +64,7 @@ class PhotoUrlTests(SimpleTestCase):
                 self.assertIsNone(photo_url(path))
 
 
-class ListingMessagesTests(WebAuthTestCase):
+class ListingMessagesTests(ApprovedShopMixin, WebAuthTestCase):
     def setUp(self):
         self.sign_in_session()
 
@@ -73,9 +73,11 @@ class ListingMessagesTests(WebAuthTestCase):
             response = self.client.get(reverse("create-listing"))
         self.assertContains(response, f'value="{COMPLETE_SHOP["address"]}"')
 
-    def test_new_offer_form_still_opens_when_marketplace_is_down(self):
+    def test_new_offer_form_waits_when_marketplace_is_down(self):
+        # LP-37: approval can't be confirmed, so the offer page stays closed.
         with patch_service("my_shop", side_effect=ServiceUnavailable("marketplace")):
-            self.assertEqual(self.client.get(reverse("create-listing")).status_code, 200)
+            response = self.client.get(reverse("create-listing"))
+        self.assertRedirects(response, reverse("workspace"), fetch_redirect_response=False)
 
     def test_field_errors_use_the_form_labels(self):
         with patch_service("create_listing", return_value=(400, {"discounted_price": ["Too high."]})):
@@ -140,10 +142,9 @@ class WorkspaceVisibilityTests(WebAuthTestCase):
         self.assertContains(response, "Hidden from customers: its pickup time has ended.")
         self.assertNotContains(response, "name=\"quantity_change\"")
 
-    def test_rejected_shop_offer_explains_it_is_hidden(self):
+    def test_rejected_shop_sees_its_request_instead_of_its_offers(self):
         response = self.workspace({**COMPLETE_SHOP, "approval_status": "REJECTED"})
-        self.assertContains(response, "Hidden from customers: your shop isn&#x27;t approved.")
-        self.assertNotContains(response, "Customers can see this offer.")
+        self.assertRedirects(response, reverse("request-status"), fetch_redirect_response=False)
 
     def test_approved_status_no_longer_says_publishing_is_coming_later(self):
         self.assertNotContains(self.workspace(self.APPROVED), "later release")

@@ -36,7 +36,7 @@ Ownership in Marketplace always comes from the token: the caller's shop is
 | --- | --- | --- | --- |
 | `POST /api/shops/` | operator | Creates the caller's shop (one per operator); only `name` accepted; repeat returns the existing shop unchanged | `views.py` `ShopCreateView` (`IsAuthenticated`, `IsShopOperator`); `serializers.py` `ShopCreateSerializer` (`RejectUnknownFieldsMixin`); `models.py` `Shop.operator_user_id` unique |
 | `GET /api/shops/me/` | operator | Caller's own shop only | `views.py` `MyShopView.get_own_shop` |
-| `PATCH /api/shops/me/` | operator | Caller's own shop; only `name`, `address`, `area`, `public_contact`; `approval_status`, `rejection_reason`, `reviewed_by`, `reviewed_at`, `operator_user_id` → 400; saves only edited fields | `views.py` `MyShopView.patch`; `serializers.py` `ShopProfileSerializer`, `validate_public_contact` |
+| `PATCH /api/shops/me/` | operator | Caller's own shop; only `name`, `address`, `area`, `public_contact`, and (LP-37) `category`, `latitude`/`longitude`, `photo`, `logo`; `approval_status`, `rejection_reason`, `reviewed_by`, `reviewed_at`, `operator_user_id` → 400; saves only edited fields | `views.py` `MyShopView.patch`; `serializers.py` `ShopProfileSerializer`, `validate_public_contact` |
 | `GET /api/listings` | anyone (auth ignored) | Only offers that are PUBLISHED, from an APPROVED shop, pickup not ended, free stock > 0; no operator identity | `views.py` `browse_listings` (`authentication_classes([])`, `AllowAny`); `browse.py` `visible_listings`; `serializers.py` `PublicListingSerializer` |
 | `POST /api/listings` | operator with a shop | Draft is created in the caller's shop, status DRAFT; `shop_id`/`status` → 400; **other unknown/read-only fields → 400 (LP-14 fix)** | `views.py` `create_listing`; `listing_service.py` `save_listing_draft`; `serializers.py` `ListingSerializer.to_internal_value` |
 | `GET /api/listings/{id}` | anyone (auth ignored) | Same visibility as the list; everything else → 404 | `views.py` `listing_offer`; `browse.py` `visible_listing` |
@@ -65,10 +65,12 @@ Only `GET /health/live/` and `/health/ready/` (anyone). No business endpoints ye
 | `/sign-in/`, `/register/` | anyone | Redirect to `/login/` and `/signup/`, keeping the query string | `config/urls.py` |
 | `/account/` (LP-56) | customer | The customer's own name and email | `account_views.py` `my_account` (`customer_required`) |
 | `POST /sign-out/` | anyone (POST + CSRF only) | Revokes and deletes the session's tokens | `account_views.py` `sign_out` |
-| `/workspace/` | operator | Shop and listings from Marketplace using the session's token | `account_views.py` `workspace` (`operator_required`) |
-| `/workspace/finish-setup/` | operator | Creates the caller's shop | `account_views.py` `finish_setup` |
+| `/workspace/` | operator, approved restaurant | Shop and listings from Marketplace using the session's token. Owners not yet approved go to their request (LP-37) | `account_views.py` `workspace` (`operator_required`), `unapproved_shop_page` |
+| `/workspace/apply/`, `/workspace/apply/{1-3}/` (LP-37) | operator, restaurant not yet sent or approved | Three-step request; sends to `POST /api/shops/me/application/`, which creates or updates only the caller's shop as Pending | `apply_views.py` `restaurant_apply`; `apply_forms.py` |
+| `/workspace/request/` (LP-37) | operator, Pending or Rejected | The request status, and the reason when rejected | `apply_views.py` `request_status` |
+| `/workspace/finish-setup/` | operator | Redirects to the request (LP-37) | `apply_views.py` `finish_setup` |
 | `/workspace/profile/` | operator | Edits the caller's shop; only the four profile fields are forwarded | `account_views.py` `shop_profile`; `forms.py` `ShopProfileForm` |
-| `/workspace/listings/new/` | operator | Only `LISTING_FIELDS` are forwarded | `listing_views.py` `create_listing` |
+| `/workspace/listings/new/` | operator, approved restaurant (LP-37, for every offer page below) | Only `LISTING_FIELDS` are forwarded | `listing_views.py` `create_listing` |
 | `/workspace/listings/{id}/edit/` | operator | Listing must be in the caller's `listings/mine` and DRAFT, else 404; only `LISTING_FIELDS` forwarded | `listing_views.py` `edit_listing` |
 | `POST /workspace/listings/{id}/publish/` | operator (POST only) | Marketplace checks ownership and approval | `listing_views.py` `publish_listing` |
 | `POST /workspace/listings/{id}/stock/` (LP-12) | operator (POST only) | Only the change and reason are forwarded | `listing_views.py` `adjust_stock` |

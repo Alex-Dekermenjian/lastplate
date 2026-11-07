@@ -136,6 +136,10 @@ class BrowseListingsTests(MarketplaceTestCase):
                 "name": "Cedar Bakery",
                 "area": "Hamra",
                 "public_contact": "+961 1 234 567",
+                # LP-37: the restaurant's category and images.
+                "category": "Other",
+                "photo_display": None,
+                "logo_display": None,
             },
         )
 

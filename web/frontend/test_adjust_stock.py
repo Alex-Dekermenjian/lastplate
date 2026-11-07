@@ -6,7 +6,7 @@ from django.urls import reverse
 
 from . import services
 from .services import ServiceUnavailable
-from .test_accounts import WebAuthTestCase, patch_service
+from .test_accounts import ApprovedShopMixin, WebAuthTestCase, patch_service
 from .test_shop_profile import COMPLETE_SHOP
 
 
@@ -32,7 +32,7 @@ def adjusted(free_quantity):
     )
 
 
-class AdjustStockViewTests(WebAuthTestCase):
+class AdjustStockViewTests(ApprovedShopMixin, WebAuthTestCase):
 
     def setUp(self):
         self.url = reverse("adjust-stock", args=[42])

@@ -9,7 +9,9 @@ from .test_accounts import ACCOUNT, SHOP, WebAuthTestCase, patch_service
 
 PROFILE = {"name": "Cedar Crumb Bakery", "address": "12 Bliss Street, Beirut", "area": "Hamra",
            "public_contact": "+961 1 234 567"}
-COMPLETE_SHOP = {**SHOP, **PROFILE, "rejection_reason": "", "profile_complete": True}
+# LP-37: the workspace and offer pages are for approved restaurants.
+COMPLETE_SHOP = {**SHOP, **PROFILE, "rejection_reason": "", "profile_complete": True,
+                 "approval_status": "APPROVED", "application_sent": True}
 NEW_SHOP = {**SHOP, "address": "", "area": "", "public_contact": "", "rejection_reason": "", "profile_complete": False}
 
 
@@ -31,11 +33,12 @@ class ShopProfilePageTests(WebAuthTestCase):
         for value in PROFILE.values():
             self.assertContains(response, f'value="{value}"')
         self.assertContains(response, "csrfmiddlewaretoken")
-        self.assertContains(response, "Pending review")
+        self.assertContains(response, "Approved")
 
     def test_login_email_is_never_used_or_shown(self):
         self.sign_in_session()
-        with patch_service("my_shop", return_value=(200, NEW_SHOP)):
+        with patch_service("my_shop", return_value=(200, {**NEW_SHOP, "approval_status": "APPROVED"})), \
+                patch_service("my_listings", return_value=(200, [])):
             for url in (self.url, reverse("workspace")):
                 with self.subTest(url=url):
                     response = self.client.get(url)
@@ -48,8 +51,9 @@ class ShopProfilePageTests(WebAuthTestCase):
     def test_saving_sends_only_profile_fields_and_returns_to_workspace(self):
         self.sign_in_session()
         posted = {**PROFILE, "approval_status": "APPROVED", "operator_user_id": "99", "rejection_reason": "x"}
-        with patch_service("my_shop", return_value=(200, NEW_SHOP)), \
-                patch_service("update_shop", return_value=(200, COMPLETE_SHOP)) as update_shop:
+        with patch_service("my_shop", return_value=(200, {**NEW_SHOP, "approval_status": "APPROVED"})), \
+                patch_service("update_shop", return_value=(200, COMPLETE_SHOP)) as update_shop, \
+                patch_service("my_listings", return_value=(200, [])):
             response = self.client.post(self.url, posted, follow=True)
         update_shop.assert_called_once_with("access-token-1", PROFILE)
         self.assertRedirects(response, reverse("workspace"))
@@ -104,10 +108,10 @@ class ShopProfilePageTests(WebAuthTestCase):
         self.assertContains(response, 'value="Hamra"')
         self.assertContains(page, "profile can't be loaded")
 
-    def test_operator_without_shop_is_sent_to_finish_setup(self):
+    def test_operator_without_shop_is_sent_to_the_request(self):
         self.sign_in_session()
         with patch_service("my_shop", return_value=(404, {})):
-            self.assertRedirects(self.client.get(self.url), reverse("finish-setup"), fetch_redirect_response=False)
+            self.assertRedirects(self.client.get(self.url), reverse("restaurant-apply"), fetch_redirect_response=False)
 
     def test_post_without_csrf_token_is_rejected(self):
         client = Client(enforce_csrf_checks=True)
@@ -119,7 +123,7 @@ class ShopProfilePageTests(WebAuthTestCase):
 class WorkspaceProfileTests(WebAuthTestCase):
     def test_shows_profile_details_and_completion_prompt(self):
         self.sign_in_session()
-        with patch_service("my_shop", return_value=(200, NEW_SHOP)):
+        with patch_service("my_shop", return_value=(200, {**NEW_SHOP, "approval_status": "APPROVED"})):
             response = self.client.get(reverse("workspace"))
         self.assertContains(response, "Not set", count=3)
         self.assertContains(response, "Complete your pickup address, area and shop phone number")
@@ -132,12 +136,13 @@ class WorkspaceProfileTests(WebAuthTestCase):
     def test_rejection_reason_is_shown_only_for_rejected_shops(self):
         self.sign_in_session()
         rejected = {**COMPLETE_SHOP, "approval_status": "REJECTED", "rejection_reason": "We could not confirm you represent this shop."}
+        # LP-37: a rejected owner reads the reason on their request page.
         with patch_service("my_shop", return_value=(200, rejected)):
-            response = self.client.get(reverse("workspace"))
-        self.assertContains(response, "Not approved")
+            response = self.client.get(reverse("request-status"))
+        self.assertContains(response, "Request not approved")
         self.assertContains(response, "We could not confirm you represent this shop.")
         with patch_service("my_shop", return_value=(200, {**rejected, "rejection_reason": ""})):
-            self.assertContains(self.client.get(reverse("workspace")), "No reason has been recorded yet.")
+            self.assertNotContains(self.client.get(reverse("request-status")), "<h2>Reason</h2>")
         with patch_service("my_shop", return_value=(200, {**COMPLETE_SHOP, "rejection_reason": "stale text"})):
             self.assertNotContains(self.client.get(reverse("workspace")), "stale text")
 
@@ -145,7 +150,7 @@ class WorkspaceProfileTests(WebAuthTestCase):
         self.sign_in_session()
         rejected = {**COMPLETE_SHOP, "approval_status": "REJECTED", "rejection_reason": "<script>alert(1)</script>"}
         with patch_service("my_shop", return_value=(200, rejected)):
-            response = self.client.get(reverse("workspace"))
+            response = self.client.get(reverse("request-status"))
         self.assertNotContains(response, "<script>alert(1)</script>")
         self.assertContains(response, "&lt;script&gt;")
 

@@ -27,6 +27,23 @@ def patch_service(name, **kwargs):
     return mock.patch.object(services, name, **kwargs)
 
 
+# LP-37: offer pages and the workspace are for approved restaurants only.
+APPROVED_SHOP = {**SHOP, "address": "12 Bliss Street, Beirut", "area": "Hamra", "public_contact": "+961 1 234 567",
+                 "rejection_reason": "", "profile_complete": True, "approval_status": "APPROVED",
+                 "application_sent": True}
+
+
+class ApprovedShopMixin:
+    """my_shop answers with an approved restaurant unless a test patches it."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        patcher = patch_service("my_shop", return_value=(200, APPROVED_SHOP))
+        patcher.start()
+        cls.addClassCleanup(patcher.stop)
+
+
 class WebAuthTestCase(TestCase):
     def sign_in_session(self, access="access-token-1", refresh="refresh-token-1"):
         session = self.client.session
@@ -57,13 +74,13 @@ class RegistrationTests(WebAuthTestCase):
             self.assertEqual(client.post(self.url, registration()).status_code, 403)
         register.assert_not_called()
 
-    def test_restaurant_sign_up_renews_session_and_asks_for_the_shop_name(self):
+    def test_restaurant_sign_up_renews_session_and_opens_the_request(self):
         old_key = self.client.session.session_key
         with patch_service("register", return_value=(201, {**TOKENS, "user": ACCOUNT})) as register, \
                 patch_service("create_shop") as create_shop:
             response = self.client.post(self.url, registration())
 
-        self.assertRedirects(response, reverse("finish-setup"), fetch_redirect_response=False)
+        self.assertRedirects(response, reverse("restaurant-apply"), fetch_redirect_response=False)
         register.assert_called_once_with("Owner", "owner@example.test", PASSWORD, "restaurant")
         create_shop.assert_not_called()
         session = self.client.session
@@ -73,19 +90,10 @@ class RegistrationTests(WebAuthTestCase):
         self.assertNotIn("token", cookie)
 
         with patch_service("my_shop", return_value=(404, {})):
-            page = self.client.get(reverse("finish-setup"))
-        self.assertContains(page, "Now tell us your restaurant&#x27;s name.")
+            page = self.client.get(reverse("restaurant-apply"))
+        self.assertContains(page, "Now tell us about your restaurant.")
+        self.assertContains(page, "Step 1 of 3")
         self.assert_no_secrets(page)
-
-        with patch_service("create_shop", return_value=(201, SHOP)) as create_shop:
-            done = self.client.post(reverse("finish-setup"), {"shop_name": "Cedar Crumb Bakery"})
-        create_shop.assert_called_once_with("access-token-1", "Cedar Crumb Bakery")
-        self.assertRedirects(done, reverse("workspace"), fetch_redirect_response=False)
-
-        with patch_service("my_shop", return_value=(200, SHOP)), patch_service("my_listings", return_value=(200, [])):
-            workspace = self.client.get(reverse("workspace"))
-        self.assertContains(workspace, "Cedar Crumb Bakery")
-        self.assertContains(workspace, "Pending review")
 
     def test_local_validation_keeps_safe_input_but_never_passwords(self):
         with patch_service("register") as register:
@@ -115,7 +123,7 @@ class RegistrationTests(WebAuthTestCase):
                 patch_service("account", return_value=(200, ACCOUNT)):
             response = self.client.post(self.url, registration())
         sign_in.assert_called_once_with("owner@example.test", PASSWORD)
-        self.assertRedirects(response, reverse("finish-setup"), fetch_redirect_response=False)
+        self.assertRedirects(response, reverse("restaurant-apply"), fetch_redirect_response=False)
         self.assertEqual(self.client.session[account_views.ACCOUNT_KEY]["id"], 7)
 
     def test_timeout_then_failed_sign_in_does_not_continue(self):
@@ -133,11 +141,12 @@ class RegistrationTests(WebAuthTestCase):
         self.assertContains(response, "can&#x27;t tell whether your account was created")
         self.assertNotIn(tokens.REFRESH_TOKEN_KEY, self.client.session)
 
-    def test_finish_setup_retry_failure_is_explained(self):
+    def test_the_old_setup_page_opens_the_request(self):
         self.sign_in_session()
-        with patch_service("create_shop", side_effect=ServiceUnavailable("marketplace")):
+        with patch_service("create_shop") as create_shop:
             response = self.client.post(reverse("finish-setup"), {"shop_name": "Cedar Crumb Bakery"})
-        self.assertContains(response, "Your account is safe")
+        self.assertRedirects(response, reverse("restaurant-apply"), fetch_redirect_response=False)
+        create_shop.assert_not_called()
 
 
 class SignInTests(WebAuthTestCase):
@@ -214,7 +223,7 @@ class ProtectedPageTests(WebAuthTestCase):
 
         with patch_service(
             "my_shop",
-            side_effect=[(401, {}), (200, SHOP)],
+            side_effect=[(401, {}), (200, APPROVED_SHOP)],
         ) as my_shop, patch_service(
             "my_listings",
             return_value=(200, []),
@@ -225,7 +234,7 @@ class ProtectedPageTests(WebAuthTestCase):
 
             response = self.client.get(reverse("workspace"))
 
-        self.assertContains(response, "Pending review")
+        self.assertContains(response, "Approved")
 
         # The expired token should be refreshed only once.
         refresh.assert_called_once_with("refresh-token-1")
@@ -249,11 +258,11 @@ class ProtectedPageTests(WebAuthTestCase):
         self.assertRedirects(response, reverse("login"), fetch_redirect_response=False)
         self.assertFalse(Session.objects.filter(session_key=key).exists())
 
-    def test_operator_without_shop_is_sent_to_finish_setup(self):
+    def test_operator_without_shop_is_sent_to_the_request(self):
         self.sign_in_session()
         with patch_service("my_shop", return_value=(404, {})):
             response = self.client.get(reverse("workspace"))
-        self.assertRedirects(response, reverse("finish-setup"), fetch_redirect_response=False)
+        self.assertRedirects(response, reverse("restaurant-apply"), fetch_redirect_response=False)
 
     def test_unavailable_marketplace_does_not_invent_a_status(self):
         self.sign_in_session()
@@ -264,9 +273,13 @@ class ProtectedPageTests(WebAuthTestCase):
 
     def test_each_status_is_explained(self):
         self.sign_in_session()
-        for status, label in (("APPROVED", "Approved"), ("REJECTED", "Not approved")):
-            with self.subTest(status=status), patch_service("my_shop", return_value=(200, {**SHOP, "approval_status": status})):
-                self.assertContains(self.client.get(reverse("workspace")), label)
+        with patch_service("my_shop", return_value=(200, APPROVED_SHOP)), patch_service("my_listings", return_value=(200, [])):
+            self.assertContains(self.client.get(reverse("workspace")), "Approved")
+        # LP-37: owners who aren't approved see their request instead.
+        for shop in ({**APPROVED_SHOP, "approval_status": "REJECTED"}, {**APPROVED_SHOP, "approval_status": "PENDING"}):
+            with self.subTest(status=shop["approval_status"]), patch_service("my_shop", return_value=(200, shop)):
+                self.assertRedirects(self.client.get(reverse("workspace")), reverse("request-status"),
+                                     fetch_redirect_response=False)
 
 
 class SignOutTests(WebAuthTestCase):

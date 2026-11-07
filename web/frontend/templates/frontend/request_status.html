@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Your request — LastPlate{% endblock %}
+
+{% block content %}
+<section class="request-status">
+  {% if unavailable %}
+    <h1>Your request</h1>
+    <p class="notice notice--warning" role="status">We can't reach the shop service right now, so we can't show your request. Please try again in a few minutes.</p>
+  {% elif rejected %}
+    <div class="request-status__icon request-status__icon--rejected" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>
+    </div>
+    <h1>Request not approved</h1>
+    <p class="muted">The LastPlate team did not approve {{ shop.name }}, so it can't post offers.</p>
+    {% if shop.rejection_reason %}
+      <div class="card request-status__card">
+        <h2>Reason</h2>
+        <p>{{ shop.rejection_reason }}</p>
+      </div>
+    {% endif %}
+    <p class="muted">If you think this is a mistake, please contact the LastPlate team.</p>
+  {% else %}
+    <div class="request-status__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    </div>
+    <h1>Request sent</h1>
+    <p class="muted">The LastPlate team is reviewing {{ shop.name }}. Log in again later to see if you're approved.</p>
+    <div class="card request-status__card">
+      <h2>What happens next</h2>
+      <ol class="timeline">
+        <li class="timeline__item timeline__item--done">Request sent · conditions accepted</li>
+        <li class="timeline__item timeline__item--current" aria-current="step">LastPlate reviews your details</li>
+        <li class="timeline__item">Approved: log in to open your restaurant</li>
+        <li class="timeline__item">Post your first LastBag</li>
+      </ol>
+    </div>
+  {% endif %}
+
+  <div class="request-status__actions">
+    {% if not rejected %}
+      <a class="button button--primary button--block" href="{% url 'workspace' %}">Check again</a>
+    {% endif %}
+    <form method="post" action="{% url 'sign-out' %}">
+      {% csrf_token %}
+      <button class="button button--secondary button--block" type="submit">Log out</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

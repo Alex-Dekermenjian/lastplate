@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 """
 
 import os
+import tempfile
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -115,6 +116,13 @@ SESSION_COOKIE_AGE = 60 * 60 * 24  # matches the planned refresh-token lifetime
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
+
+# LP-37: Images chosen on the last step of a restaurant's request are kept in
+# this private folder (never served) until the request is sent, so a mistake on
+# that step does not make the owner choose them again.
+APPLICATION_UPLOAD_DIR = Path(
+    os.environ.get("APPLICATION_UPLOAD_DIR", Path(tempfile.gettempdir()) / "lastplate-applications")
+)
 
 
 # Internationalization

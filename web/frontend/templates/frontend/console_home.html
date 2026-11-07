@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Console — LastPlate{% endblock %}
+{% block header_class %}header-restaurant{% endblock %}
+
+{% block content %}
+<section class="card">
+  <p class="eyebrow">Console</p>
+  <h1>Hello, {{ request.session.account.display_name }}</h1>
+
+  {% if unavailable %}
+    <p class="notice notice--warning" role="alert">We can't load the numbers right now. Please refresh in a few minutes.</p>
+  {% else %}
+    <ul class="stat-grid">
+      <li class="stat">
+        <a href="{% url 'console-restaurants' %}?tab=pending">
+          <span class="stat__value">{{ summary.pending_shops }}</span>
+          <span class="stat__label">Pending restaurants</span>
+        </a>
+      </li>
+      <li class="stat">
+        <a href="{% url 'console-restaurants' %}?tab=approved">
+          <span class="stat__value">{{ summary.approved_shops }}</span>
+          <span class="stat__label">Approved restaurants</span>
+        </a>
+      </li>
+      <li class="stat">
+        <a href="{% url 'browse-offers' %}">
+          <span class="stat__value">{{ summary.live_offers }}</span>
+          <span class="stat__label">Live offers</span>
+        </a>
+      </li>
+    </ul>
+    {% if summary.pending_shops %}
+      <a class="button button--primary button--block" href="{% url 'console-restaurants' %}?tab=pending">Review pending restaurants</a>
+    {% else %}
+      <p class="muted">No restaurants are waiting for review.</p>
+    {% endif %}
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block bottom_bar %}{% include "frontend/_console_bar.html" %}{% endblock %}
