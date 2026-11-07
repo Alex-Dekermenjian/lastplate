@@ -28,6 +28,7 @@ PENDING_SHOP_KEY = "pending_shop_name"
 
 CUSTOMER = "CUSTOMER"
 SHOP_OPERATOR = "SHOP_OPERATOR"
+ADMIN = "ADMIN"
 
 INVALID_LOGIN = "Email or password is incorrect."
 TOO_MANY_SIGN_INS = "Too many sign-in attempts. Please wait a minute and try again."
@@ -40,6 +41,7 @@ REGISTRATION_UNCONFIRMED = (
 REGISTRATION_FAILED = "We couldn't complete your sign-up. Please check your details and try again."
 SHOPS_ONLY = "That page is for restaurant accounts."
 CUSTOMERS_ONLY = "That page is for customer accounts."
+ADMINS_ONLY = "That page is for the LastPlate administrator."
 
 STATUS_EXPLANATIONS = {
     "PENDING": ("Pending review", "A LastPlate administrator checks new shops before they can publish offers. You can prepare drafts now, but you can't publish yet."),
@@ -102,6 +104,8 @@ def signed_in(request):
 
 def landing_url(account):
     """Where an account goes after login, or when it opens a page that isn't for it."""
+    if account.get("role") == ADMIN:
+        return reverse("console")
     if account.get("is_staff"):
         return settings.STAFF_ADMIN_URL  # TODO: /console later
     if account.get("role") == SHOP_OPERATOR:
@@ -136,6 +140,7 @@ def role_required(role, refusal):
 
 operator_required = role_required(SHOP_OPERATOR, SHOPS_ONLY)
 customer_required = role_required(CUSTOMER, CUSTOMERS_ONLY)
+admin_required = role_required(ADMIN, ADMINS_ONLY)
 
 
 def authenticated_call(request, call, *args):
@@ -245,12 +250,12 @@ def login(request):
                 form.add_error(None, INVALID_LOGIN)
             elif account_status != 200:
                 form.add_error(None, SIGN_IN_UNAVAILABLE)
-            elif account.get("is_staff"):
+            elif account.get("is_staff") and account.get("role") != ADMIN:
                 # Staff work in the Django admin, which has its own login, so
-                # no web session is kept for them.
+                # no web session is kept for them. The Admin role uses /console.
                 revoke(token_data["refresh"])
                 return redirect(landing_url(account))
-            elif account.get("role") not in (CUSTOMER, SHOP_OPERATOR):
+            elif account.get("role") not in (CUSTOMER, SHOP_OPERATOR, ADMIN):
                 revoke(token_data["refresh"])
                 form.add_error(None, SIGN_IN_UNAVAILABLE)
             else:

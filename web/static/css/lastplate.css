@@ -327,3 +327,26 @@ p { margin: 0 0 12px; }
 @media (min-width: 431px) {
   .app-column { border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
 }
+
+/* LP-57: administrator console */
+.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0 20px; padding: 0; list-style: none; }
+.stat a {
+  display: flex; flex-direction: column; gap: 4px; min-height: 88px; padding: 12px;
+  background: var(--tint); border-radius: 16px; color: var(--text); text-decoration: none;
+}
+.stat a:hover { box-shadow: var(--shadow); }
+.stat__value { font-size: 28px; font-weight: 800; }
+.stat__label { font-size: 14px; color: var(--text-2); font-weight: 700; }
+.tabs { display: flex; gap: 6px; margin: 12px 0 16px; border-bottom: 1px solid var(--border); }
+.tabs__tab {
+  display: flex; align-items: center; min-height: 44px; padding: 8px 14px;
+  border-bottom: 3px solid transparent; color: var(--text-2); font-weight: 700; text-decoration: none;
+}
+.tabs__tab[aria-current="page"] { color: var(--btn); border-bottom-color: var(--accent); }
+.shop-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.shop-list__item {
+  display: grid; gap: 4px; padding: 14px 16px; min-height: 44px;
+  border: 1px solid var(--border); border-radius: 16px; color: var(--text); text-decoration: none;
+}
+.shop-list__item:hover { border-color: var(--btn); }
+.review-card { margin-top: 16px; }

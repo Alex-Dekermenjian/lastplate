@@ -18,6 +18,8 @@
         {% if request.session.account %}
           {% if request.session.account.role == "SHOP_OPERATOR" %}
             <a class="button button--secondary" href="{% url 'workspace' %}">Workspace</a>
+          {% elif request.session.account.role == "ADMIN" %}
+            <a class="button button--secondary" href="{% url 'console' %}">Console</a>
           {% else %}
             <a class="button button--secondary" href="{% url 'my-account' %}">My account</a>
           {% endif %}

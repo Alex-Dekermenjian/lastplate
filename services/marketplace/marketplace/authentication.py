@@ -59,6 +59,15 @@ class AccessTokenAuthentication(authentication.BaseAuthentication):
         return self.keyword
 
 
+class IsAdmin(BasePermission):
+    """LP-57: the LastPlate administrator (Accounts role ADMIN) only."""
+
+    message = "Only the LastPlate administrator can do this."
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.role == "ADMIN")
+
+
 class IsShopOperator(BasePermission):
     message = "Only shop operators can do this."
 

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Restaurants — Console — LastPlate{% endblock %}
+{% block header_class %}header-restaurant{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h1>Restaurants</h1>
+
+  <nav class="tabs" aria-label="Review status">
+    {% for key, value, label in tabs %}
+      <a class="tabs__tab" href="?tab={{ key }}"{% if key == tab %} aria-current="page"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  {% if unavailable %}
+    <p class="notice notice--warning" role="alert">We can't load restaurants right now. Please refresh in a few minutes.</p>
+  {% elif not shops %}
+    <p class="muted">No {{ tab }} restaurants.</p>
+  {% else %}
+    <ul class="shop-list">
+      {% for shop in shops %}
+        <li>
+          <a class="shop-list__item" href="{% url 'console-restaurant' shop.id %}">
+            <strong>{{ shop.name }}</strong>
+            <span class="muted">
+              {{ shop.area|default:"No area yet" }}
+              {% if shop.applied_at %}· applied {{ shop.applied_at|date:"j M, H:i" }}{% endif %}
+            </span>
+            {% if tab == "pending" and not shop.profile_complete %}
+              <span class="badge">Profile incomplete</span>
+            {% endif %}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block bottom_bar %}{% include "frontend/_console_bar.html" %}{% endblock %}

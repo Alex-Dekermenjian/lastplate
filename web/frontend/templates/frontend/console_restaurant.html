@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}{% if shop %}{{ shop.name }}{% else %}Restaurant{% endif %} — Console — LastPlate{% endblock %}
+{% block header_class %}header-restaurant{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'console-restaurants' %}{% if shop %}?tab={{ shop.approval_status|lower }}{% endif %}">← Restaurants</a></p>
+
+{% for error in form.non_field_errors %}
+  <p class="notice notice--error" role="alert">{{ error }}</p>
+{% endfor %}
+
+{% if unavailable %}
+  <section class="card">
+    <h1>Restaurant</h1>
+    <p class="notice notice--warning" role="alert">We can't load this restaurant right now. Please refresh in a few minutes.</p>
+  </section>
+{% else %}
+  <section class="card">
+    <h1>{{ shop.name }}</h1>
+    <span class="status status--{{ shop.approval_status }}">{{ shop.status_label }}</span>
+
+    <dl class="details">
+      <dt>Pickup address</dt><dd>{{ shop.address|default:"Not set" }}</dd>
+      <dt>Area</dt><dd>{{ shop.area|default:"Not set" }}</dd>
+      <dt>Phone</dt><dd>{{ shop.public_contact|default:"Not set" }}</dd>
+      <dt>Owner account</dt><dd>#{{ shop.operator_user_id }}</dd>
+      {% if shop.applied_at %}<dt>Applied</dt><dd>{{ shop.applied_at|date:"j M Y, H:i" }}</dd>{% endif %}
+      {% if shop.reviewed_at %}<dt>Reviewed</dt><dd>{{ shop.reviewed_at|date:"j M Y, H:i" }}</dd>{% endif %}
+    </dl>
+
+    {% if shop.approval_status == "REJECTED" and shop.rejection_reason %}
+      <div class="notice notice--error"><strong>Reason given:</strong> {{ shop.rejection_reason|linebreaksbr }}</div>
+    {% endif %}
+    {% if not shop.profile_complete %}
+      <p class="notice notice--warning">The profile is incomplete, so this restaurant can't be approved yet.</p>
+    {% endif %}
+  </section>
+
+  {% if shop.approval_status != "APPROVED" %}
+    <section class="card review-card">
+      <h2>Approve</h2>
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="decision" value="APPROVED">
+        <div class="check">
+          <input type="checkbox" name="identity_confirmed" id="identity-confirmed"
+                 {% if form.identity_confirmed.value %}checked{% endif %}
+                 {% if form.identity_confirmed.errors %}aria-describedby="identity-error"{% endif %}>
+          <label for="identity-confirmed">{{ form.identity_confirmed.label }}</label>
+        </div>
+        {% for error in form.identity_confirmed.errors %}<p class="field-error" id="identity-error">{{ error }}</p>{% endfor %}
+        <button class="button button--primary button--block" type="submit"
+                {% if not shop.profile_complete %}disabled{% endif %}>Approve restaurant</button>
+      </form>
+      <p class="help">Approval is a manual onboarding check; it does not certify food safety or business legality.</p>
+    </section>
+  {% endif %}
+
+  {% if shop.approval_status != "REJECTED" %}
+    <section class="card review-card">
+      <h2>Reject</h2>
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="decision" value="REJECTED">
+        <div class="field{% if form.reason.errors %} field--error{% endif %}">
+          <label for="reject-reason">{{ form.reason.label }}</label>
+          <p class="help">{{ form.reason.help_text }}</p>
+          <textarea name="reason" id="reject-reason" rows="3" maxlength="2000">{{ form.reason.value|default:"" }}</textarea>
+          {% for error in form.reason.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+        <button class="button button--secondary button--block" type="submit">Reject restaurant</button>
+      </form>
+    </section>
+  {% endif %}
+{% endif %}
+{% endblock %}
+
+{% block bottom_bar %}{% include "frontend/_console_bar.html" %}{% endblock %}

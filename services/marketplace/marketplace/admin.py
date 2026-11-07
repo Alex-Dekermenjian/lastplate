@@ -1,8 +1,8 @@
 from django import forms
 from django.contrib import admin
-from django.utils import timezone
 
 from .models import Shop
+from .shop_review import record_review, review_errors
 
 REVIEW_PERMISSION = "marketplace.review_shop"
 
@@ -24,24 +24,17 @@ class ShopReviewForm(forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
         status = cleaned.get("approval_status")
-        reason = cleaned.get("rejection_reason", "")
-        Status = Shop.ApprovalStatus
+        if status is None:
+            return cleaned
 
-        if status == Status.APPROVED:
-            if self.instance.approval_status != Status.APPROVED:
-                if not self.instance.profile_complete:
-                    self.add_error("approval_status", "This shop's profile is incomplete, so it cannot be approved.")
-                if not cleaned.get("identity_confirmed"):
-                    self.add_error("identity_confirmed", "Confirm the applicant represents this shop before approving.")
+        # LP-57: the same rules as /console, from one shared function.
+        errors = review_errors(
+            self.instance, status, cleaned.get("rejection_reason", ""), cleaned.get("identity_confirmed")
+        )
+        for field, message in errors.items():
+            self.add_error(field, message)
+        if status == Shop.ApprovalStatus.APPROVED:
             cleaned["rejection_reason"] = ""
-        elif status == Status.REJECTED:
-            if not reason:
-                self.add_error("rejection_reason", "Give a reason. The shop owner will see it.")
-        elif status == Status.PENDING:
-            if self.instance.approval_status != Status.PENDING:
-                self.add_error("approval_status", "A reviewed shop cannot return to Pending. Approve or reject it.")
-            elif reason:
-                self.add_error("rejection_reason", "Choose Rejected to give a reason.")
         return cleaned
 
 
@@ -57,7 +50,7 @@ class ShopAdmin(admin.ModelAdmin):
     ordering = ["created_at"]
     readonly_fields = [
         "name", "operator_user_id", "address", "area", "public_contact", "profile_is_complete",
-        "reviewed_by", "reviewed_at", "created_at", "updated_at",
+        "reviewed_by", "reviewed_by_user_id", "reviewed_at", "created_at", "updated_at",
     ]
 
     @admin.display(boolean=True, description="Profile complete")
@@ -71,7 +64,7 @@ class ShopAdmin(admin.ModelAdmin):
         return [
             ("Shop details", {"fields": ["name", "operator_user_id", "address", "area", "public_contact", "profile_is_complete"]}),
             ("Decision", {"fields": decision}),
-            ("Review record", {"fields": ["reviewed_by", "reviewed_at", "created_at", "updated_at"]}),
+            ("Review record", {"fields": ["reviewed_by", "reviewed_by_user_id", "reviewed_at", "created_at", "updated_at"]}),
         ]
 
     def has_add_permission(self, request):
@@ -89,7 +82,4 @@ class ShopAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         if not {"approval_status", "rejection_reason"} & set(form.changed_data):
             return
-        obj.reviewed_by = request.user
-        obj.reviewed_at = timezone.now()
-        # Save only the decision, so a profile edit made at the same moment survives.
-        obj.save(update_fields=["approval_status", "rejection_reason", "reviewed_by", "reviewed_at", "updated_at"])
+        record_review(obj, obj.approval_status, obj.rejection_reason, reviewer=request.user)
