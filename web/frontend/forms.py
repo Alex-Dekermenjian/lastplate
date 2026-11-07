@@ -66,9 +66,3 @@ class ShopProfileForm(forms.Form):
         widget=forms.TextInput(attrs={"type": "tel", "inputmode": "tel", "autocomplete": "off"}),
     )
 
-
-class ShopSetupForm(forms.Form):
-    shop_name = forms.CharField(
-        label="Shop name", max_length=150,
-        widget=forms.TextInput(attrs={"autocomplete": "organization"}),
-    )

@@ -63,3 +63,13 @@ urlpatterns = [
     path("health/live/", health.live, name="health-live"),
     path("health/ready/", health.ready, name="health-ready"),
 ]
+
+# LP-37: the restaurant's three-step request and its status. Kept in its own
+# block so other cards can add routes above without touching these lines.
+from frontend import apply_views  # noqa: E402
+
+urlpatterns += [
+    path("workspace/apply/", apply_views.restaurant_apply, name="restaurant-apply"),
+    path("workspace/apply/<int:step>/", apply_views.restaurant_apply, name="restaurant-apply"),
+    path("workspace/request/", apply_views.request_status, name="request-status"),
+]

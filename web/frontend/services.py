@@ -244,6 +244,19 @@ def update_shop(access, profile):
     )
 
 
+# LP-37: Send the restaurant's request to join LastPlate (with its images).
+@sensitive_variables("access", "files")
+def submit_application(access, fields, files):
+    return _call_multipart(
+        "marketplace",
+        "POST",
+        "/api/shops/me/application/",
+        fields=fields,
+        files=files,
+        token=access,
+    )
+
+
 # LP-10 and LP-11: Retrieve the authenticated shop's food listings.
 @sensitive_variables("access")
 def my_listings(access):
