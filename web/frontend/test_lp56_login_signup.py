@@ -103,11 +103,11 @@ class SignUpTests(WebAuthTestCase):
         self.assertEqual(self.client.session[tokens.REFRESH_TOKEN_KEY], "refresh-token-1")
         self.assertEqual(self.client.session[account_views.ACCOUNT_KEY]["role"], "CUSTOMER")
 
-    def test_restaurant_lands_on_finish_setup(self):
+    def test_restaurant_lands_on_the_request(self):
         with patch_service("register", return_value=(201, {**TOKENS, "user": OPERATOR})) as register:
             response = self.client.post(self.url, signup_data(account_type="restaurant", email=OPERATOR["email"]))
 
-        self.assertRedirects(response, reverse("finish-setup"), fetch_redirect_response=False)
+        self.assertRedirects(response, reverse("restaurant-apply"), fetch_redirect_response=False)
         self.assertEqual(register.call_args.args[3], "restaurant")
         self.assertEqual(self.client.session[account_views.ACCOUNT_KEY]["role"], "SHOP_OPERATOR")
 

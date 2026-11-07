@@ -10,6 +10,12 @@ urlpatterns = [
         views.ShopCreateView.as_view(),
         name="shop-create",
     ),
+    # LP-37: the owner sends the request to join LastPlate
+    path(
+        "shops/me/application/",
+        views.ShopApplicationView.as_view(),
+        name="shop-application",
+    ),
     path(
         "shops/me/",
         views.MyShopView.as_view(),

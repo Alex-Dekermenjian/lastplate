@@ -24,8 +24,15 @@ from .listing_service import (
 )
 from .models import Listing, Shop
 from .photo_service import replace_listing_photo
+from .shop_service import (
+    ApplicationClosed,
+    delete_replaced_images,
+    image_names,
+    submit_application,
+)
 from .serializers import (
     ListingSerializer,
+    ShopApplicationSerializer,
     PublicListingDetailSerializer,
     PublicListingSerializer,
     ShopCreateSerializer,
@@ -110,6 +117,8 @@ class MyShopView(APIView):
         serializer = ShopProfileSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        old_images = image_names(shop)
+
         for field, value in serializer.validated_data.items():
             setattr(shop, field, value)
 
@@ -121,8 +130,58 @@ class MyShopView(APIView):
                 "updated_at",
             ]
         )
+        delete_replaced_images(shop, old_images)
 
         return Response(ShopSerializer(shop).data)
+
+
+# --------------------------------------------------
+# LP-37: A restaurant's request to join LastPlate
+# --------------------------------------------------
+
+ALREADY_REVIEWED = (
+    "Your restaurant has already been reviewed, so its request "
+    "can't be changed. Please contact the LastPlate team."
+)
+
+
+class ShopApplicationView(APIView):
+    """
+    Send the three-step request. Creates the owner's shop, or updates it
+    while it is still Pending, and records when the conditions were
+    accepted. The shop is always found from the verified token.
+    """
+    permission_classes = [IsAuthenticated, IsShopOperator]
+
+    def post(self, request):
+        shop = Shop.objects.filter(
+            operator_user_id=request.user.id
+        ).first()
+
+        if shop is not None and shop.approval_status != Shop.ApprovalStatus.PENDING:
+            return Response(
+                {"detail": ALREADY_REVIEWED},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        serializer = ShopApplicationSerializer(data=request.data, shop=shop)
+        serializer.is_valid(raise_exception=True)
+
+        data = dict(serializer.validated_data)
+        data.pop("accept_conditions")
+
+        try:
+            shop, created = submit_application(request.user.id, data)
+        except ApplicationClosed:
+            return Response(
+                {"detail": ALREADY_REVIEWED},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        return Response(
+            ShopSerializer(shop).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
 
 
 # --------------------------------------------------

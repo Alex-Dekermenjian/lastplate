@@ -135,9 +135,10 @@ def new_operator(browser, label):
     shop = f"FLOWCHECK {label} shop {RUN} (fictional)"
     browser.post(f"{WEB}/signup/", {"account_type": "restaurant", "display_name": f"Flowcheck {label} (fictional)",
                                     "email": email, "password": OWNER_PASSWORD})
-    browser.post(f"{WEB}/workspace/finish-setup/", {"shop_name": shop})
-    browser.post(f"{WEB}/workspace/profile/", {"name": shop, "address": "12 Sample Street, Beirut (fictional)", "area": "Hamra",
-                                               "public_contact": "+961 1 234 567"})
+    # LP-37: the three-step request to join LastPlate.
+    browser.post(f"{WEB}/workspace/apply/1/", {"name": shop, "category": "Bakery", "public_contact": "+961 1 234 567"})
+    browser.post(f"{WEB}/workspace/apply/2/", {"address": "12 Sample Street, Beirut (fictional)", "area": "Hamra"})
+    browser.post_photo(f"{WEB}/workspace/apply/3/", {"accept_conditions": "on"}, "cover.png", "image/png", valid_png())
     _, tokens = api("POST", f"{ACCOUNTS}/api/auth/token/", {"email": email, "password": OWNER_PASSWORD})
     token = tokens["access"]
     return token, api("GET", f"{MARKET}/api/shops/me/", token=token)[1]
@@ -173,12 +174,14 @@ def run():
     owner = Browser()
     token, shop = new_operator(owner, "owner")
     check(shop["approval_status"] == "PENDING" and shop["profile_complete"], "new shop is Pending with a complete profile", shop)
+    check(shop["application_sent"] and shop["category"] == "Bakery" and shop["photo_display"], "request sent with category and photo", shop)
+    check("Request sent" in owner.get(workspace)[2], "Pending owner sees the request status")
+    check("Request sent" in owner.get(new_offer)[2], "Pending owner cannot open offer pages")
     title = f"FLOWCHECK Pastry box {RUN} (fictional)"
-    owner.post(new_offer, offer(title))
+    check(api("POST", f"{MARKET}/api/listings", {"title": title}, token)[0] == 201, "API: Pending shop can save a draft")
     listing = own(token, title)
-    check(listing["status"] == "DRAFT", "Pending shop can save a draft")
-    page = owner.post(f"{WEB}/workspace/listings/{listing['id']}/publish/", {}, form_url=workspace)[2]
-    check("must be approved" in page and own(token, title)["status"] == "DRAFT", "Pending shop cannot publish")
+    api("POST", f"{MARKET}/api/listings/{listing['id']}/publish", {}, token)
+    check(own(token, title)["status"] == "DRAFT", "Pending shop cannot publish")
     check(api("PATCH", f"{MARKET}/api/shops/me/", {"approval_status": "APPROVED"}, token)[0] == 400, "owner cannot approve itself")
 
     section("Admin approval")

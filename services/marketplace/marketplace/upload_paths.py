@@ -1,12 +1,8 @@
-
 import uuid
 
 
-def listing_photo_upload_path(instance, filename):
-    """
-    Generate a unique filename for each listing photo.
-    The original user-supplied filename is not reused.
-    """
+def _unique_image_path(folder, filename):
+    """A new random name in the folder; the user's filename is not reused."""
 
     extension = filename.rsplit(".", 1)[-1].lower()
 
@@ -16,6 +12,18 @@ def listing_photo_upload_path(instance, filename):
     if extension not in ("jpg", "png"):
         extension = "jpg"
 
-    unique_name = uuid.uuid4().hex
+    return f"{folder}/{uuid.uuid4().hex}.{extension}"
 
-    return f"listing_photos/{unique_name}.{extension}"
+
+def listing_photo_upload_path(instance, filename):
+    """Generate a unique filename for each listing photo."""
+    return _unique_image_path("listing_photos", filename)
+
+
+# LP-37: Restaurant cover photos and logos
+def shop_photo_upload_path(instance, filename):
+    return _unique_image_path("shop_photos", filename)
+
+
+def shop_logo_upload_path(instance, filename):
+    return _unique_image_path("shop_logos", filename)
