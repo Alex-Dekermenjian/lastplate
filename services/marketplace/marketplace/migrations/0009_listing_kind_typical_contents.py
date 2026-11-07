@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("marketplace", "0007_shop_application"),
+        ("marketplace", "0008_merge_shop_application_shop_reviewed_by_user_id"),
     ]
 
     operations = [

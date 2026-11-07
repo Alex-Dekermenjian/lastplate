@@ -59,7 +59,9 @@ what `0001_initial` already declares, so all histories end with the same schema.
 | New | Runs everything; the guards do nothing |
 | `0001_initial` recorded, no listing table (LP-7 to LP-9 history) | Creates the table, then runs the rest; existing data is untouched |
 | `0001_initial` recorded, no shop table (LP-10 and LP-11 history) | Creates the table, then runs the rest; existing data is untouched |
-| Already on `0006_stockadjustment` | Nothing to run |
+| Already on `0006_stockadjustment` | Runs both `0007` migrations and the `0008` merge |
+| Has only one `0007` (LP-37's `0007_shop_application` or LP-57's `0007_shop_reviewed_by_user_id`) | Runs the other `0007`, then the `0008` merge |
+| Already on `0008_merge_shop_application_shop_reviewed_by_user_id` | Nothing to run |
 
 `marketplace/test_migration_repair.py` tests each of these. Back up the database
 before upgrading one you care about:

@@ -8,7 +8,7 @@ https://docs.djangoproject.com/en/5.2/topics/http/urls/
 from django.urls import path
 from django.views.generic import RedirectView
 
-from frontend import account_views, browse_views, health, listing_views, views
+from frontend import account_views, browse_views, console_views, health, listing_views, views
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -29,6 +29,15 @@ urlpatterns = [
     # Old addresses from LP-7; ?next= and other query strings are kept.
     path("sign-in/", RedirectView.as_view(pattern_name="login", query_string=True), name="sign-in"),
     path("register/", RedirectView.as_view(pattern_name="signup", query_string=True), name="register"),
+
+    # LP-57: the administrator's console (Admin role only).
+    path("console/", console_views.console_home, name="console"),
+    path("console/restaurants/", console_views.console_restaurants, name="console-restaurants"),
+    path(
+        "console/restaurants/<int:shop_id>/",
+        console_views.console_restaurant,
+        name="console-restaurant",
+    ),
 
     path("workspace/", account_views.workspace, name="workspace"),
     path("workspace/finish-setup/", account_views.finish_setup, name="finish-setup"),

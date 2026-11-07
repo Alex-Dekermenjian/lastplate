@@ -384,10 +384,10 @@ class LastBagBrowsingTests(TestCase):
 
 
 class LastBagMigrationTests(TransactionTestCase):
-    """0008 adds kind and typical_contents; offers made before it are items."""
+    """0009 adds kind and typical_contents; offers made before it are items."""
 
     def setUp(self):
-        migrate_to("0007_shop_application")
+        migrate_to("0008_merge_shop_application_shop_reviewed_by_user_id")
         self.addCleanup(migrate_to, LATEST)
 
     def test_existing_offers_become_items(self):
@@ -398,14 +398,14 @@ class LastBagMigrationTests(TransactionTestCase):
                 "VALUES (9, 'Older offer', '', '', 2, '', 'PUBLISHED', 1, now(), now(), '', '')"
             )
 
-        migrate_to("0008_listing_kind_typical_contents")
+        migrate_to("0009_listing_kind_typical_contents")
 
         with connection.cursor() as cursor:
             cursor.execute("SELECT title, kind, typical_contents FROM marketplace_listing")
             self.assertEqual(cursor.fetchall(), [("Older offer", "ITEM", "")])
 
     def test_database_refuses_an_unknown_kind(self):
-        migrate_to("0008_listing_kind_typical_contents")
+        migrate_to("0009_listing_kind_typical_contents")
 
         with self.assertRaises(IntegrityError), connection.cursor() as cursor:
             cursor.execute(

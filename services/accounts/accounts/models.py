@@ -35,6 +35,9 @@ class User(AbstractUser):
     class Role(models.TextChoices):
         CUSTOMER = "CUSTOMER", "Customer"
         SHOP_OPERATOR = "SHOP_OPERATOR", "Shop operator"
+        # LP-57: the LastPlate administrator. Created only with the
+        # create_admin management command, never by public sign-up.
+        ADMIN = "ADMIN", "Admin"
 
     username = None
     email = models.EmailField(unique=True)
