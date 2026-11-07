@@ -8,10 +8,10 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 
 from . import services
-from .test_accounts import WebAuthTestCase, patch_service
+from .test_accounts import ApprovedShopMixin, WebAuthTestCase, patch_service
 
 
-class ListingPhotoTests(WebAuthTestCase):
+class ListingPhotoTests(ApprovedShopMixin, WebAuthTestCase):
 
     def setUp(self):
         self.url = reverse("create-listing")

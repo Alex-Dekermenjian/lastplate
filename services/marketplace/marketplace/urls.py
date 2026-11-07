@@ -1,14 +1,26 @@
 
 from django.urls import path
 
-from . import views
+from . import admin_api, views
 
 urlpatterns = [
+    # LP-57: admin API for /console (Admin tokens only)
+    path("admin/summary", admin_api.summary, name="admin-summary"),
+    path("admin/shops", admin_api.shop_list, name="admin-shops"),
+    path("admin/shops/<int:pk>", admin_api.shop_detail, name="admin-shop-detail"),
+    path("admin/shops/<int:pk>/review", admin_api.shop_review, name="admin-shop-review"),
+
     # LP-7 and LP-8: Shop endpoints
     path(
         "shops/",
         views.ShopCreateView.as_view(),
         name="shop-create",
+    ),
+    # LP-37: the owner sends the request to join LastPlate
+    path(
+        "shops/me/application/",
+        views.ShopApplicationView.as_view(),
+        name="shop-application",
     ),
     path(
         "shops/me/",

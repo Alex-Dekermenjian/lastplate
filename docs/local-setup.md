@@ -11,7 +11,7 @@ open decisions are in [microservices-plan.md](microservices-plan.md).
 | Accounts (`services/accounts`, port 8001) | Email-based user model with roles, its migration, Django admin login, health endpoints; LP-7 APIs: shop-operator registration, RS256 token sign-in, refresh, logout (refresh-token blacklist), `/api/users/me/`, throttling; 9 original tests + health and auth API tests | Web sign-in/registration pages and the Pending shop (rest of LP-7) |
 | Marketplace (`services/marketplace`, port 8002) | Own database, health endpoints; LP-7: verifies Accounts tokens with the public key only, minimal `Shop` (one per operator, Pending), `POST /api/shops/` (idempotent), `GET /api/shops/me/`; LP-8: shop profile (pickup address, area, public contact) via `PATCH /api/shops/me/`; LP-9: team-admin shop review in Django admin (`/admin/`) | Listings, stock (LP-10 to LP-13) |
 | Reservations (`services/reservations`, port 8003) | Runnable empty service, own database, health endpoints | All reservation logic (Sprint 2) |
-| Web frontend (`web`, port 8000) | Server-side sessions; home page; LP-56: one login page (`/login/`) and sign-up for customers and restaurants (`/signup/`), customer account page (`/account/`), POST sign-out, workspace with shop status (`/workspace/`), finish-shop-setup retry (`/workspace/finish-setup/`); LP-8: shop profile page (`/workspace/profile/`); LP-10 and LP-11: create, edit and publish offers with photos; LP-12: stock adjustments; LP-13: public offers (`/offers/`) | Customer accounts, reservations (Sprint 2) |
+| Web frontend (`web`, port 8000) | Server-side sessions; home page; LP-56: one login page (`/login/`) and sign-up for customers and restaurants (`/signup/`), customer account page (`/account/`), POST sign-out, workspace with shop status (`/workspace/`), LP-37: three-step restaurant request (`/workspace/apply/`) and its status page (`/workspace/request/`); LP-8: shop profile page (`/workspace/profile/`); LP-10 and LP-11: create, edit and publish offers with photos; LP-12: stock adjustments; LP-13: public offers (`/offers/`) | Customer accounts, reservations (Sprint 2) |
 | Docker Compose | PostgreSQL with one database and login role per service; all four apps | Production deployment (LP-15) |
 | CI | Checks and tests per service; Compose smoke check | Cross-service feature integration tests |
 
@@ -133,8 +133,30 @@ It builds the images and then checks three things:
 
 The stack is left running.
 
-## Review a shop (LP-9)
+## Review a restaurant in /console (LP-57)
 
+The LastPlate administrator reviews restaurants on the website itself, at
+http://127.0.0.1:8000/console/. Admin accounts can only be created with a command;
+public sign-up never creates one. Create yours once (it asks for the password twice):
+
+```powershell
+docker compose --env-file compose.env exec accounts python manage.py create_admin --email admin@example.test --name "LastPlate Admin"
+```
+
+1. Log in at http://127.0.0.1:8000/login/ with that account. You land on **/console**,
+   which counts pending and approved restaurants and live offers.
+2. Open **Restaurants**. The **Pending**, **Approved** and **Rejected** tabs list each
+   restaurant; open one to see its full profile.
+3. To approve, tick **I confirmed the applicant represents this restaurant** and press
+   **Approve restaurant**. The profile must be complete.
+4. To reject, write a reason (the owner sees it) and press **Reject restaurant**.
+
+A reviewed restaurant cannot go back to Pending. The console and the Django admin
+below use the same rules (`marketplace/shop_review.py`).
+
+## Review a shop in the Django admin (LP-9, developer backup)
+
+Since LP-57 the Django admin is only a developer backup for /console.
 Shops are approved or rejected in Marketplace's own Django admin. It has its own
 team-admin accounts, separate from Accounts and from shop operators. Create one once:
 

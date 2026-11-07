@@ -7,6 +7,7 @@ from django.views.decorators.http import require_http_methods
 
 from . import services
 from .account_views import authenticated_call, operator_required
+from .apply_views import approved_shop_required
 from .services import ServiceUnavailable
 from .listing_photos import photo_url
 
@@ -83,6 +84,10 @@ def not_found(request, message):
 
 def shop_pickup_address(request):
     """The shop's saved address, offered as a new offer's pickup address."""
+    shop = getattr(request, "shop", None)
+    if isinstance(shop, dict):
+        return shop.get("address") or ""
+
     try:
         status, shop = authenticated_call(request, services.my_shop)
     except ServiceUnavailable:
@@ -96,6 +101,7 @@ def shop_pickup_address(request):
 
 @operator_required
 @require_http_methods(["GET", "POST"])
+@approved_shop_required
 def create_listing(request):
     """Create a draft listing, then optionally upload its photo."""
 
@@ -239,6 +245,7 @@ def create_listing(request):
 
 @operator_required
 @require_http_methods(["GET", "POST"])
+@approved_shop_required
 def edit_listing(request, listing_id):
     """Edit an existing draft owned by the signed-in shop."""
 
@@ -386,6 +393,7 @@ def edit_listing(request, listing_id):
 
 @operator_required
 @require_http_methods(["POST"])
+@approved_shop_required
 def publish_listing(request, listing_id):
     """Publish a draft through the Marketplace API."""
 
@@ -469,6 +477,7 @@ STOCK_ERROR_MESSAGES = {
 
 @operator_required
 @require_http_methods(["POST"])
+@approved_shop_required
 def adjust_stock(request, listing_id):
     """Add or remove units of a published offer, with a reason."""
 

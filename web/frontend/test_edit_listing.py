@@ -3,7 +3,7 @@
 
 from django.urls import reverse
 
-from .test_accounts import WebAuthTestCase, patch_service
+from .test_accounts import ApprovedShopMixin, WebAuthTestCase, patch_service
 
 
 DRAFT_LISTING = {
@@ -24,7 +24,7 @@ DRAFT_LISTING = {
 }
 
 
-class EditListingTests(WebAuthTestCase):
+class EditListingTests(ApprovedShopMixin, WebAuthTestCase):
 
     def setUp(self):
         self.url = reverse("edit-listing", args=[42])
@@ -143,7 +143,7 @@ class EditListingTests(WebAuthTestCase):
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 
-class EditListingPhotoTests(WebAuthTestCase):
+class EditListingPhotoTests(ApprovedShopMixin, WebAuthTestCase):
 
     def setUp(self):
         self.url = reverse("edit-listing", args=[42])

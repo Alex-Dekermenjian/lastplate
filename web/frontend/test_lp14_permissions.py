@@ -8,13 +8,14 @@ from django.test import Client
 from django.urls import reverse
 
 from . import account_views, services, tokens
-from .test_accounts import ACCOUNT, WebAuthTestCase, patch_service
+from .test_accounts import ACCOUNT, ApprovedShopMixin, WebAuthTestCase, patch_service
 
 # Every function the web frontend uses to call a backend service.
 SERVICE_CALLS = (
     "register", "sign_in", "account", "refresh", "sign_out", "create_shop", "my_shop",
     "update_shop", "my_listings", "create_listing", "upload_listing_photo", "edit_listing",
     "publish_listing", "adjust_stock", "stock_history",
+    "admin_summary", "admin_shops", "admin_shop", "admin_review_shop",
 )
 
 DRAFT = {"id": 42, "title": "Croissant Box", "status": "DRAFT", "photo_display": None}
@@ -105,7 +106,7 @@ class WrongRoleIsBlockedTests(WebAuthTestCase):
                 services_.assert_none_called(self)
 
 
-class SignedInOperatorTests(WebAuthTestCase):
+class SignedInOperatorTests(ApprovedShopMixin, WebAuthTestCase):
 
     def setUp(self):
         self.sign_in_session()
@@ -145,7 +146,7 @@ class SignedInOperatorTests(WebAuthTestCase):
                 patch_service("my_listings", return_value=(200, [DRAFT])), \
                 patch_service("edit_listing", return_value=(200, DRAFT)) as edit_api, \
                 patch_service("update_shop", return_value=(200, {})) as update_api, \
-                patch_service("my_shop", return_value=(200, {"approval_status": "PENDING"})):
+                patch_service("my_shop", return_value=(200, {"approval_status": "APPROVED"})):
             self.client.post(reverse("create-listing"), forged)
             self.client.post(reverse("edit-listing", args=[42]), forged)
             self.client.post(reverse("shop-profile"), {
@@ -166,7 +167,7 @@ class SignedInOperatorTests(WebAuthTestCase):
 
     def test_stock_form_sends_only_the_change_and_reason(self):
         with patch_service("adjust_stock", return_value=(201, {"listing": {}})) as adjust_api, \
-                mock.patch.object(services, "my_shop", return_value=(200, {})):
+                mock.patch.object(services, "my_shop", return_value=(200, {"approval_status": "APPROVED"})):
             self.client.post(
                 reverse("adjust-stock", args=[42]),
                 {"quantity_change": "2", "reason": "Baked more", "actor_user_id": "1", "kind": "SHOP_CANCELLATION"},

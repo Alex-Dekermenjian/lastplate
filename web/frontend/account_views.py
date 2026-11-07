@@ -20,7 +20,7 @@ from django.views.decorators.http import require_POST
 from . import services, tokens
 from .browse_views import lebanon_time, pickup_window
 from .listing_photos import photo_url
-from .forms import LoginForm, ShopProfileForm, ShopSetupForm, SignUpForm
+from .forms import LoginForm, ShopProfileForm, SignUpForm
 from .services import ServiceUnavailable
 
 ACCOUNT_KEY = "account"
@@ -28,6 +28,7 @@ PENDING_SHOP_KEY = "pending_shop_name"
 
 CUSTOMER = "CUSTOMER"
 SHOP_OPERATOR = "SHOP_OPERATOR"
+ADMIN = "ADMIN"
 
 INVALID_LOGIN = "Email or password is incorrect."
 TOO_MANY_SIGN_INS = "Too many sign-in attempts. Please wait a minute and try again."
@@ -40,6 +41,7 @@ REGISTRATION_UNCONFIRMED = (
 REGISTRATION_FAILED = "We couldn't complete your sign-up. Please check your details and try again."
 SHOPS_ONLY = "That page is for restaurant accounts."
 CUSTOMERS_ONLY = "That page is for customer accounts."
+ADMINS_ONLY = "That page is for the LastPlate administrator."
 
 STATUS_EXPLANATIONS = {
     "PENDING": ("Pending review", "A LastPlate administrator checks new shops before they can publish offers. You can prepare drafts now, but you can't publish yet."),
@@ -81,6 +83,17 @@ def listing_summary(listing, shop):
     }
 
 
+def unapproved_shop_page(shop):
+    """LP-37: where an owner goes instead of the workspace while their
+    restaurant isn't approved: the request form, or their request's status."""
+    status = shop.get("approval_status")
+    if status == "APPROVED":
+        return None
+    if status == "REJECTED" or shop.get("application_sent"):
+        return "request-status"
+    return "restaurant-apply"
+
+
 class SessionEnded(Exception):
     """The refresh token was rejected; the person must log in again."""
 
@@ -91,6 +104,8 @@ def signed_in(request):
 
 def landing_url(account):
     """Where an account goes after login, or when it opens a page that isn't for it."""
+    if account.get("role") == ADMIN:
+        return reverse("console")
     if account.get("is_staff"):
         return settings.STAFF_ADMIN_URL  # TODO: /console later
     if account.get("role") == SHOP_OPERATOR:
@@ -125,6 +140,7 @@ def role_required(role, refusal):
 
 operator_required = role_required(SHOP_OPERATOR, SHOPS_ONLY)
 customer_required = role_required(CUSTOMER, CUSTOMERS_ONLY)
+admin_required = role_required(ADMIN, ADMINS_ONLY)
 
 
 def authenticated_call(request, call, *args):
@@ -146,19 +162,6 @@ def start_session(request, token_data, account, remember=True):
         # Without "Keep me logged in" the session ends when the browser closes.
         # With it, the session lasts SESSION_COOKIE_AGE, the refresh-token lifetime.
         request.session.set_expiry(0)
-
-
-def create_pending_shop(request, name):
-    """Ask Marketplace for the operator's shop. Safe to repeat: Marketplace
-    returns the existing shop instead of creating a second one."""
-    try:
-        status, _ = authenticated_call(request, services.create_shop, name)
-    except (ServiceUnavailable, SessionEnded):
-        return False
-    if status in (200, 201):
-        request.session.pop(PENDING_SHOP_KEY, None)
-        return True
-    return False
 
 
 @sensitive_variables("data")
@@ -211,8 +214,8 @@ def signup(request):
             token_data, account = result
             start_session(request, token_data, account)
             if account["role"] == SHOP_OPERATOR:
-                messages.success(request, "Your account is ready. Now tell us your restaurant's name.")
-                return redirect("finish-setup")
+                messages.success(request, "Your account is ready. Now tell us about your restaurant.")
+                return redirect("restaurant-apply")
             messages.success(request, f"Welcome to LastPlate, {account['display_name']}!")
             return redirect(landing_url(account))
     return render(request, "frontend/signup.html", {"form": form})
@@ -247,12 +250,12 @@ def login(request):
                 form.add_error(None, INVALID_LOGIN)
             elif account_status != 200:
                 form.add_error(None, SIGN_IN_UNAVAILABLE)
-            elif account.get("is_staff"):
+            elif account.get("is_staff") and account.get("role") != ADMIN:
                 # Staff work in the Django admin, which has its own login, so
-                # no web session is kept for them.
+                # no web session is kept for them. The Admin role uses /console.
                 revoke(token_data["refresh"])
                 return redirect(landing_url(account))
-            elif account.get("role") not in (CUSTOMER, SHOP_OPERATOR):
+            elif account.get("role") not in (CUSTOMER, SHOP_OPERATOR, ADMIN):
                 revoke(token_data["refresh"])
                 form.add_error(None, SIGN_IN_UNAVAILABLE)
             else:
@@ -304,7 +307,7 @@ def workspace(request):
         status, shop = None, None
 
     if status == 404:
-        return redirect("finish-setup")
+        return redirect("restaurant-apply")
 
     if status != 200:
         return render(
@@ -312,6 +315,11 @@ def workspace(request):
             "frontend/workspace.html",
             {"unavailable": True},
         )
+
+    # LP-37: until approved, the owner sees their request instead.
+    gate = unapproved_shop_page(shop)
+    if gate:
+        return redirect(gate)
 
     label, explanation = STATUS_EXPLANATIONS.get(
         shop["approval_status"],
@@ -368,7 +376,7 @@ def shop_profile(request):
     except ServiceUnavailable:
         status, shop = None, None
     if status == 404:
-        return redirect("finish-setup")
+        return redirect("restaurant-apply")
 
     if request.method == "POST":
         form = ShopProfileForm(request.POST)
@@ -398,17 +406,5 @@ def shop_profile(request):
 
 @operator_required
 def finish_setup(request):
-    if request.method == "GET":
-        try:
-            status, _ = authenticated_call(request, services.my_shop)
-        except ServiceUnavailable:
-            status = None
-        if status == 200:
-            return redirect("workspace")
-    form = ShopSetupForm(request.POST or None, initial={"shop_name": request.session.get(PENDING_SHOP_KEY, "")})
-    if request.method == "POST" and form.is_valid():
-        if create_pending_shop(request, form.cleaned_data["shop_name"]):
-            messages.success(request, "Your shop is set up and waiting for review.")
-            return redirect("workspace")
-        form.add_error(None, "We still couldn't reach the shop service. Your account is safe; please try again in a few minutes.")
-    return render(request, "frontend/finish_setup.html", {"form": form})
+    """LP-37: the LP-7 one-field setup is replaced by the three-step request."""
+    return redirect("restaurant-apply")

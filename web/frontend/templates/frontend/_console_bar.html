@@ -1,0 +1,4 @@
+<nav class="bottom-bar-restaurant" aria-label="Console">
+  <a href="{% url 'console' %}"{% if console_page == "home" %} aria-current="page"{% endif %}>Home</a>
+  <a href="{% url 'console-restaurants' %}"{% if console_page == "restaurants" %} aria-current="page"{% endif %}>Restaurants</a>
+</nav>

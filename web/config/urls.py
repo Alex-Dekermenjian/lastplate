@@ -8,7 +8,7 @@ https://docs.djangoproject.com/en/5.2/topics/http/urls/
 from django.urls import path
 from django.views.generic import RedirectView
 
-from frontend import account_views, browse_views, cart, health, listing_views, views
+from frontend import account_views, browse_views, cart, console_views, health, listing_views, views
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -36,6 +36,15 @@ urlpatterns = [
     # Old addresses from LP-7; ?next= and other query strings are kept.
     path("sign-in/", RedirectView.as_view(pattern_name="login", query_string=True), name="sign-in"),
     path("register/", RedirectView.as_view(pattern_name="signup", query_string=True), name="register"),
+
+    # LP-57: the administrator's console (Admin role only).
+    path("console/", console_views.console_home, name="console"),
+    path("console/restaurants/", console_views.console_restaurants, name="console-restaurants"),
+    path(
+        "console/restaurants/<int:shop_id>/",
+        console_views.console_restaurant,
+        name="console-restaurant",
+    ),
 
     path("workspace/", account_views.workspace, name="workspace"),
     path("workspace/finish-setup/", account_views.finish_setup, name="finish-setup"),
@@ -69,4 +78,14 @@ urlpatterns = [
 
     path("health/live/", health.live, name="health-live"),
     path("health/ready/", health.ready, name="health-ready"),
+]
+
+# LP-37: the restaurant's three-step request and its status. Kept in its own
+# block so other cards can add routes above without touching these lines.
+from frontend import apply_views  # noqa: E402
+
+urlpatterns += [
+    path("workspace/apply/", apply_views.restaurant_apply, name="restaurant-apply"),
+    path("workspace/apply/<int:step>/", apply_views.restaurant_apply, name="restaurant-apply"),
+    path("workspace/request/", apply_views.request_status, name="request-status"),
 ]

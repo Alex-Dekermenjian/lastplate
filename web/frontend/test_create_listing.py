@@ -3,10 +3,10 @@
 
 from django.urls import reverse
 
-from .test_accounts import WebAuthTestCase, patch_service
+from .test_accounts import ApprovedShopMixin, WebAuthTestCase, patch_service
 
 
-class CreateListingPageTests(WebAuthTestCase):
+class CreateListingPageTests(ApprovedShopMixin, WebAuthTestCase):
 
     def setUp(self):
         self.url = reverse("create-listing")

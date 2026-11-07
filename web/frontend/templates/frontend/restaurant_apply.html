@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Register your restaurant — LastPlate{% endblock %}
+
+{% block content %}
+<section class="apply">
+  <div class="apply__top">
+    {% if step > 1 %}
+      <button class="apply__back" type="submit" form="apply-form" name="back" value="1" aria-label="Back to step {{ step|add:"-1" }}">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
+    {% endif %}
+    <h1 class="apply__title">Register your restaurant</h1>
+  </div>
+
+  <div class="progress" role="progressbar" aria-valuemin="1" aria-valuemax="{{ step_count }}" aria-valuenow="{{ step }}" aria-label="Step {{ step }} of {{ step_count }}">
+    {% for number in steps %}
+      <span class="progress__segment{% if number <= step %} progress__segment--done{% endif %}"></span>
+    {% endfor %}
+  </div>
+  <p class="apply__step muted">Step {{ step }} of {{ step_count }} · {{ step_title }}</p>
+
+  <form id="apply-form" class="apply__form" method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% for error in form.non_field_errors %}
+      <p class="notice notice--error" role="alert">{{ error }}</p>
+    {% endfor %}
+
+    {% for field in form %}
+      {% if field.name == "accept_conditions" %}
+        <div class="check check--terms{% if field.errors %} check--error{% endif %}">
+          {{ field }}
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        </div>
+        <p class="help">Approval is a manual check by the LastPlate team. It is not a food-safety certification.</p>
+        {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+      {% else %}
+        <div class="field{% if field.errors %} field--error{% endif %}">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {% if field.help_text %}<p class="help" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>{% endif %}
+          {% if field.name == "photo" or field.name == "logo" %}
+            {% for name, info in held.items %}
+              {% if name == field.name %}
+                <p class="held-file">Kept: <strong>{{ info.filename }}</strong>. Choose another file to replace it.</p>
+              {% endif %}
+            {% endfor %}
+            <input type="file" name="{{ field.name }}" id="{{ field.id_for_label }}" accept="image/jpeg,image/png">
+          {% else %}
+            {{ field }}
+          {% endif %}
+          {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+      {% endif %}
+    {% endfor %}
+  </form>
+</section>
+{% endblock %}
+
+{% block bottom_bar %}
+<div class="apply-actions">
+  {% if step > 1 %}
+    <button class="button button--secondary" type="submit" form="apply-form" name="back" value="1">Back</button>
+  {% endif %}
+  <button class="button button--primary" type="submit" form="apply-form">{% if is_last %}Send request{% else %}Continue{% endif %}</button>
+</div>
+{% endblock %}

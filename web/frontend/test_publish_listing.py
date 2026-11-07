@@ -3,11 +3,11 @@
 
 from django.urls import reverse
 
-from .test_accounts import WebAuthTestCase, patch_service
+from .test_accounts import ApprovedShopMixin, WebAuthTestCase, patch_service
 from .test_shop_profile import COMPLETE_SHOP
 
 
-class PublishListingTests(WebAuthTestCase):
+class PublishListingTests(ApprovedShopMixin, WebAuthTestCase):
 
     def setUp(self):
         self.url = reverse("publish-listing", args=[42])
@@ -103,4 +103,5 @@ class PublishListingTests(WebAuthTestCase):
         ):
             response = self.client.get(reverse("workspace"))
 
-        self.assertNotContains(response, "Publish offer")
+        # LP-37: a pending restaurant sees its request, not its offers.
+        self.assertRedirects(response, reverse("request-status"), fetch_redirect_response=False)
