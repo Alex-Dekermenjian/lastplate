@@ -404,7 +404,28 @@ class PublicShopSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Shop
-        fields = ["name", "area", "public_contact"]
+        # LP-39: id links an offer to its restaurant page.
+        fields = ["id", "name", "area", "public_contact"]
+        read_only_fields = fields
+
+
+# LP-39: A restaurant's own page, with the category and cover photo the
+# owner gave in their LP-37 request (category is "Other" unless chosen).
+class PublicShopDetailSerializer(PublicShopSerializer):
+
+    address = serializers.CharField(read_only=True)
+    category = serializers.SerializerMethodField()
+    photo_display = serializers.SerializerMethodField()
+
+    def get_category(self, obj):
+        return getattr(obj, "category", "") or ""
+
+    def get_photo_display(self, obj):
+        photo = getattr(obj, "photo", None)
+        return photo.url if photo else None
+
+    class Meta(PublicShopSerializer.Meta):
+        fields = [*PublicShopSerializer.Meta.fields, "address", "category", "photo_display"]
         read_only_fields = fields
 
 
@@ -461,6 +482,28 @@ class PublicListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
             "pickup_end",
             "shop",
         ]
+        read_only_fields = fields
+
+
+LASTBAG = "LASTBAG"
+ITEM = "ITEM"
+
+
+class RestaurantOfferSerializer(PublicListingSerializer):
+    """LP-39: an offer on its restaurant's page. LP-38 adds Listing.kind and the
+    LastBag's typical contents; offers without a kind are specific items."""
+
+    kind = serializers.SerializerMethodField()
+    typical_contents = serializers.SerializerMethodField()
+
+    def get_kind(self, obj):
+        return getattr(obj, "kind", "") or ITEM
+
+    def get_typical_contents(self, obj):
+        return getattr(obj, "typical_contents", "") or ""
+
+    class Meta(PublicListingSerializer.Meta):
+        fields = [*PublicListingSerializer.Meta.fields, "kind", "typical_contents"]
         read_only_fields = fields
 
 

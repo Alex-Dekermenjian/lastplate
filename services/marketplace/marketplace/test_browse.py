@@ -131,6 +131,8 @@ class BrowseListingsTests(MarketplaceTestCase):
         self.assertEqual(
             item["shop"],
             {
+                # LP-39: the shop's own id links to its restaurant page.
+                "id": self.shop.id,
                 "name": "Cedar Bakery",
                 "area": "Hamra",
                 "public_contact": "+961 1 234 567",

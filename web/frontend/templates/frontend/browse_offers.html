@@ -46,7 +46,7 @@
 
           <div class="offer-card__body">
             <p class="offer-card__shop">
-              {{ offer.shop.name }}{% if offer.shop.area %} · {{ offer.shop.area }}{% endif %}
+              {% if offer.shop.id %}<a href="{% url 'restaurant-detail' offer.shop.id %}">{{ offer.shop.name }}</a>{% else %}{{ offer.shop.name }}{% endif %}{% if offer.shop.area %} · {{ offer.shop.area }}{% endif %}
             </p>
             <h2 class="offer-card__title">
               <a href="{% url 'offer-detail' offer.id %}">{{ offer.title }}</a>

@@ -93,7 +93,11 @@ def offer_for_display(data):
             data.get("original_price"), data.get("discounted_price")
         ),
         "terms_revision": data.get("terms_revision"),
+        # LP-39: LastBags (LP-38) show typical contents, never exact ones.
+        "is_lastbag": data.get("kind") == "LASTBAG",
+        "typical_contents": data.get("typical_contents") or "",
         "shop": {
+            "id": shop.get("id"),
             "name": shop.get("name") or "",
             "area": shop.get("area") or "",
             "public_contact": shop.get("public_contact") or "",
@@ -158,3 +162,41 @@ def offer_detail(request, listing_id):
         )
 
     return render(request, template, {"offer": offer_for_display(data)})
+
+
+@require_GET
+def restaurant_detail(request, shop_id):
+    """LP-39: a restaurant's page: its details, then its LastBag and items."""
+    template = "frontend/restaurant.html"
+
+    try:
+        status, data = services.restaurant_page(shop_id)
+    except ServiceUnavailable:
+        return render(request, template, {"unavailable": UNAVAILABLE_MESSAGE}, status=503)
+
+    if status == 404:
+        return render(request, template, {"not_found": True}, status=404)
+
+    if status != 200 or not isinstance(data, dict) or not isinstance(data.get("shop"), dict):
+        return render(request, template, {"unavailable": UNAVAILABLE_MESSAGE}, status=502)
+
+    shop = data["shop"]
+    offers = [
+        offer_for_display({**item, "shop": shop})
+        for item in data.get("offers") or []
+        if isinstance(item, dict) and item.get("id") is not None
+    ]
+
+    return render(request, template, {
+        "shop": {
+            "id": shop.get("id"),
+            "name": shop.get("name") or "Restaurant",
+            "address": shop.get("address") or "",
+            "area": shop.get("area") or "",
+            "public_contact": shop.get("public_contact") or "",
+            "category": shop.get("category") or "",
+            "photo_url": photo_url(shop.get("photo_display")),
+        },
+        "lastbags": [offer for offer in offers if offer["is_lastbag"]],
+        "items": [offer for offer in offers if not offer["is_lastbag"]],
+    })

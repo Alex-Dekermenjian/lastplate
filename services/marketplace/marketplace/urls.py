@@ -28,6 +28,9 @@ urlpatterns = [
         name="shop-me",
     ),
 
+    # LP-39: a restaurant's public page (anyone)
+    path("shops/<int:pk>", views.restaurant_page, name="restaurant-page"),
+
     # LP-10 and LP-13: Listing endpoints. GET is the public marketplace
     # (anyone); POST creates and PATCH edits the operator's own draft.
     path(

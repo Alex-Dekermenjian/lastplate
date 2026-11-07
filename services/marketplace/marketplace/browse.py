@@ -45,17 +45,30 @@ def _with_shops(listings):
     ]
 
 
-def visible_listings(now=None):
-    """Every offer customers can browse, with its shop, ending soonest first."""
+def visible_listings(now=None, shop_id=None):
+    """Every offer customers can browse, with its shop, ending soonest first.
+
+    LP-39: shop_id limits the result to one restaurant's offers.
+    """
     now = now or timezone.now()
+
+    open_listings = _open_listings(now)
+    if shop_id is not None:
+        open_listings = open_listings.filter(shop_id=shop_id)
 
     listings = [
         listing
-        for listing in _open_listings(now).order_by("pickup_end", "id")
+        for listing in open_listings.order_by("pickup_end", "id")
         if free_quantity(listing) > 0
     ]
 
     return _with_shops(listings)
+
+
+def visible_shop(pk):
+    """LP-39: an approved restaurant customers may open, or None. Pending and
+    rejected restaurants look the same as missing ones."""
+    return _approved_shops().filter(pk=pk).first()
 
 
 def visible_listing(pk, now=None):
