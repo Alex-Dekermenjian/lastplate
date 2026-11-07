@@ -1,10 +1,27 @@
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
 
 from .image_validators import validate_listing_photo
-from .upload_paths import listing_photo_upload_path
+from .upload_paths import (
+    listing_photo_upload_path,
+    shop_logo_upload_path,
+    shop_photo_upload_path,
+)
+
+
+# LP-37: A restaurant's category. The stored value is the readable word
+# itself, because pages (LP-39) show it exactly as stored.
+class ShopCategory(models.TextChoices):
+    BAKERY = "Bakery", "Bakery"
+    CAFE = "Café", "Café"
+    RESTAURANT = "Restaurant", "Restaurant"
+    SUSHI = "Sushi", "Sushi"
+    PASTRY = "Pastry", "Pastry"
+    GROCERY = "Grocery", "Grocery"
+    OTHER = "Other", "Other"
 
 
 # LP-7, LP-8 and LP-9: Shop model
@@ -24,6 +41,8 @@ class Shop(models.Model):
         APPROVED = "APPROVED", "Approved"
         REJECTED = "REJECTED", "Rejected"
 
+    Category = ShopCategory
+
     operator_user_id = models.PositiveBigIntegerField(unique=True)
     name = models.CharField(max_length=150)
 
@@ -35,6 +54,43 @@ class Shop(models.Model):
     )
     area = models.CharField(max_length=100, blank=True)
     public_contact = models.CharField(max_length=150, blank=True)
+
+    # LP-37: Restaurant application details
+    category = models.CharField(
+        max_length=20,
+        choices=ShopCategory.choices,
+        default=ShopCategory.OTHER,
+    )
+    latitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(-90), MaxValueValidator(90)],
+    )
+    longitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(-180), MaxValueValidator(180)],
+    )
+    photo = models.ImageField(
+        "cover photo",
+        upload_to=shop_photo_upload_path,
+        validators=[validate_listing_photo],
+        null=True,
+        blank=True,
+    )
+    logo = models.ImageField(
+        upload_to=shop_logo_upload_path,
+        validators=[validate_listing_photo],
+        null=True,
+        blank=True,
+    )
+    # When the owner ticked "I accept LastPlate's conditions for
+    # restaurants" and sent the request. Empty until then.
+    conditions_accepted_at = models.DateTimeField(null=True, blank=True)
 
     # LP-9: Shop approval
     approval_status = models.CharField(
@@ -81,6 +137,10 @@ class Shop(models.Model):
                 ),
                 name="marketplace_shop_valid_approval_status",
             ),
+            models.CheckConstraint(
+                condition=Q(category__in=ShopCategory.values),
+                name="marketplace_shop_valid_category",
+            ),
         ]
 
     PROFILE_FIELDS = (
@@ -89,6 +149,11 @@ class Shop(models.Model):
         "area",
         "public_contact",
     )
+
+    @property
+    def application_sent(self):
+        """LP-37: the owner finished the three-step request."""
+        return self.conditions_accepted_at is not None
 
     @property
     def profile_complete(self):

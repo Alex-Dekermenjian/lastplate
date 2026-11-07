@@ -66,6 +66,38 @@ class ShopCreateSerializer(
     name = serializers.CharField(max_length=150)
 
 
+# LP-37: Restaurant images use the LP-11 checks (JPEG or PNG, at most 5 MB,
+# checked by content rather than by file name).
+def validate_shop_image(value):
+    try:
+        validate_listing_photo(value)
+    except ValidationError as exc:
+        raise serializers.ValidationError(exc.messages)
+
+    return value
+
+
+# LP-37: Optional map position. A map pin can fill these in later.
+COORDINATE = {
+    "max_digits": 9,
+    "decimal_places": 6,
+    "required": False,
+    "allow_null": True,
+}
+SEND_BOTH_COORDINATES = "Enter both latitude and longitude, or leave both empty."
+
+
+def validate_coordinate_pair(attrs):
+    if (attrs.get("latitude") is None) != (attrs.get("longitude") is None):
+        raise serializers.ValidationError(
+            {"longitude": [SEND_BOTH_COORDINATES]}
+        )
+
+
+def image_url(image):
+    return image.url if image else None
+
+
 # LP-8: Shop profile editing
 class ShopProfileSerializer(
     RejectUnknownFieldsMixin,
@@ -100,11 +132,38 @@ class ShopProfileSerializer(
         validators=[validate_public_contact],
     )
 
+    # LP-37: category, map position and images can be changed later too.
+    category = serializers.ChoiceField(
+        choices=Shop.Category.choices,
+        required=False,
+    )
+    latitude = serializers.DecimalField(
+        min_value=-90, max_value=90, **COORDINATE,
+    )
+    longitude = serializers.DecimalField(
+        min_value=-180, max_value=180, **COORDINATE,
+    )
+    photo = serializers.FileField(
+        required=False,
+        validators=[validate_shop_image],
+    )
+    logo = serializers.FileField(
+        required=False,
+        validators=[validate_shop_image],
+    )
+
     def validate(self, attrs):
         if not attrs:
             raise serializers.ValidationError(
                 "Send at least one profile field to change."
             )
+
+        # Coordinates change together, so a pin is never half moved.
+        if ("latitude" in attrs) != ("longitude" in attrs):
+            raise serializers.ValidationError(
+                {"longitude": [SEND_BOTH_COORDINATES]}
+            )
+        validate_coordinate_pair(attrs)
 
         return attrs
 
@@ -115,6 +174,9 @@ class ShopSerializer(serializers.ModelSerializer):
     profile_complete = serializers.BooleanField(
         read_only=True
     )
+    application_sent = serializers.BooleanField(read_only=True)
+    photo_display = serializers.SerializerMethodField()
+    logo_display = serializers.SerializerMethodField()
 
     class Meta:
         model = Shop
@@ -126,14 +188,87 @@ class ShopSerializer(serializers.ModelSerializer):
             "address",
             "area",
             "public_contact",
+            "category",
+            "latitude",
+            "longitude",
+            "photo_display",
+            "logo_display",
             "approval_status",
             "rejection_reason",
             "profile_complete",
+            "application_sent",
+            "conditions_accepted_at",
             "created_at",
             "updated_at",
         ]
 
         read_only_fields = fields
+
+    def get_photo_display(self, obj):
+        return image_url(obj.photo)
+
+    def get_logo_display(self, obj):
+        return image_url(obj.logo)
+
+
+# LP-37: The restaurant's request to join LastPlate, sent once all three
+# steps are filled in. Ownership and approval come from the server.
+class ShopApplicationSerializer(
+    RejectUnknownFieldsMixin,
+    serializers.Serializer,
+):
+    # Step 1: restaurant info
+    name = serializers.CharField(min_length=2, max_length=150)
+    category = serializers.ChoiceField(choices=Shop.Category.choices)
+    public_contact = serializers.CharField(
+        max_length=32,
+        validators=[validate_public_contact],
+    )
+
+    # Step 2: location
+    address = serializers.CharField(min_length=5, max_length=255)
+    area = serializers.CharField(min_length=2, max_length=100)
+    latitude = serializers.DecimalField(
+        min_value=-90, max_value=90, **COORDINATE,
+    )
+    longitude = serializers.DecimalField(
+        min_value=-180, max_value=180, **COORDINATE,
+    )
+
+    # Step 3: photos and conditions
+    photo = serializers.FileField(
+        required=False,
+        validators=[validate_shop_image],
+    )
+    logo = serializers.FileField(
+        required=False,
+        validators=[validate_shop_image],
+    )
+    accept_conditions = serializers.BooleanField()
+
+    def __init__(self, *args, shop=None, **kwargs):
+        # The owner's existing shop, if any. A cover photo it already has
+        # need not be sent again.
+        self.shop = shop
+        super().__init__(*args, **kwargs)
+
+    def validate_accept_conditions(self, value):
+        if value is not True:
+            raise serializers.ValidationError(
+                "Tick the box to accept LastPlate's conditions for restaurants."
+            )
+
+        return value
+
+    def validate(self, attrs):
+        validate_coordinate_pair(attrs)
+
+        if not attrs.get("photo") and not (self.shop and self.shop.photo):
+            raise serializers.ValidationError(
+                {"photo": ["Add a cover photo of your restaurant."]}
+            )
+
+        return attrs
 
 
 # LP-11: How optional listing details are shown. Missing ingredient or
@@ -273,6 +408,29 @@ class PublicShopSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+# LP-37: The restaurant shown with each public offer, with its category,
+# cover photo and logo.
+class PublicShopCardSerializer(PublicShopSerializer):
+
+    photo_display = serializers.SerializerMethodField()
+    logo_display = serializers.SerializerMethodField()
+
+    def get_photo_display(self, obj):
+        return image_url(obj.photo)
+
+    def get_logo_display(self, obj):
+        return image_url(obj.logo)
+
+    class Meta(PublicShopSerializer.Meta):
+        fields = [
+            *PublicShopSerializer.Meta.fields,
+            "category",
+            "photo_display",
+            "logo_display",
+        ]
+        read_only_fields = fields
+
+
 class PublicListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
     """
     A browsable offer. The view passes the already-loaded shops in
@@ -283,7 +441,7 @@ class PublicListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
 
     def get_shop(self, obj):
         shop = self.context["shops"][obj.shop_id]
-        return PublicShopSerializer(shop).data
+        return PublicShopCardSerializer(shop).data
 
     class Meta:
         model = Listing

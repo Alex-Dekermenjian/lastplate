@@ -72,6 +72,10 @@ Passwords are never stored as plain text.
 | address | Shop address |
 | area | Area used for browsing/filtering |
 | public_contact | Contact method intended for customers |
+| category (LP-37) | Bakery, Café, Restaurant, Sushi, Pastry, Grocery or Other; the stored value is the word shown. Existing shops became Other |
+| latitude / longitude (LP-37) | Optional map position (both or neither) |
+| photo / logo (LP-37) | Cover photo (required to send the request) and optional logo; JPEG or PNG up to 5 MB, the LP-11 checks |
+| conditions_accepted_at (LP-37) | When the owner accepted LastPlate's conditions and sent the request |
 | approval_status | PENDING, APPROVED or REJECTED |
 | rejection_reason | Required when rejected |
 | reviewed_by / reviewed_at | Administrator and decision time |

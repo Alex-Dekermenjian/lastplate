@@ -20,7 +20,7 @@ from django.views.decorators.http import require_POST
 from . import services, tokens
 from .browse_views import lebanon_time, pickup_window
 from .listing_photos import photo_url
-from .forms import LoginForm, ShopProfileForm, ShopSetupForm, SignUpForm
+from .forms import LoginForm, ShopProfileForm, SignUpForm
 from .services import ServiceUnavailable
 
 ACCOUNT_KEY = "account"
@@ -81,6 +81,17 @@ def listing_summary(listing, shop):
         "hidden_because": hidden_because,
         "visible_to_customers": published and not hidden_because,
     }
+
+
+def unapproved_shop_page(shop):
+    """LP-37: where an owner goes instead of the workspace while their
+    restaurant isn't approved: the request form, or their request's status."""
+    status = shop.get("approval_status")
+    if status == "APPROVED":
+        return None
+    if status == "REJECTED" or shop.get("application_sent"):
+        return "request-status"
+    return "restaurant-apply"
 
 
 class SessionEnded(Exception):
@@ -153,19 +164,6 @@ def start_session(request, token_data, account, remember=True):
         request.session.set_expiry(0)
 
 
-def create_pending_shop(request, name):
-    """Ask Marketplace for the operator's shop. Safe to repeat: Marketplace
-    returns the existing shop instead of creating a second one."""
-    try:
-        status, _ = authenticated_call(request, services.create_shop, name)
-    except (ServiceUnavailable, SessionEnded):
-        return False
-    if status in (200, 201):
-        request.session.pop(PENDING_SHOP_KEY, None)
-        return True
-    return False
-
-
 @sensitive_variables("data")
 def register_account(form, data):
     """Create the account. Returns (token_data, account) or None after adding form errors."""
@@ -216,8 +214,8 @@ def signup(request):
             token_data, account = result
             start_session(request, token_data, account)
             if account["role"] == SHOP_OPERATOR:
-                messages.success(request, "Your account is ready. Now tell us your restaurant's name.")
-                return redirect("finish-setup")
+                messages.success(request, "Your account is ready. Now tell us about your restaurant.")
+                return redirect("restaurant-apply")
             messages.success(request, f"Welcome to LastPlate, {account['display_name']}!")
             return redirect(landing_url(account))
     return render(request, "frontend/signup.html", {"form": form})
@@ -309,7 +307,7 @@ def workspace(request):
         status, shop = None, None
 
     if status == 404:
-        return redirect("finish-setup")
+        return redirect("restaurant-apply")
 
     if status != 200:
         return render(
@@ -317,6 +315,11 @@ def workspace(request):
             "frontend/workspace.html",
             {"unavailable": True},
         )
+
+    # LP-37: until approved, the owner sees their request instead.
+    gate = unapproved_shop_page(shop)
+    if gate:
+        return redirect(gate)
 
     label, explanation = STATUS_EXPLANATIONS.get(
         shop["approval_status"],
@@ -373,7 +376,7 @@ def shop_profile(request):
     except ServiceUnavailable:
         status, shop = None, None
     if status == 404:
-        return redirect("finish-setup")
+        return redirect("restaurant-apply")
 
     if request.method == "POST":
         form = ShopProfileForm(request.POST)
@@ -403,17 +406,5 @@ def shop_profile(request):
 
 @operator_required
 def finish_setup(request):
-    if request.method == "GET":
-        try:
-            status, _ = authenticated_call(request, services.my_shop)
-        except ServiceUnavailable:
-            status = None
-        if status == 200:
-            return redirect("workspace")
-    form = ShopSetupForm(request.POST or None, initial={"shop_name": request.session.get(PENDING_SHOP_KEY, "")})
-    if request.method == "POST" and form.is_valid():
-        if create_pending_shop(request, form.cleaned_data["shop_name"]):
-            messages.success(request, "Your shop is set up and waiting for review.")
-            return redirect("workspace")
-        form.add_error(None, "We still couldn't reach the shop service. Your account is safe; please try again in a few minutes.")
-    return render(request, "frontend/finish_setup.html", {"form": form})
+    """LP-37: the LP-7 one-field setup is replaced by the three-step request."""
+    return redirect("restaurant-apply")

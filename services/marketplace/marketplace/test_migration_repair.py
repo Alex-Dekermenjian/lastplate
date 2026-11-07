@@ -10,7 +10,7 @@ from django.test import SimpleTestCase, TransactionTestCase
 
 APP = "marketplace"
 LISTING_0002 = "0002_listing_allergens_listing_ingredients_listing_photo"
-LATEST = "0007_shop_reviewed_by_user_id"
+LATEST = "0008_merge_shop_application_shop_reviewed_by_user_id"
 
 
 def migrate_to(*names):
@@ -50,7 +50,13 @@ class MigrationHistoryTests(TransactionTestCase):
             tables(),
         )
         self.assertLessEqual({"photo", "ingredients", "allergens"}, columns("marketplace_listing"))
-        self.assertLessEqual({"address", "reviewed_by_id", "rejection_reason"}, columns("marketplace_shop"))
+        self.assertLessEqual(
+            {
+                "address", "reviewed_by_id", "reviewed_by_user_id", "rejection_reason",
+                "category", "photo", "logo", "conditions_accepted_at",
+            },
+            columns("marketplace_shop"),
+        )
 
     def test_fresh_database(self):
         migrate_to(LATEST)
