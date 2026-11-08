@@ -331,17 +331,19 @@ def review_again(access, note):
     return _call("marketplace", "POST", "/api/shops/me/review-again", {"note": note}, token=access)
 
 
-# LP-12: Change a published listing's stock with a reason.
-@sensitive_variables("access")
 # LP-58: quick actions from the owner's offer list.
+@sensitive_variables("access")
 def mark_sold_out(access, listing_id):
     return _call("marketplace", "POST", f"/api/listings/{int(listing_id)}/sold-out", token=access)
 
 
+@sensitive_variables("access")
 def delete_draft(access, listing_id):
     return _call("marketplace", "POST", f"/api/listings/{int(listing_id)}/delete", token=access)
 
 
+# LP-12: Change a published listing's stock with a reason.
+@sensitive_variables("access")
 def adjust_stock(access, listing_id, quantity_change, reason):
     return _call(
         "marketplace",
