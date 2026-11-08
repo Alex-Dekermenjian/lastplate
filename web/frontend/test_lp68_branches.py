@@ -56,6 +56,21 @@ class BranchesPageTests(OwnerTestCase):
         self.assertNotContains(page, "+ Add a branch")
         self.assertContains(page, "the most a restaurant can have")
 
+    def test_a_fourth_branch_is_refused_with_a_message(self):
+        data = {"new-name": "Jounieh", "new-address": "1 Main Road, Jounieh", "new-area": "Jounieh"}
+        with patch_service("my_branches", return_value=(200, [HAMRA, ACHRAFIEH, VERDUN])),                 patch_service("add_branch") as add:
+            response = self.client.post(self.url, data, follow=True)
+        add.assert_not_called()
+        self.assertContains(response, "You already have 3 branches, the most a restaurant can have.")
+
+    def test_a_refusal_after_the_page_was_loaded_is_shown(self):
+        """Two tabs: the page showed the form, but Marketplace already has 3."""
+        data = {"new-name": "Jounieh", "new-address": "1 Main Road, Jounieh", "new-area": "Jounieh"}
+        refusal = (400, {"detail": "A restaurant can have at most 3 branches."})
+        with patch_service("my_branches", return_value=(200, [HAMRA, ACHRAFIEH])),                 patch_service("add_branch", return_value=refusal):
+            response = self.client.post(self.url, data)
+        self.assertContains(response, "A restaurant can have at most 3 branches.", status_code=400)
+
     def test_the_only_branch_can_never_be_removed(self):
         page = self.get([{**HAMRA, "live_offers": 0}])
         self.assertContains(page, "Your restaurant needs at least one branch.")

@@ -57,6 +57,8 @@
     </details>
   {% else %}
     <p class="notice notice--info">You have {{ max_branches }} branches, the most a restaurant can have.</p>
+    {# If Marketplace still refused an addition (for example a race), show why. #}
+    {% for error in add_form.non_field_errors %}<p class="notice notice--error" role="alert">{{ error }}</p>{% endfor %}
   {% endif %}
 </section>
 {% endblock %}

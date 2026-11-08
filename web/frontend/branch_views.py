@@ -95,6 +95,11 @@ def branches(request):
     if request.method != "POST":
         return page(request, current)
 
+    # Already 3 (another tab, a double click): say so instead of trying.
+    if len(current) >= MAX_BRANCHES:
+        messages.error(request, f"You already have {MAX_BRANCHES} branches, the most a restaurant can have.")
+        return redirect("branches")
+
     form = BranchForm(request.POST, prefix="new")
     if not form.is_valid():
         return page(request, current, add_form=form, status=400)
