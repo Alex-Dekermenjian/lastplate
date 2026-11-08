@@ -419,7 +419,7 @@ p { margin: 0 0 12px; }
    fit inside the circle on white, never cut off or stretched. */
 .shop-logo:has(.shop-logo__image) { background: #FFFFFF; }
 .shop-logo__image {
-  width: 100%; height: 100%; padding: 14%; box-sizing: border-box;
+  width: 100%; height: 100%; padding: 8%; box-sizing: border-box;
   object-fit: contain; display: block;
 }
 .shop-logo--small { width: 28px; height: 28px; font-size: 14px; margin-right: 8px; }
