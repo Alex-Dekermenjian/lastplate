@@ -8,7 +8,16 @@ https://docs.djangoproject.com/en/5.2/topics/http/urls/
 from django.urls import path
 from django.views.generic import RedirectView
 
-from frontend import account_views, browse_views, cart, console_views, health, listing_views, views
+from frontend import (
+    account_views,
+    browse_views,
+    cart,
+    console_views,
+    health,
+    listing_photos,
+    listing_views,
+    views,
+)
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -75,6 +84,9 @@ urlpatterns = [
         listing_views.adjust_stock,
         name="adjust-stock",
     ),
+
+    # LP-46: offer and shop photos, fetched from Marketplace so they load on any host.
+    path("media/<path:path>", listing_photos.media_proxy, name="media"),
 
     path("health/live/", health.live, name="health-live"),
     path("health/ready/", health.ready, name="health-ready"),

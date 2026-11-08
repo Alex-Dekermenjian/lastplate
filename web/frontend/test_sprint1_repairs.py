@@ -50,16 +50,17 @@ class PhotoUrlTests(SimpleTestCase):
         SERVICE_URLS={"marketplace": "http://marketplace:8000"},
         MARKETPLACE_PUBLIC_URL="http://127.0.0.1:8002",
     )
-    def test_uses_the_browser_address_not_the_docker_hostname(self):
-        self.assertEqual(photo_url(self.PATH), f"http://127.0.0.1:8002{self.PATH}")
+    def test_link_is_relative_to_this_site(self):
+        # LP-46: no Docker hostname and no 127.0.0.1 port, so it works through the tunnel.
+        self.assertEqual(photo_url(self.PATH), self.PATH)
 
-    @override_settings(DEBUG=True, MARKETPLACE_PUBLIC_URL="http://marketplace:8000")
-    def test_never_returns_a_docker_hostname(self):
-        self.assertIsNone(photo_url(self.PATH))
-
-    @override_settings(DEBUG=True, MARKETPLACE_PUBLIC_URL="http://127.0.0.1:8002")
+    @override_settings(DEBUG=True)
     def test_rejects_external_and_non_media_paths(self):
-        for path in ("https://evil.example/a.jpg", "//evil.example/a.jpg", "/admin/", "", None):
+        for path in (
+            "https://evil.example/a.jpg", "//evil.example/a.jpg", "/admin/", "", None,
+            "/media/../config/settings.py", "/media/listing_photos/.hidden.jpg",
+            "/media/listing_photos/a.jpg?x=1", "/media/notes.txt",
+        ):
             with self.subTest(path=path):
                 self.assertIsNone(photo_url(path))
 
