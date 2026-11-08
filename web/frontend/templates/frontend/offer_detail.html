@@ -67,6 +67,10 @@
     <dl class="details">
       <dt>Name</dt>
       <dd class="shop-name">{% include "frontend/_shop_logo.html" with name=offer.shop.name logo=offer.shop.logo_url %}{% if offer.shop.id %}<a href="{% url 'restaurant-detail' offer.shop.id %}">{{ offer.shop.name }}</a>{% else %}{{ offer.shop.name }}{% endif %}</dd>
+      {% if offer.branch.label %}
+        <dt>Branch</dt>
+        <dd>{{ offer.branch.label }}</dd>
+      {% endif %}
 
       <dt>Area</dt>
       <dd>{{ offer.shop.area|default:"Unknown" }}</dd>

@@ -13,7 +13,7 @@
     <a class="button button--primary button--block" href="{% url 'browse-offers' %}">Browse available food</a>
   {% else %}
     <p class="muted">
-      From {% include "frontend/_shop_logo.html" with name=cart.shop_name logo=shop_logo %}<a href="{% url 'restaurant-detail' cart.shop_id %}">{{ cart.shop_name }}</a>.
+      From {% include "frontend/_shop_logo.html" with name=cart.shop_name logo=shop_logo %}<a href="{% url 'restaurant-detail' cart.shop_id %}{% if cart.branch_id %}?branch={{ cart.branch_id }}{% endif %}">{{ cart.shop_name }}{% if cart.branch_name %} · {{ cart.branch_name }}{% endif %}</a>.
       Nothing is reserved until you check out.
     </p>
 

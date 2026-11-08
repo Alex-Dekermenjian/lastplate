@@ -28,6 +28,16 @@
       {% if shop.applied_at %}<dt>Applied</dt><dd>{{ shop.applied_at|date:"j M Y, H:i" }}</dd>{% endif %}
       {% if shop.reviewed_at %}<dt>Reviewed</dt><dd>{{ shop.reviewed_at|date:"j M Y, H:i" }}</dd>{% endif %}
     </dl>
+    {% if shop.branches|length > 1 %}
+      {# LP-68: one approval covers every branch. #}
+      <h2>Branches ({{ shop.branches|length }})</h2>
+      <ul class="console-branches">
+        {% for branch in shop.branches %}
+          <li><strong>{{ branch.name }}</strong> — {{ branch.address }}{% if branch.area %} · {{ branch.area }}{% endif %}</li>
+        {% endfor %}
+      </ul>
+      <p class="help">Approving the restaurant approves all its branches.</p>
+    {% endif %}
 
     {% if shop.approval_status == "REJECTED" and shop.rejection_reason %}
       <div class="notice notice--error"><strong>Reason given:</strong> {{ shop.rejection_reason|linebreaksbr }}</div>

@@ -65,6 +65,10 @@
        href="{% url 'shop-profile' %}">
       Edit shop profile
     </a>
+    {# LP-68 #}
+    <a class="button button--secondary" href="{% url 'branches' %}">
+      Branches ({{ shop.branches|length|default:1 }} of 3)
+    </a>
 
     <p class="muted" style="margin-top: 16px;">
       Approval is a manual onboarding check;
@@ -147,6 +151,7 @@
 
             {% if listing.kind == "LASTBAG" %}<p class="offer-card__kind"><span class="lastbag-badge">LastBag · surprise</span></p>{% endif %}
             <h3>{{ listing.title|default:"Untitled offer" }}</h3>
+            {% if listing.branch_name %}<p class="branch-tag">📍 {{ listing.branch_name }}</p>{% endif %}
 
             <p class="muted">
               Status: {{ listing.status_label }}

@@ -396,3 +396,24 @@ def restaurant_page(shop_id):
         "GET",
         f"/api/shops/{int(shop_id)}",
     )
+
+
+# LP-68: the owner's branches. Marketplace finds the restaurant from the token.
+@sensitive_variables("access")
+def my_branches(access):
+    return _call("marketplace", "GET", "/api/shops/me/branches/", token=access)
+
+
+@sensitive_variables("access")
+def add_branch(access, branch):
+    return _call("marketplace", "POST", "/api/shops/me/branches/", branch, token=access)
+
+
+@sensitive_variables("access")
+def update_branch(access, branch_id, changes):
+    return _call("marketplace", "PATCH", f"/api/shops/me/branches/{int(branch_id)}/", changes, token=access)
+
+
+@sensitive_variables("access")
+def remove_branch(access, branch_id):
+    return _call("marketplace", "DELETE", f"/api/shops/me/branches/{int(branch_id)}/", token=access)

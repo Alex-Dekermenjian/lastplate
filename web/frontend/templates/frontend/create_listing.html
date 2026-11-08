@@ -103,6 +103,7 @@
                placeholder="e.g. Gluten, milk, sesame">
       </p>
 
+      {% if not several_branches or editing %}
       <p>
         <label for="total_quantity">Quantity</label>
         <input id="total_quantity" name="total_quantity"
@@ -110,6 +111,7 @@
                value="{{ form_values.total_quantity|default_if_none:'' }}"
                placeholder="3">
       </p>
+      {% endif %}
 
     {% else %}
       <h2>Food details</h2>
@@ -153,6 +155,7 @@
                placeholder="5.00">
       </p>
 
+      {% if not several_branches or editing %}
       <p>
         <label for="total_quantity">Available quantity</label>
         <input id="total_quantity" name="total_quantity"
@@ -160,17 +163,43 @@
                value="{{ form_values.total_quantity|default_if_none:'' }}"
                placeholder="5">
       </p>
+      {% endif %}
     {% endif %}
 
     <h2>Pickup information</h2>
 
-    <p>
-      <label for="pickup_address">Pickup address</label>
-      <input id="pickup_address" name="pickup_address"
-             type="text" maxlength="255"
-             value="{{ form_values.pickup_address|default_if_none:'' }}"
-             placeholder="e.g. 12 Bliss Street, Beirut">
-    </p>
+    {# LP-68: the pickup address is the branch's. #}
+    {% if several_branches and not editing %}
+      <fieldset class="branch-picker">
+        <legend>Which branches have this offer?</legend>
+        <p class="help">Each branch gets its own offer with its own quantity. Customers pick up at that branch.</p>
+        {% for branch in branches %}
+          <div class="branch-picker__row">
+            <input type="checkbox" id="branch_{{ branch.id }}" name="branch_{{ branch.id }}" value="1"{% if branch.checked %} checked{% endif %}>
+            <label class="branch-picker__name" for="branch_{{ branch.id }}">
+              <strong>{{ branch.name }}</strong>
+              <span class="muted">{{ branch.address }}</span>
+            </label>
+            <label class="branch-picker__qty">
+              <span>Quantity</span>
+              <input type="number" min="0" step="1" name="quantity_{{ branch.id }}" value="{{ branch.quantity }}"
+                     placeholder="0" aria-label="Quantity at {{ branch.name }}">
+            </label>
+          </div>
+        {% endfor %}
+      </fieldset>
+    {% elif several_branches %}
+      <p>
+        <label for="branch">Branch</label>
+        <select id="branch" name="branch">
+          {% for branch in branches %}
+            <option value="{{ branch.id }}"{% if branch.selected %} selected{% endif %}>{{ branch.name }} — {{ branch.address }}</option>
+          {% endfor %}
+        </select>
+      </p>
+    {% elif branches %}
+      <p class="pickup-at">Pickup at <strong>{{ branches.0.name }}</strong> — {{ branches.0.address }}</p>
+    {% endif %}
 
     <p>
       <label for="pickup_start">Pickup starts (Lebanon time)</label>

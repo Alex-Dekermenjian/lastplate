@@ -30,7 +30,18 @@
         <h1>{{ shop.name }}</h1>
       </div>
     </div>
+    {% if branch_tabs %}
+      {# LP-68: each branch is like its own store: its address and its food. #}
+      <nav class="branch-tabs" aria-label="Branches of {{ shop.name }}">
+        {% for branch in branch_tabs %}
+          <a class="branch-tabs__tab" href="?branch={{ branch.id }}"{% if branch.active %} aria-current="page"{% endif %}>
+            {{ branch.name }} <span class="branch-tabs__count">{{ branch.offer_count }}</span>
+          </a>
+        {% endfor %}
+      </nav>
+    {% endif %}
     <dl class="details">
+      {% if shop.branch_name %}<dt>Branch</dt><dd>{{ shop.branch_name }}</dd>{% endif %}
       <dt>Address</dt>
       <dd>{{ shop.address|default:"Unknown" }}{% if shop.area %} · {{ shop.area }}{% endif %}</dd>
       <dt>Phone</dt>
@@ -45,7 +56,7 @@
   </section>
 
   {% if not lastbags and not items %}
-    <p class="notice notice--info">{{ shop.name }} has nothing left right now. Check back later today.</p>
+    <p class="notice notice--info">{{ shop.name }}{% if shop.branch_name %} · {{ shop.branch_name }}{% endif %} has nothing left right now. Check back later today.</p>
   {% endif %}
 
   {% for bag in lastbags %}

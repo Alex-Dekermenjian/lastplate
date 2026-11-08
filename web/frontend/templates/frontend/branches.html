@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Branches — LastPlate{% endblock %}
+
+{% block content %}
+<section class="card card--wide">
+  <p><a href="{% url 'workspace' %}">← Workspace</a></p>
+  <h1>Branches</h1>
+  <p class="muted">
+    Each branch works like its own store under your restaurant's name: its own pickup address,
+    offers and quantities. You can have up to {{ max_branches }} branches.
+  </p>
+
+  <ul class="branch-list">
+    {% for branch in branches %}
+      <li class="branch-card">
+        <div class="branch-card__head">
+          <div>
+            <h2 class="branch-card__name">{{ branch.name }}{% if forloop.first %} <span class="badge">Main</span>{% endif %}</h2>
+            <p class="muted">{{ branch.address }}{% if branch.area %} · {{ branch.area }}{% endif %}</p>
+            <p class="branch-card__counts">
+              {{ branch.live_offers }} live offer{{ branch.live_offers|pluralize }} ·
+              {{ branch.draft_offers }} draft{{ branch.draft_offers|pluralize }}
+            </p>
+          </div>
+        </div>
+
+        <details class="branch-card__edit"{% if branch.open %} open{% endif %}>
+          <summary>Edit {{ branch.name }}</summary>
+          <form method="post" action="{% url 'branch-edit' branch.id %}" novalidate>
+            {% csrf_token %}
+            {% include "frontend/_form.html" with form=branch.form %}
+            <button class="button button--primary button--block" type="submit">Save branch</button>
+          </form>
+        </details>
+
+        {% if branch.blocked %}
+          <p class="help">Can't be removed: {{ branch.blocked }}</p>
+        {% else %}
+          <form method="post" action="{% url 'branch-remove' branch.id %}">
+            {% csrf_token %}
+            <button class="link-button" type="submit">Remove {{ branch.name }}</button>
+          </form>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+
+  {% if can_add %}
+    <details class="branch-add"{% if add_open %} open{% endif %}>
+      <summary class="button button--secondary button--block">+ Add a branch</summary>
+      <form method="post" action="{% url 'branches' %}" novalidate>
+        {% csrf_token %}
+        {% include "frontend/_form.html" with form=add_form %}
+        <button class="button button--primary button--block" type="submit">Add branch</button>
+      </form>
+    </details>
+  {% else %}
+    <p class="notice notice--info">You have {{ max_branches }} branches, the most a restaurant can have.</p>
+  {% endif %}
+</section>
+{% endblock %}
