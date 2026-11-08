@@ -14,7 +14,7 @@ from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_GET
 
 from . import services
-from .browse_search import FoodSearchForm, categories_of, filter_offers, nearby_suggestion, place_label
+from .browse_search import FoodSearchForm, filter_offers, nearby_suggestion, place_label, type_label
 from .listing_photos import photo_url
 from .services import ServiceUnavailable
 
@@ -158,7 +158,7 @@ def browse_offers(request):
 
 def food_search_context(request, offers):
     """LP-69: the search bar and the offers that fit it."""
-    form = FoodSearchForm(request.GET, categories=categories_of(offers))
+    form = FoodSearchForm(request.GET)
     search = form.search()
     searching = any(search.values())
     shown = filter_offers(offers, search) if searching else offers
@@ -167,7 +167,7 @@ def food_search_context(request, offers):
         "search_form": form,
         "searching": searching,
         "search_place": place_label(search["place"]),
-        "search_words": search["q"],
+        "search_type": type_label(search["type"]),
         "total_offers": len(offers),
         "nearby": None if shown else nearby_suggestion(offers, search),
     }

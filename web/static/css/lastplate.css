@@ -515,9 +515,5 @@ p { margin: 0 0 12px; }
 }
 .food-search .field { margin-bottom: 12px; }
 .food-search__row { display: grid; gap: 0 12px; }
-.food-search__more { margin: 0 0 12px; }
-.food-search__more summary {
-  min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 800; color: var(--btn);
-}
 .food-search__actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .food-search__actions .button { flex: 1 1 140px; }

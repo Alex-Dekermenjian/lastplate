@@ -1,4 +1,4 @@
-{# LP-69: search the food by place, by words, and by type or category. #}
+{# LP-69: search the food by place and by type of food. #}
 {# It's a plain GET form, so a search can be shared or bookmarked. #}
 <form class="food-search" method="get" action="" role="search" aria-label="Search food">
   <div class="food-search__row">
@@ -8,27 +8,13 @@
         {{ field }}
       </div>
     {% endwith %}
-    {% with field=search_form.q %}
-      <div class="field food-search__words">
-        <label for="{{ field.id_for_label }}">🔎 {{ field.label }}</label>
+    {% with field=search_form.type %}
+      <div class="field food-search__type">
+        <label for="{{ field.id_for_label }}">🍽️ {{ field.label }}</label>
         {{ field }}
       </div>
     {% endwith %}
   </div>
-
-  <details class="food-search__more"{% if search_form.kind.value or search_form.category.value %} open{% endif %}>
-    <summary>More filters</summary>
-    <div class="food-search__row">
-      {% for field in search_form %}
-        {% if field.name == "kind" or field.name == "category" %}
-          <div class="field">
-            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-            {{ field }}
-          </div>
-        {% endif %}
-      {% endfor %}
-    </div>
-  </details>
 
   <div class="food-search__actions">
     <button class="button button--primary" type="submit">Search</button>
@@ -39,7 +25,7 @@
 {% if searching %}
   <p class="offer-count" role="status">
     {{ offers|length }} offer{{ offers|length|pluralize }}
-    {% if search_words %} for “{{ search_words }}”{% endif %}
+    {% if search_type %} · {{ search_type }}{% endif %}
     {% if search_place %} in {{ search_place }}{% endif %}
   </p>
   {% if not offers %}

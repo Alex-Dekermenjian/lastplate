@@ -8,6 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .browse_search import filter_offers, place_choices, region_of
+from .food_types import FOOD_TYPES
 from .browse_views import offer_for_display
 from .services import ServiceUnavailable
 from .test_accounts import patch_service
@@ -15,10 +16,10 @@ from .test_browse_offers import UNAVAILABLE, offer
 
 HAMRA_CROISSANTS = offer(id=1, title="Butter Croissants", category="Bakery",
                          shop={"id": 1, "name": "Cedar Bakery", "area": "Hamra"})
-ACHRAFIEH_PIZZA = offer(id=2, title="Pizza Slices", description="Cheese and za'atar", category="Restaurant",
+ACHRAFIEH_PIZZA = offer(id=2, title="Pizza Slices", description="Cheese and za'atar", category="Pizza",
                         shop={"id": 2, "name": "Slice Corner", "area": "Achrafieh"})
 JOUNIEH_BAG = offer(id=3, kind="LASTBAG", title="Evening LastBag", typical_contents="bread and pastries",
-                    category="Bakery", shop={"id": 3, "name": "Bay Bakery", "area": "Jounieh"})
+                    category="", shop={"id": 3, "name": "Bay Bakery", "area": "Jounieh"})
 BRANCH_OFFER = offer(id=4, title="Mana'eesh", category="Bakery",
                      shop={"id": 1, "name": "Cedar Bakery", "area": "Hamra", "branch_count": 2},
                      branch={"id": 9, "name": "Gemmayzeh", "area": "Gemmayzeh"})
@@ -87,45 +88,49 @@ class PlaceSearchTests(SearchTestCase):
         self.assertContains(response, ">Achrafieh</option>")
 
 
-class WordSearchTests(SearchTestCase):
+class FoodTypeSearchTests(SearchTestCase):
 
-    def test_words_match_the_title_description_restaurant_and_contents(self):
-        self.assertEqual(titles(self.search(q="croissant")), ["Butter Croissants"])
-        self.assertEqual(titles(self.search(q="ZA'ATAR")), ["Pizza Slices"])
-        self.assertEqual(titles(self.search(q="slice corner")), ["Pizza Slices"])
-        self.assertEqual(titles(self.search(q="pastries")), ["Butter Croissants", "Evening LastBag", "Mana'eesh"])
+    def test_one_type_of_food(self):
+        self.assertEqual(titles(self.search(type="Bakery")), ["Butter Croissants", "Mana'eesh"])
 
-    def test_every_word_must_match(self):
-        self.assertEqual(titles(self.search(q="bakery jounieh")), ["Evening LastBag"])
-        self.assertEqual(titles(self.search(q="pizza jounieh")), [])
+    def test_surprise_bags(self):
+        self.assertEqual(titles(self.search(type="lastbag")), ["Evening LastBag"])
 
-    def test_words_and_place_together(self):
-        response = self.search(q="bakery", place="region:Beirut")
+    def test_a_category_typed_before_the_list_still_matches_whatever_its_capitals(self):
+        old = [offer(id=7, title="Old Loaf", category=" bakery ", shop={"id": 7, "name": "A", "area": "Hamra"}),
+               offer(id=8, title="Odd Thing", category="sandwich stuff", shop={"id": 8, "name": "B", "area": "Hamra"})]
+        with patch_service("browse_listings", return_value=(200, old)):
+            self.assertEqual(titles(self.client.get(self.url, {"type": "Bakery"})), ["Old Loaf"])
+            self.assertEqual(titles(self.client.get(self.url, {"type": "Other"})), ["Odd Thing"])
 
-        self.assertEqual(titles(response), ["Butter Croissants", "Mana'eesh"])
-        self.assertContains(response, "2 offers")
-        self.assertContains(response, "for “bakery”")
+    def test_type_and_place_together(self):
+        response = self.search(type="Bakery", place="Gemmayzeh")
 
-    def test_the_words_typed_are_kept_in_the_box(self):
-        self.assertContains(self.search(q="pizza"), 'value="pizza"')
+        self.assertEqual(titles(response), ["Mana'eesh"])
+        self.assertContains(response, "1 offer")
+        self.assertContains(response, "· Bakery")
 
+    def test_the_type_list_is_the_fixed_list(self):
+        response = self.search()
 
-class TypeAndCategoryTests(SearchTestCase):
+        self.assertContains(response, '<option value="" selected>All types of food</option>', html=True)
+        for name in FOOD_TYPES:
+            self.assertContains(response, f'<option value="{name}">{name}</option>', html=True)
+        self.assertContains(response, '<option value="lastbag">Surprise bags (LastBag)</option>', html=True)
 
-    def test_lastbags_only_or_items_only(self):
-        self.assertEqual(titles(self.search(kind="LASTBAG")), ["Evening LastBag"])
-        self.assertNotIn("Evening LastBag", titles(self.search(kind="ITEM")))
+    def test_only_where_and_type_of_food(self):
+        response = self.search()
 
-    def test_category_choices_come_from_todays_food(self):
-        response = self.search(category="Restaurant")
+        self.assertContains(response, 'name="place"')
+        self.assertContains(response, 'name="type"')
+        for gone in ('name="q"', 'name="category"', 'name="kind"', "More filters"):
+            self.assertNotContains(response, gone)
 
-        self.assertEqual(titles(response), ["Pizza Slices"])
-        self.assertContains(response, '<option value="Bakery">Bakery</option>', html=True)
-        # The filters stay open when one is used.
-        self.assertContains(response, '<details class="food-search__more" open>')
+    def test_an_unknown_type_is_ignored(self):
+        self.assertEqual(len(titles(self.search(type="bakery"))), 4)
 
     def test_clear_returns_to_everything(self):
-        self.assertContains(self.search(q="pizza"), 'href="?">Clear</a>')
+        self.assertContains(self.search(type="Pizza"), 'href="?">Clear</a>')
         self.assertNotContains(self.search(), ">Clear</a>")
 
 

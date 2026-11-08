@@ -1,17 +1,14 @@
-"""LP-69: customers search the food by place, by words and by kind.
+"""LP-69: customers search the food by place and by type of food.
 
 Marketplace already returns only the offers customers may see; this module
 narrows that list for one customer's search, so nothing about visibility
 changes here.
 
-- Place: anywhere in Lebanon, a whole region ("All of Beirut") or one area
+- Where: anywhere in Lebanon, a whole region ("All of Beirut") or one area
   ("Hamra"). An offer's place is its branch's area (LP-68), else the
   restaurant's.
-- Words: every word must appear in the offer's title, description,
-  category, typical contents, restaurant, branch or area, ignoring case and
-  accents, so "croissant hamra" finds croissants in Hamra.
-- Kind: everything, specific items or LastBags (LP-38).
-- Category: one of the categories in today's offers.
+- Type of food: one of food_types.FOOD_TYPES (the same list owners pick
+  from), or surprise bags (LastBags, LP-38).
 """
 
 from urllib.parse import urlencode
@@ -19,17 +16,11 @@ from urllib.parse import urlencode
 from django import forms
 
 from .area_field import AreaSelect
+from .food_types import FOOD_TYPES, type_of
 from .lebanon_places import REGIONS, normalize, search_terms
 
 ANYWHERE = ""
 REGION_PREFIX = "region:"
-
-KIND_CHOICES = [
-    ("", "All food"),
-    ("ITEM", "Specific items"),
-    ("LASTBAG", "LastBags (surprise)"),
-]
-
 
 def region_of(area):
     """The region a listed place is in, for example "Beirut" for Hamra."""
@@ -63,36 +54,26 @@ class PlaceSelect(AreaSelect):
         return option
 
 
-class SearchInput(forms.TextInput):
-    input_type = "search"
+LASTBAGS = "lastbag"
+
+
+def food_type_choices():
+    return [("", "All types of food"), *[(name, name) for name in FOOD_TYPES], (LASTBAGS, "Surprise bags (LastBag)")]
 
 
 class FoodSearchForm(forms.Form):
-    """The search bar above the food. Every part is optional."""
+    """The search bar above the food: where, and what type of food."""
 
     place = forms.ChoiceField(
         label="Where", required=False, choices=place_choices,
         widget=PlaceSelect(attrs={"data-placeholder": "Search a place, e.g. Hamra"}),
     )
-    q = forms.CharField(
-        label="What", required=False, max_length=80,
-        widget=SearchInput(attrs={"placeholder": "e.g. croissant, pizza, bakery"}),
-    )
-    kind = forms.ChoiceField(label="Type", required=False, choices=KIND_CHOICES)
-    category = forms.ChoiceField(label="Category", required=False, choices=[("", "All categories")])
-
-    def __init__(self, data=None, *, categories=()):
-        super().__init__(data)
-        self.fields["category"].choices = [("", "All categories"), *[(name, name) for name in categories]]
+    type = forms.ChoiceField(label="Type of food", required=False, choices=food_type_choices)
 
     def search(self):
         """The cleaned search, with anything unknown dropped instead of refused."""
         self.is_valid()  # fills cleaned_data with the parts that are fine
         return {name: self.cleaned_data.get(name) or "" for name in self.fields}
-
-
-def categories_of(offers):
-    return sorted({offer["category"] for offer in offers if offer.get("category")}, key=str.lower)
 
 
 def _place_matches(offer, place):
@@ -104,34 +85,26 @@ def _place_matches(offer, place):
     return normalize(area) == normalize(place)
 
 
-def _words_of(offer):
-    parts = (
-        offer.get("title"), offer.get("description"), offer.get("category"),
-        offer.get("typical_contents"), offer["shop"].get("name"), offer["shop"].get("area"),
-        offer.get("branch", {}).get("name"),
-    )
-    return normalize(" ".join(part for part in parts if part))
-
-
-def _words_match(offer, query):
-    words = normalize(query).split()
-    if not words:
+def _type_matches(offer, food_type):
+    if not food_type:
         return True
-    text = _words_of(offer)
-    return all(word in text for word in words)
+    if food_type == LASTBAGS:
+        return offer["is_lastbag"]
+    # Offers typed before the list are matched ignoring case and spaces.
+    return type_of(offer.get("category")) == food_type
 
 
 def filter_offers(offers, search):
     """The offers that fit every part of the search."""
-    kind = search.get("kind") or ""
-    category = search.get("category") or ""
     return [
         offer for offer in offers
         if _place_matches(offer, search.get("place") or "")
-        and _words_match(offer, search.get("q") or "")
-        and (not kind or (kind == "LASTBAG") == offer["is_lastbag"])
-        and (not category or offer.get("category") == category)
+        and _type_matches(offer, search.get("type") or "")
     ]
+
+
+def type_label(food_type):
+    return dict(food_type_choices()).get(food_type, "") if food_type else ""
 
 
 def place_label(place):

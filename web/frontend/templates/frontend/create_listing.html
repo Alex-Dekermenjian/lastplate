@@ -131,10 +131,14 @@
       </p>
 
       <p>
-        <label for="category">Category</label>
-        <input id="category" name="category" type="text"
-               value="{{ form_values.category|default_if_none:'' }}"
-               placeholder="e.g. Bakery">
+        {# The type of food comes from one list, so it is always written the same way. #}
+        <label for="category">Type of food</label>
+        <select id="category" name="category">
+          <option value="">Choose a type of food</option>
+          {% for value, label in food_types %}
+            <option value="{{ value }}"{% if value == form_values.category %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
       </p>
 
       <h2>Pricing and availability</h2>
