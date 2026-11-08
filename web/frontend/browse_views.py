@@ -14,6 +14,7 @@ from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_GET
 
 from . import services
+from .browse_search import FoodSearchForm, categories_of, filter_offers, nearby_suggestion, place_label
 from .listing_photos import photo_url
 from .services import ServiceUnavailable
 
@@ -152,7 +153,41 @@ def browse_offers(request):
         if isinstance(item, dict) and item.get("id") is not None
     ]
 
-    return render(request, template, {"offers": offers})
+    return render(request, template, food_search_context(request, offers))
+
+
+def food_search_context(request, offers):
+    """LP-69: the search bar and the offers that fit it."""
+    form = FoodSearchForm(request.GET, categories=categories_of(offers))
+    search = form.search()
+    searching = any(search.values())
+    shown = filter_offers(offers, search) if searching else offers
+    return {
+        "offers": shown,
+        "search_form": form,
+        "searching": searching,
+        "search_place": place_label(search["place"]),
+        "search_words": search["q"],
+        "total_offers": len(offers),
+        "nearby": None if shown else nearby_suggestion(offers, search),
+    }
+
+
+def home_food(request):
+    """LP-69: the home page shows the food straight away. If Marketplace is
+    down the home page still opens, with a short message instead."""
+    try:
+        status, data = services.browse_listings()
+    except ServiceUnavailable:
+        return {"unavailable": UNAVAILABLE_MESSAGE}
+    if status != 200 or not isinstance(data, list):
+        return {"unavailable": UNAVAILABLE_MESSAGE}
+    offers = [
+        offer_for_display(item)
+        for item in data
+        if isinstance(item, dict) and item.get("id") is not None
+    ]
+    return food_search_context(request, offers)
 
 
 @require_GET

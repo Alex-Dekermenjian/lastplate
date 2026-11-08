@@ -1,0 +1,54 @@
+{# LP-69: search the food by place, by words, and by type or category. #}
+{# It's a plain GET form, so a search can be shared or bookmarked. #}
+<form class="food-search" method="get" action="" role="search" aria-label="Search food">
+  <div class="food-search__row">
+    {% with field=search_form.place %}
+      <div class="field food-search__place">
+        <label for="{{ field.id_for_label }}">📍 {{ field.label }}</label>
+        {{ field }}
+      </div>
+    {% endwith %}
+    {% with field=search_form.q %}
+      <div class="field food-search__words">
+        <label for="{{ field.id_for_label }}">🔎 {{ field.label }}</label>
+        {{ field }}
+      </div>
+    {% endwith %}
+  </div>
+
+  <details class="food-search__more"{% if search_form.kind.value or search_form.category.value %} open{% endif %}>
+    <summary>More filters</summary>
+    <div class="food-search__row">
+      {% for field in search_form %}
+        {% if field.name == "kind" or field.name == "category" %}
+          <div class="field">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </details>
+
+  <div class="food-search__actions">
+    <button class="button button--primary" type="submit">Search</button>
+    {% if searching %}<a class="button button--secondary" href="?">Clear</a>{% endif %}
+  </div>
+</form>
+
+{% if searching %}
+  <p class="offer-count" role="status">
+    {{ offers|length }} offer{{ offers|length|pluralize }}
+    {% if search_words %} for “{{ search_words }}”{% endif %}
+    {% if search_place %} in {{ search_place }}{% endif %}
+  </p>
+  {% if not offers %}
+    <div class="notice notice--info">
+      <p>No food matches your search right now.</p>
+      {% if nearby %}
+        <p><a href="?{{ nearby.query }}">See {{ nearby.count }} offer{{ nearby.count|pluralize }} in all of {{ nearby.region }}</a></p>
+      {% endif %}
+      {% if total_offers %}<p><a href="?">See all {{ total_offers }} offer{{ total_offers|pluralize }} in Lebanon</a></p>{% endif %}
+    </div>
+  {% endif %}
+{% endif %}

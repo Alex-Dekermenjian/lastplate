@@ -5,6 +5,8 @@ from urllib.request import urlopen
 from django.conf import settings
 from django.shortcuts import render
 
+from .browse_views import home_food
+
 
 def fetch_service_status(name, base_url):
     """Call one service's readiness API and summarise the answer."""
@@ -24,4 +26,5 @@ def home(request):
     statuses = [
         fetch_service_status(name, url) for name, url in settings.SERVICE_URLS.items()
     ]
-    return render(request, "frontend/home.html", {"statuses": statuses})
+    # LP-69: the home page is where customers find food, with the search bar.
+    return render(request, "frontend/home.html", {"statuses": statuses, **home_food(request)})
