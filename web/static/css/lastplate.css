@@ -457,3 +457,51 @@ p { margin: 0 0 12px; }
 }
 .profile-preview__name { display: flex; align-items: center; gap: 12px; padding: 0 16px 14px; margin-top: -32px; }
 .profile-preview__name .eyebrow { margin: 28px 0 0; }
+
+/* LP-68: choosing branches (and a quantity for each) when posting food. */
+.branch-picker { border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; margin: 0 0 16px; }
+.branch-picker legend { font-weight: 800; padding: 0 6px; }
+.branch-picker__row {
+  display: grid; grid-template-columns: auto 1fr 110px; align-items: center; gap: 10px;
+  padding: 10px 0; border-top: 1px solid var(--border);
+}
+.branch-picker__row:first-of-type { border-top: 0; }
+.branch-picker__row input[type="checkbox"] { width: 22px; height: 22px; }
+.branch-picker__name { display: grid; gap: 2px; margin: 0; }
+.branch-picker__qty { display: grid; gap: 2px; margin: 0; font-size: 13px; font-weight: 700; color: var(--text-2); }
+.branch-picker__qty input { min-height: 44px; }
+.pickup-at { padding: 12px 14px; background: var(--tint); border-radius: 12px; }
+
+/* LP-68: the Branches page and branch labels. */
+.branch-list { display: grid; gap: 12px; margin: 16px 0; padding: 0; list-style: none; }
+.branch-card { border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; }
+.branch-card__name { margin: 0; font-size: 20px; }
+.branch-card__counts { margin: 4px 0 0; font-size: 14px; color: var(--text-2); font-weight: 700; }
+.branch-card__edit { margin: 10px 0 6px; }
+.branch-card__edit summary, .branch-add summary { cursor: pointer; font-weight: 700; color: var(--btn); min-height: 44px; display: flex; align-items: center; }
+.branch-card__edit form, .branch-add form { margin-top: 12px; }
+.branch-add { margin-top: 8px; }
+.branch-add summary { justify-content: center; list-style: none; }
+.branch-add summary::-webkit-details-marker { display: none; }
+.branch-tag { margin: 2px 0 6px; font-weight: 800; color: var(--btn); }
+.apply-branch { border: 1px solid var(--border); border-radius: 16px; padding: 4px 14px; margin: 0 0 14px; }
+.apply-branch summary { cursor: pointer; font-weight: 800; color: var(--btn); min-height: 44px; display: flex; align-items: center; }
+
+/* LP-68: branch tabs on a restaurant's page. */
+.branch-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 6px; }
+.branch-tabs__tab {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 14px;
+  border: 2px solid var(--border); border-radius: 999px; color: var(--text); font-weight: 800; text-decoration: none;
+}
+.branch-tabs__tab[aria-current="page"] { border-color: var(--btn); background: var(--tint); color: var(--btn); }
+.branch-tabs__count { font-size: 13px; color: var(--text-2); }
+
+/* LP-45: a rejected restaurant asks for review again. */
+.review-again__steps { margin: 0 0 12px; padding-left: 20px; }
+.review-again__steps li { margin-bottom: 6px; }
+.review-again__note {
+  width: 100%; min-height: 88px; padding: 12px 14px; font: inherit; color: var(--text);
+  background: var(--surface); border: 1px solid var(--input-border); border-radius: var(--radius-input);
+}
+.review-again__note:focus { outline: 3px solid var(--btn); outline-offset: 1px; border-color: var(--btn); }
+.console-filter { margin: 12px 0; font-size: 14px; }

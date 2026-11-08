@@ -8,6 +8,7 @@ Owners whose restaurant isn't approved see their request status and can't
 open offer pages.
 """
 
+import json
 import os
 import re
 import time
@@ -23,7 +24,7 @@ from django.shortcuts import redirect, render
 
 from . import services
 from .account_views import authenticated_call, operator_required, unapproved_shop_page
-from .apply_forms import LocationForm, PhotosForm, RestaurantInfoForm
+from .apply_forms import LocationForm, PhotosForm, RestaurantInfoForm, other_branches
 from .services import ServiceUnavailable
 
 APPLICATION_KEY = "restaurant_application"
@@ -34,6 +35,8 @@ STEPS = {
     3: ("Photos and conditions", PhotosForm),
 }
 STEP_FIELDS = {number: list(form.base_fields) for number, (_title, form) in STEPS.items()}
+# LP-68: Marketplace reports problems with the extra branches under this name.
+STEP_FIELDS[2].append("other_branches")
 IMAGE_FIELDS = ("photo", "logo")
 HELD_NAME = re.compile(r"[0-9a-f]{32}\.(jpg|png)")
 HELD_MAX_AGE = 24 * 60 * 60
@@ -259,6 +262,12 @@ def send_application(request, state, form):
     if values.get("latitude") and values.get("longitude"):
         fields["latitude"] = values["latitude"]
         fields["longitude"] = values["longitude"]
+    # LP-68: the first branch's name and any other branches.
+    if values.get("branch_name"):
+        fields["branch_name"] = values["branch_name"]
+    extra = other_branches(values)
+    if extra:
+        fields["other_branches"] = json.dumps(extra)
     fields["accept_conditions"] = "true"
 
     files = {}

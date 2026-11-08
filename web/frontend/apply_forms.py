@@ -82,11 +82,67 @@ class LocationForm(forms.Form):
     )
     # LP-65: no map, so the latitude/longitude boxes are gone.
     area = AreaField()
+    # LP-68: this is the first branch; up to two more can be added below.
+    branch_name = forms.CharField(
+        label="Branch name (optional)", required=False, max_length=100,
+        help_text="Customers see it after your restaurant's name. Leave empty to use your area, for example Hamra.",
+    )
 
     def __init__(self, *args, current_area=None, **kwargs):
         super().__init__(*args, **kwargs)
         # An area typed before LP-65 stays allowed until the owner changes it.
         self.fields["area"].choices = area_choices(current_area)
+
+    def clean(self):
+        cleaned = super().clean()
+        names = [(cleaned.get("branch_name") or cleaned.get("area") or "").strip().lower()]
+        for number in range(1, OTHER_BRANCHES + 1):
+            values = {part: (cleaned.get(f"other_{number}_{part}") or "").strip() for part in BRANCH_PARTS}
+            if any(values.values()) and not all(values.values()):
+                for part, value in values.items():
+                    if not value:
+                        self.add_error(f"other_{number}_{part}", "Fill in the name, address and area, or leave all three empty.")
+            elif all(values.values()):
+                if values["name"].lower() in names:
+                    self.add_error(f"other_{number}_name", "Give each branch a different name.")
+                names.append(values["name"].lower())
+        return cleaned
+
+    def other_groups(self):
+        """The extra branches, for the template: a heading and three fields each."""
+        groups = []
+        for number in range(1, OTHER_BRANCHES + 1):
+            fields = [self[f"other_{number}_{part}"] for part in BRANCH_PARTS]
+            groups.append({
+                "number": number + 1,
+                "fields": fields,
+                "open": any(field.value() for field in fields) or any(field.errors for field in fields),
+            })
+        return groups
+
+
+# LP-68: up to two more branches (three in total), each all-or-nothing.
+OTHER_BRANCHES = 2
+BRANCH_PARTS = ("name", "address", "area")
+for _number in range(1, OTHER_BRANCHES + 1):
+    LocationForm.base_fields[f"other_{_number}_name"] = forms.CharField(
+        label="Branch name", required=False, min_length=2, max_length=100,
+        help_text="For example Achrafieh.",
+    )
+    LocationForm.base_fields[f"other_{_number}_address"] = forms.CharField(
+        label="Street address", required=False, min_length=5, max_length=255,
+    )
+    LocationForm.base_fields[f"other_{_number}_area"] = AreaField(required=False)
+
+
+def other_branches(values):
+    """The extra branches an owner filled in, from the saved step answers."""
+    branches = []
+    for number in range(1, OTHER_BRANCHES + 1):
+        branch = {part: (values.get(f"other_{number}_{part}") or "").strip() for part in BRANCH_PARTS}
+        if all(branch.values()):
+            branches.append(branch)
+    return branches
 
 
 class PhotosForm(forms.Form):

@@ -73,6 +73,10 @@ def offer_for_display(data):
     start = lebanon_time(data.get("pickup_start"))
     end = lebanon_time(data.get("pickup_end"))
     shop = data.get("shop") if isinstance(data.get("shop"), dict) else {}
+    # LP-68: the branch the offer is picked up from. A restaurant with several
+    # branches is shown as "ZWZ · Hamra"; with one, just "ZWZ".
+    branch = data.get("branch") if isinstance(data.get("branch"), dict) else {}
+    several_branches = (shop.get("branch_count") or 1) > 1
 
     # LP-38: A LastBag shows what it usually holds, never exact contents.
     is_lastbag = data.get("kind") == "LASTBAG"
@@ -106,10 +110,16 @@ def offer_for_display(data):
         "shop": {
             "id": shop.get("id"),
             "name": shop.get("name") or "",
-            "area": shop.get("area") or "",
+            # LP-68: the branch's area (where the food is), else the shop's.
+            "area": branch.get("area") or shop.get("area") or "",
             "public_contact": shop.get("public_contact") or "",
             # LP-66: the round logo badge next to the restaurant's name.
             "logo_url": photo_url(shop.get("logo_display")),
+        },
+        "branch": {
+            "id": branch.get("id"),
+            "name": branch.get("name") or "",
+            "label": (branch.get("name") or "") if several_branches else "",
         },
     }
 
@@ -192,23 +202,48 @@ def restaurant_detail(request, shop_id):
         return render(request, template, {"unavailable": UNAVAILABLE_MESSAGE}, status=502)
 
     shop = data["shop"]
+    branches = [branch for branch in shop.get("branches") or [] if isinstance(branch, dict) and branch.get("id")]
+    shop_card = {**shop, "branch_count": len(branches) or 1}
     offers = [
-        offer_for_display({**item, "shop": shop})
+        offer_for_display({**item, "shop": shop_card})
         for item in data.get("offers") or []
         if isinstance(item, dict) and item.get("id") is not None
     ]
+
+    # LP-68: the customer picks a branch and sees that branch's food. Offers
+    # from before branches (no branch) belong to the main branch.
+    chosen = next((b for b in branches if str(b["id"]) == request.GET.get("branch", "")), None)
+    selected = chosen or (branches[0] if branches else None)
+    if selected and len(branches) > 1:
+        main_id = branches[0]["id"]
+        offers = [
+            offer for offer in offers
+            if (offer["branch"]["id"] or main_id) == selected["id"]
+        ]
+    counts = {}
+    for item in data.get("offers") or []:
+        if isinstance(item, dict):
+            branch_id = (item.get("branch") or {}).get("id") or (branches[0]["id"] if branches else None)
+            counts[branch_id] = counts.get(branch_id, 0) + 1
+    branch_tabs = [
+        {**branch, "active": selected is not None and branch["id"] == selected["id"], "offer_count": counts.get(branch["id"], 0)}
+        for branch in branches
+    ] if len(branches) > 1 else []
 
     return render(request, template, {
         "shop": {
             "id": shop.get("id"),
             "name": shop.get("name") or "Restaurant",
-            "address": shop.get("address") or "",
-            "area": shop.get("area") or "",
+            # LP-68: the chosen branch's address and area.
+            "address": (selected or {}).get("address") or shop.get("address") or "",
+            "area": (selected or {}).get("area") or shop.get("area") or "",
+            "branch_name": (selected or {}).get("name", "") if branch_tabs else "",
             "public_contact": shop.get("public_contact") or "",
             "category": shop.get("category") or "",
             "photo_url": photo_url(shop.get("photo_display")),
             "logo_url": photo_url(shop.get("logo_display")),
         },
+        "branch_tabs": branch_tabs,
         "lastbags": [offer for offer in offers if offer["is_lastbag"]],
         "items": [offer for offer in offers if not offer["is_lastbag"]],
         # LP-62: Add buttons for customers and signed-out visitors (who are

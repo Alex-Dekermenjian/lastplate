@@ -74,7 +74,12 @@ def listing_summary(listing, shop):
         elif free is not None and free <= 0:
             hidden_because = "it has sold out. Add stock to show it again."
 
+    # LP-68: which branch the offer is at, when the restaurant has several.
+    branch = listing.get("branch_details") if isinstance(listing.get("branch_details"), dict) else {}
+    several_branches = len(shop.get("branches") or []) > 1
+
     return {
+        "branch_name": branch.get("name", "") if several_branches else "",
         "status_label": LISTING_STATUS_LABELS.get(listing.get("status"), listing.get("status")),
         "pickup_window": pickup_window(start, end) if start and end else "",
         "pickup_ended": pickup_ended,

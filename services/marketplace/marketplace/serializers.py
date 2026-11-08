@@ -4,9 +4,10 @@ import re
 from django.core.exceptions import ValidationError
 from rest_framework import serializers
 
+from .branch_service import active_branches, ensure_first_branch, live_offers
 from .image_validators import validate_listing_photo
 from .logo_processing import prepare_logo
-from .models import Listing, Shop, StockAdjustment
+from .models import MAX_BRANCHES, Branch, Listing, Shop, StockAdjustment
 from .stock import free_quantity as calculate_free_quantity
 from .validators import LASTBAG as LASTBAG_KIND, validate_listing_data
 
@@ -185,6 +186,11 @@ class ShopSerializer(serializers.ModelSerializer):
     application_sent = serializers.BooleanField(read_only=True)
     photo_display = serializers.SerializerMethodField()
     logo_display = serializers.SerializerMethodField()
+    # LP-68: the restaurant's active branches, main branch first.
+    branches = serializers.SerializerMethodField()
+
+    def get_branches(self, obj):
+        return BranchSerializer(active_branches(obj), many=True).data
 
     class Meta:
         model = Shop
@@ -206,6 +212,9 @@ class ShopSerializer(serializers.ModelSerializer):
             "profile_complete",
             "application_sent",
             "conditions_accepted_at",
+            "branches",
+            # LP-45: how many times the owner asked for review again.
+            "review_requests",
             "created_at",
             "updated_at",
         ]
@@ -242,6 +251,20 @@ class ShopApplicationSerializer(
     longitude = serializers.DecimalField(
         min_value=-180, max_value=180, **COORDINATE,
     )
+    # LP-68: the first branch's name (default: its area) and up to two more
+    # branches, sent as JSON because the request is multipart.
+    branch_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    other_branches = serializers.JSONField(required=False)
+
+    def validate_other_branches(self, value):
+        if value in (None, ""):
+            return []
+        if not isinstance(value, list) or len(value) > MAX_BRANCHES - 1:
+            raise serializers.ValidationError(f"Send at most {MAX_BRANCHES - 1} other branches.")
+        branches = BranchInputSerializer(data=value, many=True)
+        if not branches.is_valid():
+            raise serializers.ValidationError(branches.errors)
+        return branches.validated_data
 
     # Step 3: photos and conditions
     photo = serializers.FileField(
@@ -273,7 +296,57 @@ class ShopApplicationSerializer(
                 {"photo": ["Add a cover photo of your restaurant."]}
             )
 
+        # LP-68: every branch needs its own name ("Hamra", "Achrafieh").
+        first = (attrs.get("branch_name") or "").strip() or attrs.get("area", "").strip()
+        names = [first, *(branch["name"] for branch in attrs.get("other_branches") or [])]
+        if len({name.strip().lower() for name in names}) != len(names):
+            raise serializers.ValidationError(
+                {"other_branches": ["Give each branch a different name."]}
+            )
+
         return attrs
+
+
+# LP-68: Branches
+class BranchInputSerializer(RejectUnknownFieldsMixin, serializers.Serializer):
+    """What an owner sends to add or change a branch."""
+
+    name = serializers.CharField(min_length=2, max_length=100)
+    address = serializers.CharField(min_length=5, max_length=255)
+    area = serializers.CharField(min_length=2, max_length=100)
+
+
+class BranchSerializer(serializers.ModelSerializer):
+    """A branch as its owner sees it, with what blocks removing it."""
+
+    draft_offers = serializers.SerializerMethodField()
+    live_offers = serializers.SerializerMethodField()
+
+    def get_draft_offers(self, obj):
+        return obj.listings.filter(status=Listing.Status.DRAFT).count()
+
+    def get_live_offers(self, obj):
+        return live_offers(obj).count()
+
+    class Meta:
+        model = Branch
+        fields = ["id", "name", "address", "area", "position", "draft_offers", "live_offers"]
+        read_only_fields = fields
+
+
+class PublicBranchSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Branch
+        fields = ["id", "name", "address", "area"]
+        read_only_fields = fields
+
+
+def branch_payload(listing):
+    """The branch an offer is at, for every page that shows the offer."""
+    branch = getattr(listing, "branch", None)
+    if branch is None:
+        return None
+    return {"id": branch.id, "name": branch.name, "address": branch.address, "area": branch.area}
 
 
 # LP-11: How optional listing details are shown. Missing ingredient or
@@ -322,8 +395,21 @@ def lastbag_title(shop):
     return "Surprise bag"
 
 
+BRANCH_NOT_YOURS = "Choose one of your restaurant's branches."
+
+
 # LP-10 and LP-11: Food listings (shop operator view)
 class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
+
+    # LP-68: the branch the offer is at. Its pickup address is the branch's.
+    branch = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(), required=False,
+        error_messages={"does_not_exist": BRANCH_NOT_YOURS, "incorrect_type": BRANCH_NOT_YOURS},
+    )
+    branch_details = serializers.SerializerMethodField()
+
+    def get_branch_details(self, obj):
+        return branch_payload(obj)
 
     class Meta:
         model = Listing
@@ -349,6 +435,8 @@ class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
             "pickup_start",
             "pickup_end",
             "status",
+            "branch",
+            "branch_details",
             "created_at",
             "updated_at",
         ]
@@ -436,7 +524,27 @@ class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
         if data["kind"] == LASTBAG_KIND and not (data["title"] or "").strip():
             attrs["title"] = lastbag_title(self.context.get("shop"))
 
+        self._resolve_branch(attrs)
         return attrs
+
+    def _resolve_branch(self, attrs):
+        """LP-68: an offer is at one of its restaurant's active branches, and
+        its pickup address is that branch's. A new offer with no branch goes
+        to the main branch; an older offer without one keeps its address."""
+        shop = self.context.get("shop")
+        branch = attrs.get("branch")
+
+        if branch is not None:
+            if shop is None or branch.shop_id != shop.id or branch.removed_at is not None:
+                raise serializers.ValidationError({"branch": [BRANCH_NOT_YOURS]})
+        elif self.instance is not None:
+            branch = self.instance.branch
+        elif shop is not None:
+            branch = ensure_first_branch(shop)
+            attrs["branch"] = branch
+
+        if branch is not None:
+            attrs["pickup_address"] = branch.address
 
 
 # LP-13: Public marketplace. Only what customers need; never the operator's
@@ -470,8 +578,14 @@ class PublicShopDetailSerializer(PublicShopSerializer):
     def get_logo_display(self, obj):
         return image_url(obj.logo)
 
+    # LP-68: the customer picks a branch and sees its food.
+    branches = serializers.SerializerMethodField()
+
+    def get_branches(self, obj):
+        return PublicBranchSerializer(obj.branches.filter(removed_at__isnull=True), many=True).data
+
     class Meta(PublicShopSerializer.Meta):
-        fields = [*PublicShopSerializer.Meta.fields, "address", "category", "photo_display", "logo_display"]
+        fields = [*PublicShopSerializer.Meta.fields, "address", "category", "photo_display", "logo_display", "branches"]
         read_only_fields = fields
 
 
@@ -481,6 +595,14 @@ class PublicShopCardSerializer(PublicShopSerializer):
 
     photo_display = serializers.SerializerMethodField()
     logo_display = serializers.SerializerMethodField()
+    # LP-68: browse loads this with the shops (browse._with_shops).
+    branch_count = serializers.SerializerMethodField()
+
+    def get_branch_count(self, obj):
+        count = getattr(obj, "active_branch_count", None)
+        if count is None:
+            count = obj.branches.filter(removed_at__isnull=True).count()
+        return count
 
     def get_photo_display(self, obj):
         return image_url(obj.photo)
@@ -494,6 +616,7 @@ class PublicShopCardSerializer(PublicShopSerializer):
             "category",
             "photo_display",
             "logo_display",
+            "branch_count",
         ]
         read_only_fields = fields
 
@@ -517,6 +640,12 @@ class PublicListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
         shop = self.context["shops"][obj.shop_id]
         return PublicShopCardSerializer(shop).data
 
+    # LP-68: where to pick up: the branch, shown as "ZWZ · Hamra".
+    branch = serializers.SerializerMethodField()
+
+    def get_branch(self, obj):
+        return branch_payload(obj)
+
     class Meta:
         model = Listing
         fields = [
@@ -536,6 +665,7 @@ class PublicListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
             "pickup_start",
             "pickup_end",
             "shop",
+            "branch",
         ]
         read_only_fields = fields
 
@@ -601,3 +731,9 @@ class StockAdjustmentSerializer(serializers.ModelSerializer):
         ]
 
         read_only_fields = fields
+
+
+# LP-45: a rejected owner asks for review again, with an optional note.
+class ReviewAgainSerializer(RejectUnknownFieldsMixin, serializers.Serializer):
+    # Only a note: the status is never chosen by the owner.
+    note = serializers.CharField(max_length=1000, required=False, allow_blank=True, default="")

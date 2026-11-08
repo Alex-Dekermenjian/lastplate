@@ -68,10 +68,13 @@ class ListingMessagesTests(ApprovedShopMixin, WebAuthTestCase):
     def setUp(self):
         self.sign_in_session()
 
-    def test_new_offer_starts_with_the_shop_address(self):
+    def test_new_offer_shows_where_it_is_picked_up(self):
+        # LP-68: the pickup address is the branch's (here the shop's own), shown, not typed.
         with patch_service("my_shop", return_value=(200, COMPLETE_SHOP)):
             response = self.client.get(reverse("create-listing"))
-        self.assertContains(response, f'value="{COMPLETE_SHOP["address"]}"')
+        self.assertContains(response, "Pickup at")
+        self.assertContains(response, COMPLETE_SHOP["address"])
+        self.assertNotContains(response, 'name="pickup_address"')
 
     def test_new_offer_form_waits_when_marketplace_is_down(self):
         # LP-37: approval can't be confirmed, so the offer page stays closed.

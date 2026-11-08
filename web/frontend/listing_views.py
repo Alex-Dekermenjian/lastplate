@@ -19,7 +19,7 @@ LISTING_FIELDS = (
     "original_price",
     "discounted_price",
     "total_quantity",
-    "pickup_address",
+    # LP-68: no pickup address here; it comes from the offer's branch.
     "pickup_start",
     "pickup_end",
     "ingredients",
@@ -37,7 +37,6 @@ LASTBAG_FIELDS = (
     "discounted_price",
     "allergens",
     "total_quantity",
-    "pickup_address",
     "pickup_start",
     "pickup_end",
 )
@@ -135,21 +134,62 @@ def not_found(request, message):
     )
 
 
-def shop_pickup_address(request):
-    """The shop's saved address, offered as a new offer's pickup address."""
+# ---------- LP-68: which branch (or branches) an offer is at ----------
+
+CHOOSE_A_BRANCH = "Choose at least one branch for this offer."
+
+
+def shop_branches(request):
+    """The restaurant's active branches, main branch first. If the shop data
+    has no branch list, its own address stands in as the one branch (no id,
+    so Marketplace uses the main branch)."""
     shop = getattr(request, "shop", None)
-    if isinstance(shop, dict):
-        return shop.get("address") or ""
+    if not isinstance(shop, dict):
+        return []
+    branches = [branch for branch in shop.get("branches") or [] if isinstance(branch, dict) and branch.get("id")]
+    if not branches and shop.get("address"):
+        branches = [{"id": None, "name": shop.get("area") or shop.get("name") or "", "address": shop["address"]}]
+    return branches
 
-    try:
-        status, shop = authenticated_call(request, services.my_shop)
-    except ServiceUnavailable:
-        return ""
 
-    if status != 200 or not isinstance(shop, dict):
-        return ""
+def branch_rows(branches, post=None, selected=None):
+    """One row per branch for the form: ticked or chosen, and its quantity."""
+    rows = []
+    for branch in branches:
+        key = str(branch["id"])
+        rows.append({
+            **branch,
+            "checked": bool(post.get(f"branch_{key}")) if post is not None else len(branches) == 1,
+            "quantity": (post.get(f"quantity_{key}", "") if post is not None else ""),
+            "selected": str(selected) == key,
+        })
+    return rows
 
-    return shop.get("address") or ""
+
+def chosen_branches(post, branches):
+    """[{"branch": id, "total_quantity": n}] for every ticked branch."""
+    entries = []
+    for branch in branches:
+        key = str(branch["id"])
+        if post.get(f"branch_{key}"):
+            entries.append({"branch": branch["id"], "total_quantity": post.get(f"quantity_{key}", "").strip() or "0"})
+    return entries
+
+
+def branch_errors(errors, branches, chosen):
+    """Marketplace's per-branch problems, as "Hamra: ..." lines."""
+    if not isinstance(errors, dict) or not isinstance(errors.get("branches"), list):
+        return {}
+    names = {branch["id"]: branch.get("name") or "Branch" for branch in branches}
+    labelled = {}
+    for entry, problems in zip(chosen, errors["branches"]):
+        if isinstance(problems, dict):
+            for field, messages_ in problems.items():
+                label = f"{names.get(entry['branch'], 'Branch')} ({'quantity' if field == 'total_quantity' else field})"
+                labelled[label] = messages_ if isinstance(messages_, list) else [str(messages_)]
+        elif problems:
+            labelled["Branches"] = problems if isinstance(problems, list) else [str(problems)]
+    return labelled
 
 
 @operator_required
@@ -158,13 +198,20 @@ def shop_pickup_address(request):
 def create_listing(request):
     """Create a draft listing, then optionally upload its photo."""
 
+    branches = shop_branches(request)
+    # LP-68: with several branches the owner ticks branches and gives each a
+    # quantity; with one branch the form is as before.
+    several = len(branches) > 1
+
     if request.method == "GET":
         return render(
             request,
             "frontend/create_listing.html",
             {
                 "kind": offer_kind(request.GET.get("kind")),
-                "form_values": {"pickup_address": shop_pickup_address(request)},
+                "form_values": {},
+                "branches": branch_rows(branches),
+                "several_branches": several,
             },
         )
 
@@ -176,13 +223,29 @@ def create_listing(request):
     if kind == LASTBAG:
         listing_data["kind"] = LASTBAG
 
+    chosen = chosen_branches(request.POST, branches) if several else []
+    if several:
+        listing_data.pop("total_quantity", None)
+        listing_data["branches"] = chosen
+    elif branches and branches[0]["id"]:
+        listing_data["branch"] = branches[0]["id"]
+
     def form_page(status, **context):
         return render(
             request,
             "frontend/create_listing.html",
-            {"kind": kind, "form_values": form_values, **context},
+            {
+                "kind": kind,
+                "form_values": form_values,
+                "branches": branch_rows(branches, request.POST),
+                "several_branches": several,
+                **context,
+            },
             status=status,
         )
+
+    if several and not chosen:
+        return form_page(400, error=CHOOSE_A_BRANCH)
 
     photo = request.FILES.get("photo")
 
@@ -210,10 +273,15 @@ def create_listing(request):
         )
 
     if status == 400:
+        shared = response
+        if isinstance(response, dict):
+            shared = {key: value for key, value in response.items() if key != "branches"}
+        field_errors = labelled_errors(shared, kind)
+        field_errors.update(branch_errors(response, branches, chosen))
         return form_page(
             400,
             error="Please correct the listing details and try again.",
-            field_errors=labelled_errors(response, kind),
+            field_errors=field_errors,
         )
 
     if status != 201:
@@ -222,11 +290,20 @@ def create_listing(request):
             error="We couldn't save your food offer. Please try again.",
         )
 
-    # The draft has been created successfully.
-    listing_id = response.get("id")
+    # The draft (one per chosen branch) has been created successfully.
+    if several:
+        listings = response.get("listings") if isinstance(response, dict) else None
+        listing_ids = [item.get("id") for item in listings or [] if isinstance(item, dict)]
+    else:
+        listing_ids = [response.get("id")]
+
+    if len(listing_ids) > 1:
+        saved = f"Your food offer was saved as {len(listing_ids)} drafts, one per branch."
+    else:
+        saved = "Your food offer was saved as a draft."
 
     if photo:
-        if not listing_id:
+        if not listing_ids or not all(listing_ids):
             messages.warning(
                 request,
                 "Your draft was saved, but the photo could not be "
@@ -234,41 +311,39 @@ def create_listing(request):
             )
             return redirect("workspace")
 
-        try:
-            photo_status, photo_response = authenticated_call(
-                request,
-                services.upload_listing_photo,
-                listing_id,
-                photo,
-            )
-        except ServiceUnavailable:
-            messages.warning(
-                request,
-                "Your draft was saved, but we couldn't confirm "
-                "whether the photo uploaded. Check your workspace "
-                "before uploading it again.",
-            )
-            return redirect("workspace")
+        # The same photo goes on each branch's offer.
+        for listing_id in listing_ids:
+            try:
+                photo_status, photo_response = authenticated_call(
+                    request,
+                    services.upload_listing_photo,
+                    listing_id,
+                    photo,
+                )
+            except ServiceUnavailable:
+                messages.warning(
+                    request,
+                    f"{saved} We couldn't confirm whether the photo uploaded. "
+                    "Check your workspace before uploading it again.",
+                )
+                return redirect("workspace")
 
-        if photo_status != 200:
-            messages.warning(
-                request,
-                "Your draft was saved, but the photo was not uploaded: "
-                f"{photo_refused(photo_response)} "
-                "Use Edit draft to try again.",
-            )
-            return redirect("workspace")
+            if photo_status != 200:
+                messages.warning(
+                    request,
+                    f"{saved} The photo was not uploaded: "
+                    f"{photo_refused(photo_response)} "
+                    "Use Edit draft to try again.",
+                )
+                return redirect("workspace")
 
-        messages.success(
-            request,
-            "Your food offer and photo were saved as a draft.",
-        )
+        if len(listing_ids) > 1:
+            messages.success(request, f"Your food offer and photo were saved as {len(listing_ids)} drafts, one per branch.")
+        else:
+            messages.success(request, "Your food offer and photo were saved as a draft.")
         return redirect("workspace")
 
-    messages.success(
-        request,
-        "Your food offer was saved as a draft.",
-    )
+    messages.success(request, saved)
     return redirect("workspace")
 
 @operator_required
@@ -321,6 +396,8 @@ def edit_listing(request, listing_id):
     # LP-38: Editing a draft keeps its kind; the form never sends it.
     kind = offer_kind(listing.get("kind"))
 
+    branches = shop_branches(request)
+
     context = {
         "editing": True,
         "kind": kind,
@@ -330,12 +407,19 @@ def edit_listing(request, listing_id):
         },
         "listing_id": listing_id,
         "form_values": listing,
+        # LP-68: a draft can move to another branch.
+        "branches": branch_rows(branches, selected=listing.get("branch")),
+        "several_branches": len(branches) > 1,
     }
 
     if request.method == "GET":
         return render(request, template, context)
 
     listing_data = listing_data_from(request.POST, kind)
+    known = {str(branch["id"]) for branch in branches}
+    if len(branches) > 1 and request.POST.get("branch") in known:
+        listing_data["branch"] = int(request.POST["branch"])
+        context["branches"] = branch_rows(branches, selected=request.POST["branch"])
 
     context["form_values"] = {
         **listing,

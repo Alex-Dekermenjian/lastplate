@@ -22,7 +22,17 @@ from .listing_service import (
     save_listing_draft,
     publish_listing as publish_listing_service,
 )
-from .models import Listing, Shop
+from .branch_service import (
+    BranchError,
+    active_branches,
+    add_branch,
+    ensure_first_branch,
+    remove_branch,
+    set_application_branches,
+    sync_main_from_shop,
+    update_branch,
+)
+from .models import Branch, Listing, Shop
 from .photo_service import replace_listing_photo
 from .shop_service import (
     ApplicationClosed,
@@ -32,18 +42,22 @@ from .shop_service import (
 )
 from .serializers import (
     LASTBAG,
+    BranchInputSerializer,
+    BranchSerializer,
     ListingSerializer,
     ShopApplicationSerializer,
     PublicListingDetailSerializer,
     PublicShopDetailSerializer,
     RestaurantOfferSerializer,
     PublicListingSerializer,
+    ReviewAgainSerializer,
     ShopCreateSerializer,
     ShopProfileSerializer,
     ShopSerializer,
     StockAdjustmentRequestSerializer,
     StockAdjustmentSerializer,
 )
+from .review_again import ReviewAgainError, request_review_again
 from .stock_service import StockAdjustmentError, adjust_stock
 
 
@@ -64,6 +78,7 @@ class ShopCreateView(APIView):
                     operator_user_id=request.user.id,
                     **serializer.validated_data,
                 )
+                ensure_first_branch(shop)  # LP-68
         except IntegrityError:
             # Never overwrite an existing shop.
             shop = Shop.objects.get(
@@ -135,7 +150,28 @@ class MyShopView(APIView):
         )
         delete_replaced_images(shop, old_images)
 
+        # LP-68: the profile's address and area are the main branch's.
+        if {"address", "area"} & set(serializer.validated_data):
+            sync_main_from_shop(shop)
+
         return Response(ShopSerializer(shop).data)
+
+
+# --------------------------------------------------
+# LP-45: A rejected restaurant asks for review again
+# --------------------------------------------------
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsShopOperator])
+def review_again(request):
+    serializer = ReviewAgainSerializer(data=request.data)
+    if not serializer.is_valid():
+        return _error("invalid", "Only a note can be sent.", status.HTTP_400_BAD_REQUEST, fields=serializer.errors)
+    try:
+        shop = request_review_again(request.user.id, serializer.validated_data["note"])
+    except ReviewAgainError as exc:
+        return _error(exc.code, exc.detail, exc.http_status)
+    return Response(ShopSerializer(shop).data, status=status.HTTP_200_OK)
 
 
 # --------------------------------------------------
@@ -172,14 +208,21 @@ class ShopApplicationView(APIView):
 
         data = dict(serializer.validated_data)
         data.pop("accept_conditions")
+        # LP-68: the branches are saved with the request, all or nothing.
+        branch_name = data.pop("branch_name", "")
+        other_branches = data.pop("other_branches", [])
 
         try:
-            shop, created = submit_application(request.user.id, data)
+            with transaction.atomic():
+                shop, created = submit_application(request.user.id, data)
+                set_application_branches(shop, branch_name, other_branches)
         except ApplicationClosed:
             return Response(
                 {"detail": ALREADY_REVIEWED},
                 status=status.HTTP_409_CONFLICT,
             )
+        except BranchError as error:
+            return Response(error.errors, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(
             ShopSerializer(shop).data,
@@ -211,6 +254,10 @@ def create_listing(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    # LP-68: one offer posted to several branches, each with its quantity.
+    if "branches" in request.data:
+        return create_listing_for_branches(request.data, shop)
+
     listing = save_listing_draft(
         data=request.data,
         shop_id=shop.id,
@@ -221,6 +268,109 @@ def create_listing(request):
         ListingSerializer(listing).data,
         status=status.HTTP_201_CREATED,
     )
+
+
+ONE_ENTRY_PER_BRANCH = "Choose each branch once, with its quantity."
+
+
+def create_listing_for_branches(data, shop):
+    """Create one draft per chosen branch, all or none. Each draft is its
+    branch's own offer, with its own stock (LP-68).
+
+    data["branches"]: [{"branch": id, "total_quantity": n}, ...]
+    Every other field is the same for all of them.
+    """
+    entries = data.get("branches")
+    if (
+        not isinstance(entries, list)
+        or not 1 <= len(entries) <= len(active_branches(shop))
+        or not all(isinstance(entry, dict) and set(entry) == {"branch", "total_quantity"} for entry in entries)
+        or len({str(entry["branch"]) for entry in entries}) != len(entries)
+    ):
+        return Response({"branches": [ONE_ENTRY_PER_BRANCH]}, status=status.HTTP_400_BAD_REQUEST)
+
+    shared = {key: value for key, value in data.items() if key != "branches"}
+    serializers_ = [
+        ListingSerializer(data={**shared, **entry}, context={"shop": shop})
+        for entry in entries
+    ]
+    invalid = [serializer for serializer in serializers_ if not serializer.is_valid()]
+    if invalid:
+        # Shared fields fail the same way for every branch: show them once.
+        # Per-branch problems (quantity, branch) are listed per branch.
+        errors = {}
+        per_branch = []
+        for serializer in serializers_:
+            problems = dict(serializer.errors) if not serializer.is_valid() else {}
+            per_branch.append({key: problems.pop(key) for key in ("branch", "total_quantity") if key in problems})
+            for field, messages_ in problems.items():
+                errors.setdefault(field, messages_)
+        if any(per_branch):
+            errors["branches"] = per_branch
+        return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+
+    with transaction.atomic():
+        listings = [
+            serializer.save(shop_id=shop.id, status=Listing.Status.DRAFT)
+            for serializer in serializers_
+        ]
+
+    return Response(
+        {"listings": ListingSerializer(listings, many=True).data},
+        status=status.HTTP_201_CREATED,
+    )
+
+
+# --------------------------------------------------
+# LP-68: The owner's branches
+# --------------------------------------------------
+
+def _own_shop(request):
+    return Shop.objects.filter(operator_user_id=request.user.id).first()
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated, IsShopOperator])
+def my_branches(request):
+    shop = _own_shop(request)
+    if shop is None:
+        return Response({"detail": "You have no shop yet."}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "GET":
+        ensure_first_branch(shop)
+        return Response(BranchSerializer(active_branches(shop), many=True).data)
+
+    serializer = BranchInputSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    try:
+        branch = add_branch(shop, **serializer.validated_data)
+    except BranchError as error:
+        return Response(error.errors, status=status.HTTP_400_BAD_REQUEST)
+    return Response(BranchSerializer(branch).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["PATCH", "DELETE"])
+@permission_classes([IsAuthenticated, IsShopOperator])
+def my_branch(request, pk):
+    shop = _own_shop(request)
+    # Another restaurant's branch looks the same as a missing one.
+    branch = Branch.objects.filter(pk=pk, shop=shop, removed_at__isnull=True).first() if shop else None
+    if branch is None:
+        return Response({"detail": "Branch not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        if request.method == "DELETE":
+            remove_branch(branch)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        serializer = BranchInputSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            return Response({"detail": "Send a name, address or area to change."}, status=status.HTTP_400_BAD_REQUEST)
+        branch = update_branch(branch, **serializer.validated_data)
+    except BranchError as error:
+        return Response(error.errors, status=status.HTTP_400_BAD_REQUEST)
+    return Response(BranchSerializer(branch).data)
 
 
 # --------------------------------------------------

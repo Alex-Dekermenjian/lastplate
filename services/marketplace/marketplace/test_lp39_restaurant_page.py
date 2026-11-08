@@ -31,6 +31,9 @@ class RestaurantPageTests(MarketplaceTestCase):
             "id": self.shop.id, "name": "Cedar Bakery", "area": "Hamra", "public_contact": "+961 1 234 567",
             "address": "12 Bliss Street, Beirut", "category": "Other", "photo_display": None,
             "logo_display": None,
+            # LP-68: the customer picks a branch; this restaurant has its main one.
+            "branches": [{"id": self.shop.branches.get().id, "name": "Hamra",
+                          "address": "12 Bliss Street, Beirut", "area": "Hamra"}],
         })
         offers = response.json()["offers"]
         self.assertEqual([o["id"] for o in offers], [soon.id, later.id])

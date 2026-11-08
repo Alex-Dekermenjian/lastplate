@@ -27,7 +27,7 @@ class CreateListingPageTests(ApprovedShopMixin, WebAuthTestCase):
             "original_price": "10.00",
             "discounted_price": "5.00",
             "total_quantity": "3",
-            "pickup_address": "12 Bliss Street, Beirut",
+            # LP-68: no pickup address is sent; it comes from the branch.
             "pickup_start": "2026-11-05T17:00",
             "pickup_end": "2026-11-05T19:00",
             "ingredients": "Flour, butter",
