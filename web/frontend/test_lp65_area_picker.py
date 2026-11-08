@@ -8,7 +8,8 @@ from .area_field import OLD_AREA_GROUP
 from .forms import ShopProfileForm
 from .lebanon_places import PLACE_NAMES, REGIONS, matches, normalize
 from .test_accounts import patch_service
-from .test_shop_profile import PROFILE, SHOP, ShopProfilePageTests
+from .test_accounts import WebAuthTestCase
+from .test_shop_profile import PROFILE, SHOP
 
 
 def places():
@@ -103,8 +104,8 @@ class AreaFieldTests(SimpleTestCase):
         self.assertIn('<option value="hamra st." selected data-search="hamra st.">hamra st.</option>', html)
 
 
-class ProfilePageAreaTests(ShopProfilePageTests):
-    """Reuses the profile page's sign-in helpers; runs only the tests below."""
+class ProfilePageAreaTests(WebAuthTestCase):
+    url = reverse("shop-profile")
 
     def test_saving_without_touching_an_old_area_keeps_it(self):
         old = {**SHOP, "area": "hamra st."}
