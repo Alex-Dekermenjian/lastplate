@@ -1,0 +1,13 @@
+{% comment %}
+LP-66: a restaurant's logo as a round badge. Any logo shape is centred and
+cropped to the circle; without a logo, the name's first letter is shown.
+Use: {% include "frontend/_shop_logo.html" with name=shop.name logo=shop.logo_url size="large" %}
+size: "small" (cards, cart) or "large" (restaurant page).
+{% endcomment %}
+<span class="shop-logo shop-logo--{{ size|default:'small' }}" aria-hidden="true">
+  {% if logo %}
+    <img class="shop-logo__image" src="{{ logo }}" alt="" loading="lazy">
+  {% else %}
+    <span class="shop-logo__initial">{{ name|default:"?"|slice:":1"|upper }}</span>
+  {% endif %}
+</span>

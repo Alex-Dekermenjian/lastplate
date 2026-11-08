@@ -108,6 +108,8 @@ def offer_for_display(data):
             "name": shop.get("name") or "",
             "area": shop.get("area") or "",
             "public_contact": shop.get("public_contact") or "",
+            # LP-66: the round logo badge next to the restaurant's name.
+            "logo_url": photo_url(shop.get("logo_display")),
         },
     }
 
@@ -205,6 +207,7 @@ def restaurant_detail(request, shop_id):
             "public_contact": shop.get("public_contact") or "",
             "category": shop.get("category") or "",
             "photo_url": photo_url(shop.get("photo_display")),
+            "logo_url": photo_url(shop.get("logo_display")),
         },
         "lastbags": [offer for offer in offers if offer["is_lastbag"]],
         "items": [offer for offer in offers if not offer["is_lastbag"]],

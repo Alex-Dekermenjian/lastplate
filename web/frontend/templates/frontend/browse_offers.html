@@ -47,6 +47,7 @@
           <div class="offer-card__body">
             {% if offer.is_lastbag %}<p class="offer-card__kind"><span class="lastbag-badge">LastBag · surprise</span></p>{% endif %}
             <p class="offer-card__shop">
+              {% include "frontend/_shop_logo.html" with name=offer.shop.name logo=offer.shop.logo_url %}
               {% if offer.shop.id %}<a href="{% url 'restaurant-detail' offer.shop.id %}">{{ offer.shop.name }}</a>{% else %}{{ offer.shop.name }}{% endif %}{% if offer.shop.area %} · {{ offer.shop.area }}{% endif %}
             </p>
             <h2 class="offer-card__title">

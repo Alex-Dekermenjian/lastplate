@@ -452,6 +452,8 @@ class PublicShopDetailSerializer(PublicShopSerializer):
     address = serializers.CharField(read_only=True)
     category = serializers.SerializerMethodField()
     photo_display = serializers.SerializerMethodField()
+    # LP-66: the logo from the LP-37 request, shown as a round badge.
+    logo_display = serializers.SerializerMethodField()
 
     def get_category(self, obj):
         return getattr(obj, "category", "") or ""
@@ -460,8 +462,11 @@ class PublicShopDetailSerializer(PublicShopSerializer):
         photo = getattr(obj, "photo", None)
         return photo.url if photo else None
 
+    def get_logo_display(self, obj):
+        return image_url(obj.logo)
+
     class Meta(PublicShopSerializer.Meta):
-        fields = [*PublicShopSerializer.Meta.fields, "address", "category", "photo_display"]
+        fields = [*PublicShopSerializer.Meta.fields, "address", "category", "photo_display", "logo_display"]
         read_only_fields = fields
 
 
