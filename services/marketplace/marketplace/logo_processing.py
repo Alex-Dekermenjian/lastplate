@@ -31,18 +31,25 @@ def _brightness(rgb):
     return 0.299 * r + 0.587 * g + 0.114 * b
 
 
-def _average_colour(image, mask=None):
-    """Average RGB of an RGB image, optionally only where mask is set."""
-    small = image.resize((32, 32))
-    small_mask = mask.resize((32, 32)) if mask is not None else None
-    pixels = [
-        pixel for i, pixel in enumerate(small.getdata())
-        if small_mask is None or small_mask.getdata()[i] > TRANSPARENT
-    ]
-    if not pixels:
+def _pixels(image):
+    """Every pixel as a tuple (Pillow 13 renamed getdata)."""
+    flattened = getattr(image, "get_flattened_data", None)
+    return list(flattened() if flattened else image.getdata())
+
+
+def _visible_colour(rgba):
+    """Average colour of the logo's solid pixels, measured at full size.
+
+    Shrinking first would blend the logo with its see-through surroundings
+    and make a white logo look grey, so up to ~20,000 pixels are sampled.
+    """
+    pixels = _pixels(rgba)
+    step = max(1, len(pixels) // 20000)
+    solid = [pixel[:3] for pixel in pixels[::step] if pixel[3] > 200]
+    if not solid:
         return WHITE
-    count = len(pixels)
-    return tuple(round(sum(channel) / count) for channel in zip(*pixels))
+    count = len(solid)
+    return tuple(round(sum(channel) / count) for channel in zip(*solid))
 
 
 def _corner_colour(image):
@@ -73,7 +80,7 @@ def prepare_logo(uploaded_file):
 
     rgba = image.convert("RGBA")
     alpha = rgba.getchannel("A")
-    see_through = sum(1 for value in alpha.resize((64, 64)).getdata() if value <= TRANSPARENT) / (64 * 64)
+    see_through = sum(1 for value in _pixels(alpha.resize((64, 64))) if value <= TRANSPARENT) / (64 * 64)
 
     if see_through > 0.05:
         # A transparent logo: crop to what is visible, then choose a badge
@@ -82,8 +89,7 @@ def prepare_logo(uploaded_file):
         if box:
             rgba = rgba.crop(box)
             alpha = rgba.getchannel("A")
-        visible = _average_colour(rgba.convert("RGB"), alpha)
-        background = DARK if _brightness(visible) > LIGHT_LOGO else WHITE
+        background = DARK if _brightness(_visible_colour(rgba)) > LIGHT_LOGO else WHITE
     else:
         # A logo with its own background: keep that colour around it.
         rgb = rgba.convert("RGB")

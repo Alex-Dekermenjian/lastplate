@@ -77,6 +77,13 @@ class LogoProcessingTests(SimpleTestCase):
         self.assertTrue(close(result.getpixel((5, 5)), DARK))
         self.assertTrue(close(result.getpixel((SIZE // 2, SIZE // 2)), WHITE))
 
+    def test_a_thin_white_outline_logo_also_gets_a_dark_badge(self):
+        """A ring and thin letters: shrinking it to measure would make it look grey."""
+        ring = Image.new("RGBA", (500, 500), (0, 0, 0, 0))
+        ImageDraw.Draw(ring).ellipse((60, 60, 440, 440), outline=(255, 255, 255, 255), width=12)
+
+        self.assertTrue(close(badge(ring).getpixel((5, 5)), DARK))
+
     def test_a_dark_logo_on_transparent_gets_a_white_badge(self):
         dark_logo = Image.new("RGBA", (400, 400), (0, 0, 0, 0))
         ImageDraw.Draw(dark_logo).ellipse((80, 80, 320, 320), fill=(30, 30, 30, 255))
