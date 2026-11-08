@@ -517,3 +517,10 @@ p { margin: 0 0 12px; }
 .food-search__row { display: grid; gap: 0 12px; }
 .food-search__actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .food-search__actions .button { flex: 1 1 140px; }
+
+/* The type of food dropdown on the offer form looks like the other boxes. */
+.offer-form select {
+  width: 100%; min-height: 48px; padding: 12px 14px; font: inherit; color: var(--text);
+  background: var(--surface); border: 1px solid var(--input-border); border-radius: var(--radius-input);
+}
+.offer-form select:focus { outline: 3px solid var(--btn); outline-offset: 1px; border-color: var(--btn); }
