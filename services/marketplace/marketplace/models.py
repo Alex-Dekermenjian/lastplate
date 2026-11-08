@@ -2,6 +2,8 @@
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.db.models import Q
 
 from .image_validators import validate_listing_photo
@@ -166,6 +168,52 @@ class Shop(models.Model):
         return self.name
 
 
+# LP-68: A restaurant's branches. Each branch works like its own store under
+# the restaurant's name ("ZWZ · Hamra"): its own pickup address, offers and
+# stock. Branch 1 is the restaurant's main address (Shop.address/area).
+MAX_BRANCHES = 3
+
+
+class Branch(models.Model):
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="branches")
+    # What customers see after the restaurant's name, e.g. "Hamra".
+    name = models.CharField(max_length=100)
+    address = models.CharField(max_length=255, blank=True)
+    # A place from the website's Lebanon list (LP-65).
+    area = models.CharField(max_length=100, blank=True)
+    # 1 is the main branch; the order owners and customers see.
+    position = models.PositiveSmallIntegerField(default=1)
+    # A removed branch is hidden but kept, so past offers keep their branch.
+    removed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["position", "id"]
+        indexes = [models.Index(fields=["shop", "removed_at"], name="marketplace_branch_active")]
+
+    @property
+    def is_active(self):
+        return self.removed_at is None
+
+    def __str__(self):
+        return f"{self.shop.name} · {self.name}"
+
+
+@receiver(post_save, sender=Shop, dispatch_uid="lp68_first_branch")
+def give_new_shop_its_first_branch(sender, instance, created, raw=False, **kwargs):
+    """Every restaurant has at least one branch, however it was created
+    (application, Django admin, tests): branch 1 from its address."""
+    if created and not raw and not instance.branches.exists():
+        Branch.objects.create(
+            shop=instance,
+            name=(instance.area or "").strip()[:100] or "Main branch",
+            address=instance.address or "",
+            area=instance.area or "",
+            position=1,
+        )
+
+
 # LP-10 and LP-11: Food listing model
 class Listing(models.Model):
 
@@ -181,6 +229,16 @@ class Listing(models.Model):
 
     # Numeric reference to a Shop in Marketplace
     shop_id = models.PositiveBigIntegerField()
+
+    # LP-68: the branch this offer is at; its pickup address comes from it.
+    # Empty only for offers made before branches existed and never moved.
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="listings",
+        null=True,
+        blank=True,
+    )
 
     kind = models.CharField(
         max_length=10,

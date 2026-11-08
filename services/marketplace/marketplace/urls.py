@@ -16,6 +16,9 @@ urlpatterns = [
         views.ShopCreateView.as_view(),
         name="shop-create",
     ),
+    # LP-68: the owner's branches
+    path("shops/me/branches/", views.my_branches, name="my-branches"),
+    path("shops/me/branches/<int:pk>/", views.my_branch, name="my-branch"),
     # LP-37: the owner sends the request to join LastPlate
     path(
         "shops/me/application/",

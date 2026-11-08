@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from .authentication import IsAdmin
 from .browse import visible_listings
 from .models import Shop
-from .serializers import RejectUnknownFieldsMixin
+from .serializers import PublicBranchSerializer, RejectUnknownFieldsMixin
 from .shop_review import ShopReviewError, review_shop
 
 Status = Shop.ApprovalStatus
@@ -21,12 +21,18 @@ ADMIN_ONLY = [IsAuthenticated, IsAdmin]
 
 class AdminShopSerializer(serializers.ModelSerializer):
     profile_complete = serializers.BooleanField(read_only=True)
+    # LP-68: one approval covers every branch, so the admin sees them all.
+    branches = serializers.SerializerMethodField()
+
+    def get_branches(self, obj):
+        return PublicBranchSerializer(obj.branches.filter(removed_at__isnull=True), many=True).data
 
     class Meta:
         model = Shop
         fields = [
             "id", "operator_user_id", "name", "address", "area", "public_contact", "profile_complete",
             "approval_status", "rejection_reason", "reviewed_by_user_id", "reviewed_at", "created_at", "updated_at",
+            "branches",
         ]
         read_only_fields = fields
 
