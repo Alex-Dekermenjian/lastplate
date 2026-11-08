@@ -87,9 +87,12 @@ urlpatterns = [
 # LP-37: the restaurant's three-step request and its status. Kept in its own
 # block so other cards can add routes above without touching these lines.
 from frontend import apply_views  # noqa: E402
+from frontend import review_again_views  # noqa: E402
 
 urlpatterns += [
     path("workspace/apply/", apply_views.restaurant_apply, name="restaurant-apply"),
     path("workspace/apply/<int:step>/", apply_views.restaurant_apply, name="restaurant-apply"),
     path("workspace/request/", apply_views.request_status, name="request-status"),
+    # LP-45: a rejected restaurant asks for review again.
+    path("workspace/request/review-again/", review_again_views.review_again, name="request-review-again"),
 ]

@@ -18,6 +18,8 @@ urlpatterns = [
     ),
     # LP-68: the owner's branches
     path("shops/me/branches/", views.my_branches, name="my-branches"),
+    # LP-45: a rejected restaurant asks for review again.
+    path("shops/me/review-again", views.review_again, name="shop-review-again"),
     path("shops/me/branches/<int:pk>/", views.my_branch, name="my-branch"),
     # LP-37: the owner sends the request to join LastPlate
     path(

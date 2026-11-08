@@ -495,3 +495,13 @@ p { margin: 0 0 12px; }
 }
 .branch-tabs__tab[aria-current="page"] { border-color: var(--btn); background: var(--tint); color: var(--btn); }
 .branch-tabs__count { font-size: 13px; color: var(--text-2); }
+
+/* LP-45: a rejected restaurant asks for review again. */
+.review-again__steps { margin: 0 0 12px; padding-left: 20px; }
+.review-again__steps li { margin-bottom: 6px; }
+.review-again__note {
+  width: 100%; min-height: 88px; padding: 12px 14px; font: inherit; color: var(--text);
+  background: var(--surface); border: 1px solid var(--input-border); border-radius: var(--radius-input);
+}
+.review-again__note:focus { outline: 3px solid var(--btn); outline-offset: 1px; border-color: var(--btn); }
+.console-filter { margin: 12px 0; font-size: 14px; }

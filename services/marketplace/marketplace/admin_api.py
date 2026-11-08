@@ -33,6 +33,8 @@ class AdminShopSerializer(serializers.ModelSerializer):
             "id", "operator_user_id", "name", "address", "area", "public_contact", "profile_complete",
             "approval_status", "rejection_reason", "reviewed_by_user_id", "reviewed_at", "created_at", "updated_at",
             "branches",
+            # LP-45: asked for review again after a rejection.
+            "review_requests", "last_rejection_reason", "review_request_note", "review_requested_at",
         ]
         read_only_fields = fields
 
@@ -70,6 +72,9 @@ def shop_list(request):
         )
     # Oldest application first, so nobody waits longest by accident.
     shops = Shop.objects.filter(approval_status=approval_status).order_by("created_at", "id")
+    # LP-45: ?resubmitted=1 lists only restaurants that asked for review again.
+    if request.query_params.get("resubmitted") in ("1", "true"):
+        shops = shops.filter(review_requests__gt=0)
     return Response(AdminShopSerializer(shops, many=True).data)
 
 

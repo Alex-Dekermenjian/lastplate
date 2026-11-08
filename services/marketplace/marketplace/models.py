@@ -121,6 +121,13 @@ class Shop(models.Model):
         blank=True,
     )
 
+    # LP-45: a rejected owner fixed their details and asked for review
+    # again. The admin sees the earlier reason and the owner's note.
+    review_requests = models.PositiveIntegerField(default=0)
+    last_rejection_reason = models.TextField(blank=True, default="")
+    review_request_note = models.TextField(blank=True, default="")
+    review_requested_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

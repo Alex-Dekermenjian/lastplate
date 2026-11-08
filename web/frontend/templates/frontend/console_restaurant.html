@@ -39,6 +39,14 @@
       <p class="help">Approving the restaurant approves all its branches.</p>
     {% endif %}
 
+    {% if shop.approval_status == "PENDING" and shop.review_requests %}
+      {# LP-45: this restaurant was rejected before and asked again. #}
+      <div class="notice notice--info">
+        <p><strong>Asked for review again</strong>{% if shop.review_requests > 1 %} ({{ shop.review_requests }} times){% endif %}.</p>
+        {% if shop.last_rejection_reason %}<p><strong>Earlier reason:</strong> {{ shop.last_rejection_reason|linebreaksbr }}</p>{% endif %}
+        <p><strong>Owner's note:</strong> {{ shop.review_request_note|default:"No note."|linebreaksbr }}</p>
+      </div>
+    {% endif %}
     {% if shop.approval_status == "REJECTED" and shop.rejection_reason %}
       <div class="notice notice--error"><strong>Reason given:</strong> {{ shop.rejection_reason|linebreaksbr }}</div>
     {% endif %}

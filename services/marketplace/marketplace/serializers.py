@@ -213,6 +213,8 @@ class ShopSerializer(serializers.ModelSerializer):
             "application_sent",
             "conditions_accepted_at",
             "branches",
+            # LP-45: how many times the owner asked for review again.
+            "review_requests",
             "created_at",
             "updated_at",
         ]
@@ -729,3 +731,9 @@ class StockAdjustmentSerializer(serializers.ModelSerializer):
         ]
 
         read_only_fields = fields
+
+
+# LP-45: a rejected owner asks for review again, with an optional note.
+class ReviewAgainSerializer(RejectUnknownFieldsMixin, serializers.Serializer):
+    # Only a note: the status is never chosen by the owner.
+    note = serializers.CharField(max_length=1000, required=False, allow_blank=True, default="")

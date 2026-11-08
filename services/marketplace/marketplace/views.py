@@ -50,12 +50,14 @@ from .serializers import (
     PublicShopDetailSerializer,
     RestaurantOfferSerializer,
     PublicListingSerializer,
+    ReviewAgainSerializer,
     ShopCreateSerializer,
     ShopProfileSerializer,
     ShopSerializer,
     StockAdjustmentRequestSerializer,
     StockAdjustmentSerializer,
 )
+from .review_again import ReviewAgainError, request_review_again
 from .stock_service import StockAdjustmentError, adjust_stock
 
 
@@ -153,6 +155,23 @@ class MyShopView(APIView):
             sync_main_from_shop(shop)
 
         return Response(ShopSerializer(shop).data)
+
+
+# --------------------------------------------------
+# LP-45: A rejected restaurant asks for review again
+# --------------------------------------------------
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsShopOperator])
+def review_again(request):
+    serializer = ReviewAgainSerializer(data=request.data)
+    if not serializer.is_valid():
+        return _error("invalid", "Only a note can be sent.", status.HTTP_400_BAD_REQUEST, fields=serializer.errors)
+    try:
+        shop = request_review_again(request.user.id, serializer.validated_data["note"])
+    except ReviewAgainError as exc:
+        return _error(exc.code, exc.detail, exc.http_status)
+    return Response(ShopSerializer(shop).data, status=status.HTTP_200_OK)
 
 
 # --------------------------------------------------

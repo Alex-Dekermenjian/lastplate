@@ -325,6 +325,12 @@ def publish_listing(access, listing_id):
     )
 
 
+# LP-45: a rejected restaurant asks for review again (Pending, never Approved).
+@sensitive_variables("access")
+def review_again(access, note):
+    return _call("marketplace", "POST", "/api/shops/me/review-again", {"note": note}, token=access)
+
+
 # LP-12: Change a published listing's stock with a reason.
 @sensitive_variables("access")
 def adjust_stock(access, listing_id, quantity_change, reason):
