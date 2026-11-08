@@ -85,7 +85,40 @@ def listing_summary(listing, shop):
         "pickup_ended": pickup_ended,
         "hidden_because": hidden_because,
         "visible_to_customers": published and not hidden_because,
+        # LP-58: which tab of the offer list it belongs to.
+        "tab": offer_tab(listing.get("status"), pickup_ended),
+        "can_mark_sold_out": published and not pickup_ended and (free is None or free > 0),
     }
+
+
+# LP-58: the owner's offers in three tabs.
+OFFER_TABS = [
+    ("live", "Live"),
+    ("drafts", "Drafts"),
+    ("ended", "Ended"),
+]
+
+
+def offer_tab(status, pickup_ended):
+    if status == "DRAFT":
+        return "drafts"
+    if status == "PUBLISHED" and not pickup_ended:
+        return "live"
+    return "ended"
+
+
+def offer_tabs(listings, wanted):
+    """The tabs with their counts, and which one is open: the one asked
+    for, else Live when there is something live, else Drafts."""
+    counts = {key: 0 for key, _ in OFFER_TABS}
+    for listing in listings:
+        counts[listing["tab"]] += 1
+    if wanted not in counts:
+        wanted = "live" if counts["live"] or not counts["drafts"] else "drafts"
+    return [
+        {"key": key, "label": label, "count": counts[key], "active": key == wanted}
+        for key, label in OFFER_TABS
+    ], wanted
 
 
 def unapproved_shop_page(shop):
@@ -355,6 +388,8 @@ def workspace(request):
             for listing in listings
         ]
 
+    tabs, active_tab = offer_tabs(listings, request.GET.get("tab"))
+
     return render(
         request,
         "frontend/workspace.html",
@@ -364,6 +399,8 @@ def workspace(request):
             "status_explanation": explanation,
             "listings": listings,
             "listings_unavailable": listings_unavailable,
+            "offer_tabs": tabs,
+            "active_tab": active_tab,
         },
     )
 

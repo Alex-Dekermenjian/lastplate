@@ -524,3 +524,57 @@ p { margin: 0 0 12px; }
   background: var(--surface); border: 1px solid var(--input-border); border-radius: var(--radius-input);
 }
 .offer-form select:focus { outline: 3px solid var(--btn); outline-offset: 1px; border-color: var(--btn); }
+/* LP-58: the owner's area: status banner, offer tabs and compact rows.
+   (Replaces the inline styles the workspace page used to have.) */
+.status-banner {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  margin: 8px 0 20px; padding: 14px 16px; border-radius: var(--radius-input); background: var(--tint);
+}
+.status-banner--REJECTED { background: var(--danger-tint); }
+.status-banner__text { margin: 0; flex: 1 1 200px; }
+.workspace-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.workspace-note { margin-top: 16px; }
+.workspace-offers { margin-top: 24px; }
+.offer-tabs { display: flex; gap: 8px; margin: 8px 0 16px; border-bottom: 2px solid var(--border); }
+.offer-tabs__tab {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 8px 12px;
+  margin-bottom: -2px; border-bottom: 3px solid transparent;
+  color: var(--text-2); font-weight: 800; text-decoration: none;
+}
+.offer-tabs__tab[aria-current="page"] { color: var(--btn); border-bottom-color: var(--btn); }
+.offer-tabs__count {
+  min-width: 22px; padding: 0 6px; border-radius: var(--radius-pill);
+  background: var(--tint); color: var(--btn-hover); font-size: 13px; text-align: center;
+}
+.offer-panel__empty { margin: 12px 0; }
+.offer-rows { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.offer-row { padding: 12px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+.offer-row .notice { margin: 10px 0 0; font-size: 14px; }
+.offer-row__main { display: grid; grid-template-columns: 72px 1fr; gap: 12px; align-items: start; }
+.offer-row__photo { display: block; width: 72px; height: 72px; border-radius: 12px; object-fit: cover; }
+.offer-row__photo--empty {
+  display: flex; align-items: center; justify-content: center; padding: 4px; text-align: center;
+  background: var(--tint); color: var(--text-2); font-size: 11px; line-height: 1.2;
+}
+.offer-row__title { margin: 0; font-size: 17px; }
+.offer-row__text .offer-card__kind { margin: 0 0 4px; }
+.offer-row__text .branch-tag { margin: 2px 0 0; font-size: 14px; }
+.offer-row__facts { margin: 4px 0 0; font-size: 14px; }
+.offer-row__status { margin: 2px 0 0; font-size: 13px; }
+.offer-row__actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin-top: 10px; }
+.offer-row__actions form { margin: 0; }
+.offer-row__details { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 6px; }
+.offer-row__details > summary {
+  min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 800; color: var(--btn);
+}
+.confirm > summary { list-style: none; cursor: pointer; }
+.confirm > summary::-webkit-details-marker { display: none; }
+.confirm[open] { flex-basis: 100%; padding: 12px; border-radius: 12px; background: var(--tint); }
+.confirm form p { margin: 8px 0; }
+.button--danger { background: var(--danger); border-color: var(--danger); color: #FFFFFF; }
+.button--danger:hover { background: #8E1B12; border-color: #8E1B12; color: #FFFFFF; }
+.stock-form { margin-top: 12px; }
+.stock-form__box { border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.stock-form__box input { width: 100%; }
+.stock-form__box .button { margin-top: 8px; }
+.confirm > summary.link-button { display: inline-flex; align-items: center; }

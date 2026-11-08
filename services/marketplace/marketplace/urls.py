@@ -66,6 +66,13 @@ urlpatterns = [
         name="upload_listing_photo",
     ),
 
+    # LP-58: the owner takes every free unit off sale.
+    path(
+        "listings/<int:pk>/sold-out",
+        views.mark_listing_sold_out,
+        name="listing_sold_out",
+    ),
+
     # LP-12: Stock adjustments (POST) and their history (GET)
     path(
         "listings/<int:pk>/stock-adjustments",

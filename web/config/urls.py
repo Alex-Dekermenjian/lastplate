@@ -8,7 +8,7 @@ https://docs.djangoproject.com/en/5.2/topics/http/urls/
 from django.urls import path
 from django.views.generic import RedirectView
 
-from frontend import account_views, branch_views, browse_views, cart, console_views, health, listing_views, views
+from frontend import account_views, branch_views, browse_views, cart, console_views, health, listing_views, offer_actions, views
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -72,6 +72,20 @@ urlpatterns = [
         listing_views.publish_listing,
         name="publish-listing",
     ),
+
+    # LP-58: Mark sold out and Delete draft, from the offer list.
+    path(
+        "workspace/listings/<int:listing_id>/sold-out/",
+        offer_actions.mark_sold_out,
+        name="mark-sold-out",
+    ),
+    path(
+        "workspace/listings/<int:listing_id>/delete/",
+        offer_actions.delete_draft,
+        name="delete-draft",
+    ),
+    # LP-58: /business is the restaurant's area; it is the workspace.
+    path("business/", RedirectView.as_view(pattern_name="workspace", query_string=True), name="business"),
 
     # LP-12: Stock adjustments.
     path(

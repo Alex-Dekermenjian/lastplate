@@ -57,6 +57,7 @@ from .serializers import (
     StockAdjustmentRequestSerializer,
     StockAdjustmentSerializer,
 )
+from .owner_actions import DraftDeleteError, delete_draft, mark_sold_out
 from .review_again import ReviewAgainError, request_review_again
 from .stock_service import StockAdjustmentError, adjust_stock
 
@@ -790,4 +791,49 @@ def listings_collection(request):
 def listing_resource(request, pk):
     if request.method == "GET":
         return listing_offer(request, pk)
+    # LP-58: an owner deletes their own draft.
+    if request.method == "DELETE":
+        return delete_listing_draft(request, pk)
     return edit_listing(request, pk)
+
+
+# --------------------------------------------------
+# LP-58: Quick actions from the owner's offer list
+# --------------------------------------------------
+
+def _operator_shop(request):
+    return Shop.objects.filter(operator_user_id=request.user.id).first()
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated, IsShopOperator])
+def delete_listing_draft(request, pk):
+    shop = _operator_shop(request)
+    if shop is None:
+        return _error("no_shop", "You have no shop.", status.HTTP_403_FORBIDDEN)
+    try:
+        delete_draft(pk, shop.id)
+    except DraftDeleteError as exc:
+        return _error(exc.code, exc.detail, exc.http_status)
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsShopOperator])
+def mark_listing_sold_out(request, pk):
+    if request.data:
+        return _error("invalid", "Marking sold out takes no fields.", status.HTTP_400_BAD_REQUEST)
+    shop = _operator_shop(request)
+    if shop is None:
+        return _error("no_shop", "You have no shop.", status.HTTP_403_FORBIDDEN)
+    try:
+        listing, adjustment = mark_sold_out(pk, shop.id, request.user.id)
+    except StockAdjustmentError as exc:
+        return _error(exc.code, exc.detail, exc.http_status)
+    return Response(
+        {
+            "adjustment": StockAdjustmentSerializer(adjustment).data,
+            "listing": ListingSerializer(listing, context={"request": request}).data,
+        },
+        status=status.HTTP_201_CREATED,
+    )
