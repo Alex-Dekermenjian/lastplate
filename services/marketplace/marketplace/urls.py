@@ -66,6 +66,13 @@ urlpatterns = [
         name="upload_listing_photo",
     ),
 
+    # LP-58: the owner deletes one of their drafts.
+    path(
+        "listings/<int:pk>/delete",
+        views.delete_listing_draft,
+        name="listing_delete_draft",
+    ),
+
     # LP-58: the owner takes every free unit off sale.
     path(
         "listings/<int:pk>/sold-out",

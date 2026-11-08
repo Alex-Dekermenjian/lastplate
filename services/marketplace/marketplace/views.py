@@ -791,9 +791,6 @@ def listings_collection(request):
 def listing_resource(request, pk):
     if request.method == "GET":
         return listing_offer(request, pk)
-    # LP-58: an owner deletes their own draft.
-    if request.method == "DELETE":
-        return delete_listing_draft(request, pk)
     return edit_listing(request, pk)
 
 
@@ -805,9 +802,12 @@ def _operator_shop(request):
     return Shop.objects.filter(operator_user_id=request.user.id).first()
 
 
-@api_view(["DELETE"])
+@api_view(["POST"])
 @permission_classes([IsAuthenticated, IsShopOperator])
 def delete_listing_draft(request, pk):
+    # Its own address, so DELETE on a listing stays refused (LP-14).
+    if request.data:
+        return _error("invalid", "Deleting a draft takes no fields.", status.HTTP_400_BAD_REQUEST)
     shop = _operator_shop(request)
     if shop is None:
         return _error("no_shop", "You have no shop.", status.HTTP_403_FORBIDDEN)

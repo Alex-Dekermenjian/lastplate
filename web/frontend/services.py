@@ -339,7 +339,7 @@ def mark_sold_out(access, listing_id):
 
 
 def delete_draft(access, listing_id):
-    return _call("marketplace", "DELETE", f"/api/listings/{int(listing_id)}", token=access)
+    return _call("marketplace", "POST", f"/api/listings/{int(listing_id)}/delete", token=access)
 
 
 def adjust_stock(access, listing_id, quantity_change, reason):

@@ -101,7 +101,7 @@ class DeleteDraftTests(StockAdjustmentTestCase):
         self.draft = published_listing(self.shop, status=Listing.Status.DRAFT)
 
     def delete(self, listing):
-        return self.client.delete(reverse("listing_detail", kwargs={"pk": listing.pk}))
+        return self.client.post(reverse("listing_delete_draft", kwargs={"pk": listing.pk}), format="json")
 
     def test_the_owner_deletes_a_draft(self):
         self.authenticate(10)
@@ -132,6 +132,14 @@ class DeleteDraftTests(StockAdjustmentTestCase):
         self.assertEqual(self.delete(self.draft).status_code, 403)
         self.assertTrue(Listing.objects.filter(pk=self.draft.pk).exists())
 
+    def test_delete_on_the_offer_itself_is_still_refused(self):
+        self.authenticate(10)
+
+        response = self.client.delete(reverse("listing_detail", kwargs={"pk": self.draft.pk}))
+
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(Listing.objects.filter(pk=self.draft.pk).exists())
+
     def test_reading_and_editing_still_work_on_the_same_address(self):
         self.authenticate(10)
         url = reverse("listing_detail", kwargs={"pk": self.draft.pk})
@@ -159,6 +167,6 @@ class DeleteDraftPhotoTests(StockAdjustmentTestCase):
         self.assertTrue(storage.exists(name))
         self.authenticate(10)
 
-        self.client.delete(reverse("listing_detail", kwargs={"pk": draft.pk}))
+        self.client.post(reverse("listing_delete_draft", kwargs={"pk": draft.pk}), format="json")
 
         self.assertFalse(storage.exists(name))
