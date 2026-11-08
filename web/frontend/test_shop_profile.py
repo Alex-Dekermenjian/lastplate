@@ -7,7 +7,7 @@ from . import services
 from .services import ServiceUnavailable
 from .test_accounts import ACCOUNT, SHOP, WebAuthTestCase, patch_service
 
-PROFILE = {"name": "Cedar Crumb Bakery", "address": "12 Bliss Street, Beirut", "area": "Hamra",
+PROFILE = {"name": "Cedar Crumb Bakery", "category": "Bakery", "address": "12 Bliss Street, Beirut", "area": "Hamra",
            "public_contact": "+961 1 234 567"}
 # LP-37: the workspace and offer pages are for approved restaurants.
 COMPLETE_SHOP = {**SHOP, **PROFILE, "rejection_reason": "", "profile_complete": True,
@@ -55,7 +55,8 @@ class ShopProfilePageTests(WebAuthTestCase):
                 patch_service("update_shop", return_value=(200, COMPLETE_SHOP)) as update_shop, \
                 patch_service("my_listings", return_value=(200, [])):
             response = self.client.post(self.url, posted, follow=True)
-        update_shop.assert_called_once_with("access-token-1", PROFILE)
+        # LP-59: the third argument is the new images; none were chosen.
+        update_shop.assert_called_once_with("access-token-1", PROFILE, {})
         self.assertRedirects(response, reverse("workspace"))
         self.assertContains(response, "Your shop profile has been saved.")
 
@@ -64,7 +65,7 @@ class ShopProfilePageTests(WebAuthTestCase):
         with patch_service("my_shop", return_value=(200, NEW_SHOP)), patch_service("update_shop") as update_shop:
             response = self.client.post(self.url, {**PROFILE, "area": "   ", "address": "x" * 256})
         update_shop.assert_not_called()
-        self.assertContains(response, "This field is required.")
+        self.assertContains(response, "Choose your area from the list.")
         self.assertContains(response, "at most 255 characters")
         self.assertContains(response, 'value="Cedar Crumb Bakery"')
 
@@ -77,8 +78,9 @@ class ShopProfilePageTests(WebAuthTestCase):
         with patch_service("my_shop", return_value=(200, NEW_SHOP)), patch_service("update_shop") as update_shop:
             response = self.client.post(self.url, {**PROFILE, "name": "A", "address": "abc", "area": "H"})
         update_shop.assert_not_called()
-        self.assertContains(response, "at least 2 characters", count=2)
+        self.assertContains(response, "at least 2 characters", count=1)
         self.assertContains(response, "at least 5 characters")
+        self.assertContains(response, "Choose your area from the list.")
 
     def test_unusable_phone_rejected_by_marketplace_is_shown(self):
         self.sign_in_session()

@@ -23,8 +23,13 @@
     {% if shop.photo_url %}
       <img class="offer-detail__photo" src="{{ shop.photo_url }}" alt="Photo of {{ shop.name }}">
     {% endif %}
-    {% if shop.category %}<p class="eyebrow">{{ shop.category }}</p>{% endif %}
-    <h1>{{ shop.name }}</h1>
+    <div class="restaurant__heading">
+      {% include "frontend/_shop_logo.html" with name=shop.name logo=shop.logo_url size="large" %}
+      <div>
+        {% if shop.category %}<p class="eyebrow">{{ shop.category }}</p>{% endif %}
+        <h1>{{ shop.name }}</h1>
+      </div>
+    </div>
     <dl class="details">
       <dt>Address</dt>
       <dd>{{ shop.address|default:"Unknown" }}{% if shop.area %} · {{ shop.area }}{% endif %}</dd>

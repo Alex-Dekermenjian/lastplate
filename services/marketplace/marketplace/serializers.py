@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from rest_framework import serializers
 
 from .image_validators import validate_listing_photo
+from .logo_processing import prepare_logo
 from .models import Listing, Shop, StockAdjustment
 from .stock import free_quantity as calculate_free_quantity
 from .validators import LASTBAG as LASTBAG_KIND, validate_listing_data
@@ -77,6 +78,16 @@ def validate_shop_image(value):
     return value
 
 
+class LogoField(serializers.FileField):
+    """LP-66: checks the uploaded logo like any shop image, then tidies it
+    into the square badge image the website shows (logo_processing)."""
+
+    def to_internal_value(self, data):
+        uploaded = super().to_internal_value(data)
+        validate_shop_image(uploaded)
+        return prepare_logo(uploaded)
+
+
 # LP-37: Optional map position. A map pin can fill these in later.
 COORDINATE = {
     "max_digits": 9,
@@ -147,10 +158,7 @@ class ShopProfileSerializer(
         required=False,
         validators=[validate_shop_image],
     )
-    logo = serializers.FileField(
-        required=False,
-        validators=[validate_shop_image],
-    )
+    logo = LogoField(required=False)
 
     def validate(self, attrs):
         if not attrs:
@@ -240,10 +248,7 @@ class ShopApplicationSerializer(
         required=False,
         validators=[validate_shop_image],
     )
-    logo = serializers.FileField(
-        required=False,
-        validators=[validate_shop_image],
-    )
+    logo = LogoField(required=False)
     accept_conditions = serializers.BooleanField()
 
     def __init__(self, *args, shop=None, **kwargs):
@@ -452,6 +457,8 @@ class PublicShopDetailSerializer(PublicShopSerializer):
     address = serializers.CharField(read_only=True)
     category = serializers.SerializerMethodField()
     photo_display = serializers.SerializerMethodField()
+    # LP-66: the logo from the LP-37 request, shown as a round badge.
+    logo_display = serializers.SerializerMethodField()
 
     def get_category(self, obj):
         return getattr(obj, "category", "") or ""
@@ -460,8 +467,11 @@ class PublicShopDetailSerializer(PublicShopSerializer):
         photo = getattr(obj, "photo", None)
         return photo.url if photo else None
 
+    def get_logo_display(self, obj):
+        return image_url(obj.logo)
+
     class Meta(PublicShopSerializer.Meta):
-        fields = [*PublicShopSerializer.Meta.fields, "address", "category", "photo_display"]
+        fields = [*PublicShopSerializer.Meta.fields, "address", "category", "photo_display", "logo_display"]
         read_only_fields = fields
 
 

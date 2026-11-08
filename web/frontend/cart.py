@@ -16,6 +16,7 @@ from django.views.decorators.http import require_POST
 from . import services
 from .account_views import customer_required
 from .browse_views import offer_for_display
+from .listing_photos import photo_url
 from .services import ServiceUnavailable
 
 CART_KEY = "cart"
@@ -24,7 +25,7 @@ NO_LONGER_AVAILABLE = "Sorry, that food is no longer available."
 
 
 def empty_cart():
-    return {"shop_id": None, "shop_name": "", "lines": {}, "prices": {}, "titles": {}}
+    return {"shop_id": None, "shop_name": "", "shop_logo": "", "lines": {}, "prices": {}, "titles": {}}
 
 
 def get_cart(request):
@@ -106,7 +107,7 @@ def add_to_cart(request, listing_id):
     if wanted > free:
         messages.info(request, f"Only {free} left of {offer.get('title') or 'this food'}.")
         wanted = free
-    cart.update(shop_id=shop.get("id"), shop_name=shop.get("name") or "")
+    cart.update(shop_id=shop.get("id"), shop_name=shop.get("name") or "", shop_logo=shop.get("logo_display") or "")
     cart["lines"][key] = wanted
     cart["prices"][key] = str(offer.get("discounted_price"))
     cart.setdefault("titles", {})[key] = offer.get("title") or ""
@@ -186,6 +187,8 @@ def view_cart(request):
 
     return render(request, "frontend/cart.html", {
         "cart": cart,
+        # LP-66: carts saved before the logo was kept simply show the initial.
+        "shop_logo": photo_url(cart.get("shop_logo")),
         "lines": lines,
         "total": total,
         "unavailable": unavailable,

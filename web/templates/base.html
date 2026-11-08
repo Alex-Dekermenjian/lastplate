@@ -45,5 +45,7 @@
     </main>
     {% block bottom_bar %}{% endblock %}
   </div>
+  {# LP-65: the searchable area list (does nothing on pages without one). #}
+  <script src="{% static 'js/area-picker.js' %}" defer></script>
 </body>
 </html>

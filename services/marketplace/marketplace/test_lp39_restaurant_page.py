@@ -9,6 +9,7 @@ from django.utils import timezone
 from .models import Listing, Shop
 from .serializers import LASTBAG
 from .test_browse import MarketplaceTestCase, make_listing, make_shop
+from .test_lp37_restaurant_apply import upload
 
 
 class RestaurantPageTests(MarketplaceTestCase):
@@ -29,11 +30,21 @@ class RestaurantPageTests(MarketplaceTestCase):
         self.assertEqual(shop, {
             "id": self.shop.id, "name": "Cedar Bakery", "area": "Hamra", "public_contact": "+961 1 234 567",
             "address": "12 Bliss Street, Beirut", "category": "Other", "photo_display": None,
+            "logo_display": None,
         })
         offers = response.json()["offers"]
         self.assertEqual([o["id"] for o in offers], [soon.id, later.id])
         self.assertEqual(offers[0]["kind"], "ITEM")
         self.assertEqual(offers[0]["free_quantity"], 5)
+
+    def test_the_restaurant_logo_is_sent_for_its_round_badge(self):
+        """LP-66: the logo from the LP-37 request reaches the restaurant page."""
+        self.shop.logo.save("logo.png", upload("logo.png", "PNG", "image/png"))
+
+        shop = self.client.get(self.url(self.shop)).json()["shop"]
+
+        self.assertEqual(shop["logo_display"], self.shop.logo.url)
+        self.assertTrue(shop["logo_display"].endswith(".png"))
 
     def test_a_stale_token_does_not_block_the_page(self):
         self.client.credentials(HTTP_AUTHORIZATION="Bearer expired")

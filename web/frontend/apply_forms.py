@@ -9,6 +9,8 @@ import re
 
 from django import forms
 
+from .area_field import AreaField, area_choices
+
 # The stored value is the readable word itself (Marketplace Shop.category).
 CATEGORIES = ["Bakery", "Café", "Restaurant", "Sushi", "Pastry", "Grocery", "Other"]
 
@@ -71,33 +73,20 @@ class RestaurantInfoForm(forms.Form):
 
 
 class LocationForm(forms.Form):
-    """Step 2 of 3. The map position is optional until a map pin exists."""
+    """Step 2 of 3. LP-65: the area is picked from the Lebanon places list."""
 
     address = forms.CharField(
         label="Address", min_length=5, max_length=255,
         help_text="Where customers collect their food, for example 12 Bliss Street, Beirut.",
         widget=forms.TextInput(attrs={"autocomplete": "street-address"}),
     )
-    area = forms.CharField(
-        label="Area", min_length=2, max_length=100,
-        help_text="Neighbourhood customers can filter by, for example Hamra.",
-        widget=forms.TextInput(attrs={"autocomplete": "address-level2"}),
-    )
-    latitude = forms.DecimalField(
-        label="Latitude (optional)", required=False, min_value=-90, max_value=90, max_digits=9, decimal_places=6,
-        widget=forms.TextInput(attrs={"inputmode": "decimal"}),
-    )
-    longitude = forms.DecimalField(
-        label="Longitude (optional)", required=False, min_value=-180, max_value=180, max_digits=9, decimal_places=6,
-        widget=forms.TextInput(attrs={"inputmode": "decimal"}),
-    )
+    # LP-65: no map, so the latitude/longitude boxes are gone.
+    area = AreaField()
 
-    def clean(self):
-        cleaned = super().clean()
-        latitude, longitude = cleaned.get("latitude"), cleaned.get("longitude")
-        if not self.errors and (latitude is None) != (longitude is None):
-            self.add_error("longitude", "Enter both latitude and longitude, or leave both empty.")
-        return cleaned
+    def __init__(self, *args, current_area=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        # An area typed before LP-65 stays allowed until the owner changes it.
+        self.fields["area"].choices = area_choices(current_area)
 
 
 class PhotosForm(forms.Form):
@@ -110,7 +99,8 @@ class PhotosForm(forms.Form):
     )
     logo = forms.FileField(
         label="Logo (optional)", required=False,
-        help_text="JPEG or PNG, up to 5 MB.",
+        # LP-66: logos are shown in a small circle, where long word logos are hard to read.
+        help_text="Shown in a small circle. A square logo or app icon works best. JPEG or PNG, up to 5 MB.",
         widget=forms.ClearableFileInput(attrs={"accept": "image/jpeg,image/png"}),
     )
     accept_conditions = forms.BooleanField(

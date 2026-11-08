@@ -235,7 +235,17 @@ def my_shop(access):
 
 
 @sensitive_variables("access")
-def update_shop(access, profile):
+def update_shop(access, profile, images=None):
+    """LP-8 profile edit. LP-59: a new logo or cover photo goes as multipart."""
+    if images:
+        return _call_multipart(
+            "marketplace",
+            "PATCH",
+            "/api/shops/me/",
+            fields=profile,
+            files=images,
+            token=access,
+        )
     return _call(
         "marketplace",
         "PATCH",

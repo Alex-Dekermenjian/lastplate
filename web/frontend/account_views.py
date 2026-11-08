@@ -20,7 +20,7 @@ from django.views.decorators.http import require_POST
 from . import services, tokens
 from .browse_views import lebanon_time, pickup_window
 from .listing_photos import photo_url
-from .forms import LoginForm, ShopProfileForm, SignUpForm
+from .forms import PROFILE_IMAGES, LoginForm, ShopProfileForm, SignUpForm
 from .services import ServiceUnavailable
 
 ACCOUNT_KEY = "account"
@@ -379,10 +379,11 @@ def shop_profile(request):
         return redirect("restaurant-apply")
 
     if request.method == "POST":
-        form = ShopProfileForm(request.POST)
+        form = ShopProfileForm(request.POST, request.FILES, current_area=(shop or {}).get("area"))
         if form.is_valid():
+            details, images = form.details_and_images()
             try:
-                save_status, body = authenticated_call(request, services.update_shop, form.cleaned_data)
+                save_status, body = authenticated_call(request, services.update_shop, details, images)
             except ServiceUnavailable:
                 form.add_error(None, PROFILE_UNAVAILABLE)
             else:
@@ -395,13 +396,23 @@ def shop_profile(request):
                 else:
                     form.add_error(None, PROFILE_UNAVAILABLE)
     elif status == 200:
-        form = ShopProfileForm(initial={field: shop.get(field, "") for field in ShopProfileForm.base_fields})
+        form = ShopProfileForm(
+            initial={field: shop.get(field, "") for field in ShopProfileForm.base_fields if field not in PROFILE_IMAGES},
+            current_area=shop.get("area"),
+        )
     else:
         form = None  # cannot show current values without the shop service
 
     shop = shop if status == 200 else None
     status_label = STATUS_EXPLANATIONS.get(shop["approval_status"], (shop["approval_status"], ""))[0] if shop else ""
-    return render(request, "frontend/shop_profile.html", {"form": form, "shop": shop, "status_label": status_label})
+    return render(request, "frontend/shop_profile.html", {
+        "form": form,
+        "shop": shop,
+        "status_label": status_label,
+        # LP-59: what customers see now, above the fields that change it.
+        "logo_url": photo_url((shop or {}).get("logo_display")),
+        "cover_url": photo_url((shop or {}).get("photo_display")),
+    })
 
 
 @operator_required
