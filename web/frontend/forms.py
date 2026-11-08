@@ -1,5 +1,7 @@
 from django import forms
 
+from .area_field import AreaField, area_choices
+
 
 # LP-56: the only account types anyone can sign up for. There is no admin or
 # staff choice; any other value fails validation.
@@ -94,11 +96,8 @@ class ShopProfileForm(forms.Form):
         help_text="Where customers collect their food.",
         widget=forms.TextInput(attrs={"autocomplete": "street-address"}),
     )
-    area = forms.CharField(
-        label="Area", min_length=2, max_length=100,
-        help_text="Neighbourhood customers can filter by, for example Hamra.",
-        widget=forms.TextInput(attrs={"autocomplete": "address-level2"}),
-    )
+    # LP-65: picked from the Lebanon places list.
+    area = AreaField()
     public_contact = forms.CharField(
         label="Shop phone number", max_length=32,
         help_text="Shown to customers so they can call the shop, for example +961 1 234 567. "
@@ -106,3 +105,7 @@ class ShopProfileForm(forms.Form):
         widget=forms.TextInput(attrs={"type": "tel", "inputmode": "tel", "autocomplete": "off"}),
     )
 
+    def __init__(self, *args, current_area=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        # LP-65: an area typed before the list stays allowed until changed.
+        self.fields["area"].choices = area_choices(current_area)

@@ -202,6 +202,8 @@ def restaurant_apply(request, step=1):
 
     title, form_class = STEPS[step]
     form_kwargs = {"held": state["held"]} if form_class is PhotosForm else {}
+    if form_class is LocationForm:
+        form_kwargs["current_area"] = state["values"].get("area")
 
     if request.method == "POST":
         form = form_class(request.POST, request.FILES, **form_kwargs)

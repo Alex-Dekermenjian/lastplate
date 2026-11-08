@@ -15,7 +15,7 @@ JPEG = b"\xff\xd8\xff\xe0" + b"0" * 64
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 64
 
 INFO = {"name": "Cedar Bakery", "category": "Bakery", "public_contact": "+961 1 234 567"}
-LOCATION = {"address": "12 Bliss Street, Beirut", "area": "Hamra", "latitude": "", "longitude": ""}
+LOCATION = {"address": "12 Bliss Street, Beirut", "area": "Hamra"}
 
 NEW_SHOP = {**SHOP, "approval_status": "PENDING", "application_sent": False}
 SENT_SHOP = {**SHOP, "name": "Cedar Bakery", "approval_status": "PENDING", "application_sent": True}
@@ -101,13 +101,13 @@ class StepValidationTests(ApplyTestCase):
         self.assertContains(response, 'value="Cedar Bakery"')
         self.assertContains(response, '<option value="Bakery" selected>')
 
-    def test_step_2_requires_an_address_and_area_and_checks_coordinates(self):
+    def test_step_2_requires_an_address_and_an_area_from_the_list(self):
         self.post(1, INFO)
         for data, message in (
             ({"address": ""}, "This field is required."),
-            ({"area": ""}, "This field is required."),
-            ({"latitude": "95", "longitude": "35"}, "less than or equal to 90"),
-            ({"latitude": "33.9"}, "Enter both latitude and longitude"),
+            ({"area": ""}, "Choose your area from the list."),
+            # LP-65: typed text is not an area, only a place from the list.
+            ({"area": "Hamra street"}, "Choose your area from the list."),
         ):
             with self.subTest(data=data):
                 response = self.post(2, {**LOCATION, **data})
@@ -196,6 +196,7 @@ class BackAndForthTests(ApplyTestCase):
 class SendRequestTests(ApplyTestCase):
     def test_sending_passes_every_answer_and_both_images(self):
         self.post(1, INFO)
+        # LP-65: there are no map boxes any more; coordinates sent anyway are ignored.
         self.post(2, {**LOCATION, "latitude": "33.896944", "longitude": "35.478333"})
 
         with patch_service("submit_application", return_value=(201, SENT_SHOP)) as submit:
@@ -207,8 +208,7 @@ class SendRequestTests(ApplyTestCase):
         self.assertEqual(access, "access-token-1")
         self.assertEqual(fields, {
             "name": "Cedar Bakery", "category": "Bakery", "public_contact": "+961 1 234 567",
-            "address": "12 Bliss Street, Beirut", "area": "Hamra",
-            "latitude": "33.896944", "longitude": "35.478333", "accept_conditions": "true",
+            "address": "12 Bliss Street, Beirut", "area": "Hamra", "accept_conditions": "true",
         })
         self.assertEqual(sorted(files), ["logo", "photo"])
         self.assertNotIn(apply_views.APPLICATION_KEY, self.client.session)

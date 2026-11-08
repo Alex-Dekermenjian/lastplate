@@ -64,7 +64,7 @@ class ShopProfilePageTests(WebAuthTestCase):
         with patch_service("my_shop", return_value=(200, NEW_SHOP)), patch_service("update_shop") as update_shop:
             response = self.client.post(self.url, {**PROFILE, "area": "   ", "address": "x" * 256})
         update_shop.assert_not_called()
-        self.assertContains(response, "This field is required.")
+        self.assertContains(response, "Choose your area from the list.")
         self.assertContains(response, "at most 255 characters")
         self.assertContains(response, 'value="Cedar Crumb Bakery"')
 
@@ -77,8 +77,9 @@ class ShopProfilePageTests(WebAuthTestCase):
         with patch_service("my_shop", return_value=(200, NEW_SHOP)), patch_service("update_shop") as update_shop:
             response = self.client.post(self.url, {**PROFILE, "name": "A", "address": "abc", "area": "H"})
         update_shop.assert_not_called()
-        self.assertContains(response, "at least 2 characters", count=2)
+        self.assertContains(response, "at least 2 characters", count=1)
         self.assertContains(response, "at least 5 characters")
+        self.assertContains(response, "Choose your area from the list.")
 
     def test_unusable_phone_rejected_by_marketplace_is_shown(self):
         self.sign_in_session()

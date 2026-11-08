@@ -379,7 +379,7 @@ def shop_profile(request):
         return redirect("restaurant-apply")
 
     if request.method == "POST":
-        form = ShopProfileForm(request.POST)
+        form = ShopProfileForm(request.POST, current_area=(shop or {}).get("area"))
         if form.is_valid():
             try:
                 save_status, body = authenticated_call(request, services.update_shop, form.cleaned_data)
@@ -395,7 +395,10 @@ def shop_profile(request):
                 else:
                     form.add_error(None, PROFILE_UNAVAILABLE)
     elif status == 200:
-        form = ShopProfileForm(initial={field: shop.get(field, "") for field in ShopProfileForm.base_fields})
+        form = ShopProfileForm(
+            initial={field: shop.get(field, "") for field in ShopProfileForm.base_fields},
+            current_area=shop.get("area"),
+        )
     else:
         form = None  # cannot show current values without the shop service
 
