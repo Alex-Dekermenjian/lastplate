@@ -110,7 +110,8 @@ class PhotosForm(forms.Form):
     )
     logo = forms.FileField(
         label="Logo (optional)", required=False,
-        help_text="JPEG or PNG, up to 5 MB.",
+        # LP-66: logos are shown in a small circle, where long word logos are hard to read.
+        help_text="Shown in a small circle. A square logo or app icon works best. JPEG or PNG, up to 5 MB.",
         widget=forms.ClearableFileInput(attrs={"accept": "image/jpeg,image/png"}),
     )
     accept_conditions = forms.BooleanField(
