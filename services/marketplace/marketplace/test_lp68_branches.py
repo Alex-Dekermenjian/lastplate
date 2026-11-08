@@ -250,6 +250,23 @@ class OneOfferForSeveralBranchesTests(BranchTestCase):
         self.assertEqual(created[self.second.id]["pickup_address"], "5 Sassine Square, Beirut")
         self.assertEqual(Listing.objects.filter(status=Listing.Status.DRAFT).count(), 2)
 
+    def test_changing_one_branchs_stock_leaves_the_other_alone(self):
+        created = {item["branch"]: item for item in self.post([
+            {"branch": self.main.id, "total_quantity": 5},
+            {"branch": self.second.id, "total_quantity": 4},
+        ]).json()["listings"]}
+        for item in created.values():
+            published = self.client.post(reverse("publish_listing", args=[item["id"]]), format="json")
+            self.assertEqual(published.status_code, 200, published.json())
+        url = reverse("listing_stock_adjustments", args=[created[self.main.id]["id"]])
+
+        response = self.client.post(url, {"quantity_change": -2, "reason": "Two sold in store"}, format="json")
+
+        self.assertEqual(response.status_code, 201, response.json())
+        self.assertEqual(response.json()["listing"]["total_quantity"], 3)
+        self.assertEqual(Listing.objects.get(pk=created[self.second.id]["id"]).total_quantity, 4)
+        self.assertEqual(Listing.objects.get(pk=created[self.main.id]["id"]).total_quantity, 3)
+
     def test_one_bad_quantity_creates_nothing(self):
         response = self.post([
             {"branch": self.main.id, "total_quantity": 5},
