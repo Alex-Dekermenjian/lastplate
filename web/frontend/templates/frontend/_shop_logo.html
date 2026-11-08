@@ -1,6 +1,6 @@
 {% comment %}
-LP-66: a restaurant's logo as a round badge. Any logo shape is centred and
-cropped to the circle; without a logo, the name's first letter is shown.
+LP-66: a restaurant's logo as a round badge. Any logo shape is shrunk to fit
+inside the circle on white (never cut off); without a logo, the first letter.
 Use: {% include "frontend/_shop_logo.html" with name=shop.name logo=shop.logo_url size="large" %}
 size: "small" (cards, cart) or "large" (restaurant page).
 {% endcomment %}
