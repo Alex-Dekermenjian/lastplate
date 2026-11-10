@@ -20,7 +20,7 @@ from django.views.decorators.http import require_POST
 from . import services, tokens
 from .browse_views import lebanon_time, pickup_window
 from .listing_photos import photo_url
-from .forms import PROFILE_IMAGES, LoginForm, ShopProfileForm, SignUpForm
+from .forms import PROFILE_IMAGES, LoginForm, ProfileForm, ShopProfileForm, SignUpForm
 from .services import ServiceUnavailable
 
 ACCOUNT_KEY = "account"
@@ -42,6 +42,7 @@ REGISTRATION_FAILED = "We couldn't complete your sign-up. Please check your deta
 SHOPS_ONLY = "That page is for restaurant accounts."
 CUSTOMERS_ONLY = "That page is for customer accounts."
 ADMINS_ONLY = "That page is for the LastPlate administrator."
+SESSION_ENDED = "Your session has ended. Please log in again."
 
 STATUS_EXPLANATIONS = {
     "PENDING": ("Pending review", "A LastPlate administrator checks new shops before they can publish offers. You can prepare drafts now, but you can't publish yet."),
@@ -118,6 +119,25 @@ def landing_url(account):
     return reverse("home")
 
 
+def login_with_next(request):
+    """Send the person to /login and bring them back to this same page afterwards."""
+    return redirect(f"{reverse('login')}?{urlencode({'next': request.get_full_path()})}")
+
+
+def session_ended(request, account):
+    """End the web session and ask the person to log in again.
+
+    LP-18: a customer returns to the page they were on once logged back in.
+    The view never ran, so nothing is changed: no cart change, no name change,
+    no reservation and no stock movement.
+    """
+    tokens.clear_tokens(request)
+    messages.info(request, SESSION_ENDED)
+    if account.get("role") == CUSTOMER:
+        return login_with_next(request)
+    return redirect("login")
+
+
 def role_required(role, refusal):
     """Allow signed-in accounts with this role only; never cache; end stale
     sessions cleanly. Anyone else is sent to their own landing page."""
@@ -131,12 +151,14 @@ def role_required(role, refusal):
             if account.get("role") != role:
                 messages.info(request, refusal)
                 return redirect(landing_url(account))
+            if role == CUSTOMER and tokens.refresh_token_expired(request):
+                # LP-18: the sign-in has run out even though the browser still
+                # holds a session cookie (cart, checkout and profile all land here).
+                return session_ended(request, account)
             try:
                 return view(request, *args, **kwargs)
             except SessionEnded:
-                tokens.clear_tokens(request)
-                messages.info(request, "Your session has ended. Please log in again.")
-                return redirect("login")
+                return session_ended(request, account)
 
         return never_cache(wrapper)
 
@@ -295,10 +317,31 @@ def sign_out(request):
     return redirect("login")
 
 
+NAME_NOT_SAVED = "We can't reach the account service right now, so your name was not saved. Please try again in a few minutes."
+
+
 @customer_required
 def my_account(request):
-    """A customer's own account page (LP-56). Only customers may open it."""
-    return render(request, "frontend/my_account.html", {"account": request.session[ACCOUNT_KEY]})
+    """A customer's profile (LP-56, LP-18): name and email, change the name,
+    log out. Only customers may open it."""
+    account = request.session[ACCOUNT_KEY]
+    form = ProfileForm(request.POST or None, initial={"display_name": account["display_name"]})
+    if request.method == "POST" and form.is_valid():
+        try:
+            status, body = authenticated_call(request, services.update_account, form.cleaned_data["display_name"])
+        except ServiceUnavailable:
+            form.add_error(None, NAME_NOT_SAVED)
+        else:
+            if status == 200 and isinstance(body, dict) and body.get("display_name"):
+                request.session[ACCOUNT_KEY] = {**account, "display_name": body["display_name"]}
+                messages.success(request, "Your name has been saved.")
+                return redirect("my-account")
+            if status == 400 and isinstance(body, dict):
+                for field, errors in body.items():
+                    form.add_error(field if field in form.fields else None, errors)
+            else:
+                form.add_error(None, NAME_NOT_SAVED)
+    return render(request, "frontend/my_account.html", {"account": account, "form": form})
 
 
 @operator_required

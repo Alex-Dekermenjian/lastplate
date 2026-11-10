@@ -26,7 +26,7 @@ Ownership in Marketplace always comes from the token: the caller's shop is
 | `POST /api/auth/token/` | anonymous | Email + password; one generic error for all failures. Throttles 30/min per client and 5/min per email. | `accounts/views.py` `SignInView`; `accounts/serializers.py` `SignInSerializer`; `accounts/throttles.py` `SignInEmailThrottle` |
 | `POST /api/auth/token/refresh/` | holder of a valid, non-blacklisted refresh token | — | simplejwt `TokenRefreshView` |
 | `POST /api/auth/logout/` | holder of a refresh token | Blacklists that refresh token. Access tokens stay valid until they expire (15 min). | simplejwt `TokenBlacklistView` |
-| `GET /api/users/me/` | any signed-in user (customer or operator) | Returns only the caller's own record; read-only (other methods → 405) | `accounts/views.py` `MeView`; default `IsAuthenticated` |
+| `GET /api/users/me/` | any signed-in user (customer or operator) | Returns only the caller's own record. **LP-18:** `PATCH` changes the caller's own `display_name` only; any other field (email, role, is_staff) → 400; other methods → 405 | `accounts/views.py` `MeView`; `serializers.py` `ProfileUpdateSerializer`; default `IsAuthenticated` |
 | `/admin/` | staff (Accounts admin accounts) | No models registered; login/logout/index only. Bearer tokens give no access. | Django admin (`config/urls.py`) |
 | `GET /health/live/`, `/health/ready/` | anyone | — | `config/health.py` |
 
@@ -63,7 +63,8 @@ Only `GET /health/live/` and `/health/ready/` (anyone). No business endpoints ye
 | `/signup/` (LP-56) | anonymous (signed-in → their landing page) | Creates a customer or restaurant account; any other `account_type` is rejected before Accounts is called, and no role field is ever forwarded | `account_views.py` `signup`; `forms.py` `SignUpForm` |
 | `/login/` (LP-56) | anonymous | One page for every account. Customers land on `/`, operators on `/workspace/`, staff on the Django admin with no web session kept; `next` must be same-host | `account_views.py` `login`, `landing_url` |
 | `/sign-in/`, `/register/` | anyone | Redirect to `/login/` and `/signup/`, keeping the query string | `config/urls.py` |
-| `/account/` (LP-56) | customer | The customer's own name and email | `account_views.py` `my_account` (`customer_required`) |
+| `/account/` (LP-56, LP-18) | customer | The customer's own name and email; only the name can be changed, and it is sent as `PATCH /api/users/me/` with the session's token. If the sign-in has run out, the customer goes to `/login/` and back to this page, and nothing is saved | `account_views.py` `my_account` (`customer_required`, `session_ended`) |
+| `/search/`, `/orders/` (LP-18) | customer (placeholder pages until their own cards are built) | None; no data is read. Anyone else is sent to their own landing page | `customer_views.py` `search`, `my_orders` (`customer_required`) |
 | `POST /sign-out/` | anyone (POST + CSRF only) | Revokes and deletes the session's tokens | `account_views.py` `sign_out` |
 | `/workspace/` | operator, approved restaurant | Shop and listings from Marketplace using the session's token. Owners not yet approved go to their request (LP-37) | `account_views.py` `workspace` (`operator_required`), `unapproved_shop_page` |
 | `/workspace/apply/`, `/workspace/apply/{1-3}/` (LP-37) | operator, restaurant not yet sent or approved | Three-step request; sends to `POST /api/shops/me/application/`, which creates or updates only the caller's shop as Pending | `apply_views.py` `restaurant_apply`; `apply_forms.py` |

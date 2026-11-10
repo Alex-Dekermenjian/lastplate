@@ -382,6 +382,8 @@ p { margin: 0 0 12px; }
   min-height: 56px; padding: 12px 20px; background: var(--btn); color: #FFFFFF;
   font-weight: 800; text-decoration: none;
 }
+/* LP-18: sit above the customer bottom bar when both show. */
+.cart-bar:has(+ .bottom-bar-customer) { bottom: 57px; }
 .cart-bar:hover { background: var(--btn-hover); color: #FFFFFF; }
 .cart-lines { display: grid; gap: 10px; margin: 16px 0; padding: 0; list-style: none; }
 .cart-line {

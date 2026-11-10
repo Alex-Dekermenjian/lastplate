@@ -203,6 +203,18 @@ def refresh(refresh_token):
     )
 
 
+@sensitive_variables("access")
+def update_account(access, display_name):
+    """LP-18: change the signed-in user's own display name."""
+    return _call(
+        "accounts",
+        "PATCH",
+        "/api/users/me/",
+        {"display_name": display_name},
+        token=access,
+    )
+
+
 @sensitive_variables("refresh_token")
 def sign_out(refresh_token):
     return _call(
