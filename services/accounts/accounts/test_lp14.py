@@ -84,14 +84,18 @@ class AccessTokenRejectionTests(AuthAPITestCase):
 
         self.assertEqual(self.get_me(token).status_code, 401)
 
-    def test_me_is_read_only(self):
+    def test_me_only_allows_get_and_a_display_name_patch(self):
+        """LP-18: PATCH changes the display name only; a role change is refused."""
         token = str(AccessToken.for_user(self.owner))
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
 
-        for method in ("post", "put", "patch", "delete"):
+        for method in ("post", "put", "delete"):
             with self.subTest(method):
                 response = getattr(self.client, method)(self.me, {"role": "CUSTOMER"}, format="json")
                 self.assertEqual(response.status_code, 405)
+        with self.subTest("patch"):
+            response = self.client.patch(self.me, {"role": "CUSTOMER"}, format="json")
+            self.assertEqual(response.status_code, 400)
         self.owner.refresh_from_db()
         self.assertEqual(self.owner.role, User.Role.SHOP_OPERATOR)
 

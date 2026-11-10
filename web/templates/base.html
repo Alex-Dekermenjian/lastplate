@@ -43,7 +43,7 @@
       {% endif %}
       {% block content %}{% endblock %}
     </main>
-    {% block bottom_bar %}{% endblock %}
+    {% block bottom_bar %}{% if request.session.account.role == "CUSTOMER" %}{% include "frontend/_customer_bar.html" %}{% endif %}{% endblock %}
   </div>
   {# LP-65: the searchable area list (does nothing on pages without one). #}
   <script src="{% static 'js/area-picker.js' %}" defer></script>

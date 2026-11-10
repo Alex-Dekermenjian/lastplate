@@ -1,12 +1,23 @@
-{% extends "base.html" %}
+\{% extends "base.html" %}
 
-{% block title %}My account — LastPlate{% endblock %}
+{% block title %}Profile — LastPlate{% endblock %}
 
 {% block content %}
 <section class="card">
   <h1>{{ account.display_name }}</h1>
   <p class="muted">{{ account.email }}</p>
-  <p>Orders and saved places are coming soon. For now you can browse food near you.</p>
-  <a class="button button--primary button--block" href="{% url 'browse-offers' %}">Browse available food</a>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "frontend/_form.html" %}
+    <button class="button button--primary button--block" type="submit">Save name</button>
+  </form>
+</section>
+
+<section class="card">
+  <form method="post" action="{% url 'sign-out' %}">
+    {% csrf_token %}
+    <button class="button button--secondary button--block" type="submit">Log out</button>
+  </form>
 </section>
 {% endblock %}

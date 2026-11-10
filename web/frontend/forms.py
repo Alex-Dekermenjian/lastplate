@@ -87,6 +87,15 @@ class LoginForm(forms.Form):
     remember_me = forms.BooleanField(label="Keep me logged in", required=False, initial=True)
 
 
+class ProfileForm(forms.Form):
+    """LP-18: a customer's own profile. Only the name can be changed here."""
+
+    display_name = forms.CharField(
+        label="Your name", max_length=150,
+        widget=forms.TextInput(attrs={"autocomplete": "name"}),
+    )
+
+
 class ShopProfileForm(forms.Form):
     """Length rules mirror Marketplace for quick feedback; Marketplace is the
     authority and its errors (including phone-number checks) are shown too."""
