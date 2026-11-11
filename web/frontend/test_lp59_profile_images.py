@@ -38,8 +38,8 @@ class ProfileImagesTests(WebAuthTestCase):
             page = self.client.get(self.url)
 
         self.assertContains(page, 'enctype="multipart/form-data"')
-        self.assertContains(page, 'src="http://127.0.0.1:8002/media/shop_logos/old.png"')
-        self.assertContains(page, 'src="http://127.0.0.1:8002/media/shop_photos/old.jpg"')
+        self.assertContains(page, 'src="/media/shop_logos/old.png"')
+        self.assertContains(page, 'src="/media/shop_photos/old.jpg"')
         for field in ('name="category"', 'name="logo"', 'name="photo"'):
             self.assertContains(page, field)
         self.assertContains(page, '<option value="Bakery" selected>Bakery</option>', html=True)
