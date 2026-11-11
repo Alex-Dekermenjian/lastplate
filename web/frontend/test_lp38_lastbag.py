@@ -23,7 +23,6 @@ BAG_POST = {
     "discounted_price": "5",
     "allergens": "Gluten, milk, sesame",
     "total_quantity": "3",
-    "pickup_address": "12 Bliss Street, Beirut",
     "pickup_start": "2026-11-07T19:00",
     "pickup_end": "2026-11-07T20:00",
 }

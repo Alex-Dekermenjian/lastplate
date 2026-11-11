@@ -27,7 +27,9 @@
     {% endfor %}
 
     {% for field in form %}
-      {% if field.name == "accept_conditions" %}
+      {% if field.name|slice:":6" == "other_" %}
+        {# LP-68: extra branches are shown below, grouped. #}
+      {% elif field.name == "accept_conditions" %}
         <div class="check check--terms{% if field.errors %} check--error{% endif %}">
           {{ field }}
           <label for="{{ field.id_for_label }}">{{ field.label }}</label>
@@ -52,6 +54,23 @@
         </div>
       {% endif %}
     {% endfor %}
+
+    {% if step == 2 %}
+      {% for group in form.other_groups %}
+        <details class="apply-branch"{% if group.open %} open{% endif %}>
+          <summary>+ Add {% if group.number == 2 %}another{% else %}a third{% endif %} branch (optional)</summary>
+          <p class="help">Each branch works like its own store: its own pickup address, offers and quantities.</p>
+          {% for field in group.fields %}
+            <div class="field{% if field.errors %} field--error{% endif %}">
+              <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {% if field.help_text %}<p class="help" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>{% endif %}
+              {{ field }}
+              {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+          {% endfor %}
+        </details>
+      {% endfor %}
+    {% endif %}
   </form>
 </section>
 {% endblock %}

@@ -19,12 +19,29 @@
         <p>{{ shop.rejection_reason }}</p>
       </div>
     {% endif %}
+    {# LP-45: fix what was wrong, then ask again. #}
+    <div class="card request-status__card">
+      <h2>Fix it and ask again</h2>
+      <ol class="review-again__steps">
+        <li><a href="{% url 'shop-profile' %}">Edit your restaurant's details</a> to fix what the team asked for.</li>
+        <li>Tell the team what you changed, then ask for review again.</li>
+      </ol>
+      <form method="post" action="{% url 'request-review-again' %}">
+        {% csrf_token %}
+        <div class="field">
+          <label for="review-note">What did you change? (optional)</label>
+          <textarea id="review-note" name="note" rows="3" maxlength="1000" class="review-again__note"
+                    placeholder="e.g. I added our real phone number."></textarea>
+        </div>
+        <button class="button button--primary button--block" type="submit">Request review again</button>
+      </form>
+    </div>
     <p class="muted">If you think this is a mistake, please contact the LastPlate team.</p>
   {% else %}
     <div class="request-status__icon" aria-hidden="true">
       <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
     </div>
-    <h1>Request sent</h1>
+    <h1>Request sent{% if shop.review_requests %} again{% endif %}</h1>
     <p class="muted">The LastPlate team is reviewing {{ shop.name }}. Log in again later to see if you're approved.</p>
     <div class="card request-status__card">
       <h2>What happens next</h2>

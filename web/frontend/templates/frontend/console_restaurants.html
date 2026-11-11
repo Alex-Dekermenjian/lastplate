@@ -13,6 +13,17 @@
     {% endfor %}
   </nav>
 
+  {% if tab == "pending" %}
+    {# LP-45 #}
+    <p class="console-filter">
+      {% if sent_again_only %}
+        Showing restaurants that asked for review again. <a href="?tab=pending">Show all pending</a>
+      {% else %}
+        <a href="?tab=pending&amp;again=1">Show only restaurants that asked again</a>
+      {% endif %}
+    </p>
+  {% endif %}
+
   {% if unavailable %}
     <p class="notice notice--warning" role="alert">We can't load restaurants right now. Please refresh in a few minutes.</p>
   {% elif not shops %}
@@ -27,6 +38,9 @@
               {{ shop.area|default:"No area yet" }}
               {% if shop.applied_at %}· applied {{ shop.applied_at|date:"j M, H:i" }}{% endif %}
             </span>
+            {% if tab == "pending" and shop.review_requests %}
+              <span class="badge">Asked again{% if shop.review_requests > 1 %} ×{{ shop.review_requests }}{% endif %}</span>
+            {% endif %}
             {% if tab == "pending" and not shop.profile_complete %}
               <span class="badge">Profile incomplete</span>
             {% endif %}

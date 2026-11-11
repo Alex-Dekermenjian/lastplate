@@ -150,7 +150,7 @@ class SignedInOperatorTests(ApprovedShopMixin, WebAuthTestCase):
             self.client.post(reverse("create-listing"), forged)
             self.client.post(reverse("edit-listing", args=[42]), forged)
             self.client.post(reverse("shop-profile"), {
-                "name": "Cedar", "address": "Main street 1", "area": "Hamra",
+                "name": "Cedar", "category": "Bakery", "address": "Main street 1", "area": "Hamra",
                 "public_contact": "+961 1 234 567", "approval_status": "APPROVED",
                 "operator_user_id": "1", "reviewed_by": "1",
             })

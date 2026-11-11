@@ -6,11 +6,26 @@
 <p class="eyebrow">Save food, save money</p>
 <h1>LastPlate</h1>
 <p class="lead">Surplus food from local shops, at a lower price, collected in person.</p>
-<p>
-  <a class="button button--primary" href="{% url 'browse-offers' %}">Browse available food</a>
-</p>
-
 <p class="muted">Run a restaurant? <a href="{% url 'signup' %}">Sign up</a> to publish your surplus food.</p>
+
+{# LP-69: the food is right here, with a search by place and by words. #}
+<section class="home-food" aria-labelledby="home-food-title">
+  <h2 id="home-food-title" class="home-food__title">Food left near you</h2>
+  {% if unavailable %}
+    <p class="notice notice--warning" role="alert">{{ unavailable }}</p>
+  {% else %}
+    {% include "frontend/_food_search.html" %}
+    {% if not offers and not searching %}
+      <p class="notice notice--info">There's no food available right now. Check back later today.</p>
+    {% elif offers %}
+      {% if not searching %}<p class="offer-count">{{ offers|length }} offer{{ offers|length|pluralize }} available</p>{% endif %}
+      {% include "frontend/_offer_grid.html" %}
+    {% endif %}
+  {% endif %}
+  <p>
+    <a class="button button--secondary button--block" href="{% url 'browse-offers' %}">How it works and all available food</a>
+  </p>
+</section>
 
 <details class="dev-status">
   <summary>Service status (for developers)</summary>

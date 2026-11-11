@@ -16,6 +16,11 @@ urlpatterns = [
         views.ShopCreateView.as_view(),
         name="shop-create",
     ),
+    # LP-68: the owner's branches
+    path("shops/me/branches/", views.my_branches, name="my-branches"),
+    # LP-45: a rejected restaurant asks for review again.
+    path("shops/me/review-again", views.review_again, name="shop-review-again"),
+    path("shops/me/branches/<int:pk>/", views.my_branch, name="my-branch"),
     # LP-37: the owner sends the request to join LastPlate
     path(
         "shops/me/application/",
@@ -59,6 +64,20 @@ urlpatterns = [
         "listings/<int:pk>/photo",
         views.upload_listing_photo,
         name="upload_listing_photo",
+    ),
+
+    # LP-58: the owner deletes one of their drafts.
+    path(
+        "listings/<int:pk>/delete",
+        views.delete_listing_draft,
+        name="listing_delete_draft",
+    ),
+
+    # LP-58: the owner takes every free unit off sale.
+    path(
+        "listings/<int:pk>/sold-out",
+        views.mark_listing_sold_out,
+        name="listing_sold_out",
     ),
 
     # LP-12: Stock adjustments (POST) and their history (GET)

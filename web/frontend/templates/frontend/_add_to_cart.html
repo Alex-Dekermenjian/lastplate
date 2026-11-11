@@ -1,5 +1,5 @@
 {% if can_add %}
-  <form method="post" action="{% url 'cart-add' offer.id %}?back={{ request.path|urlencode }}">
+  <form method="post" action="{% url 'cart-add' offer.id %}?back={{ request.get_full_path|urlencode }}">
     {% csrf_token %}
     <button class="button button--primary" type="submit">Add<span class="visually-hidden"> {{ offer.title }} to cart</span></button>
   </form>

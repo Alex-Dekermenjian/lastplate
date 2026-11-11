@@ -10,12 +10,14 @@ from django.views.generic import RedirectView
 
 from frontend import (
     account_views,
+    branch_views,
     browse_views,
     cart,
     console_views,
     health,
     listing_photos,
     listing_views,
+    offer_actions,
     views,
 )
 
@@ -58,6 +60,10 @@ urlpatterns = [
     path("workspace/", account_views.workspace, name="workspace"),
     path("workspace/finish-setup/", account_views.finish_setup, name="finish-setup"),
     path("workspace/profile/", account_views.shop_profile, name="shop-profile"),
+    # LP-68: the restaurant's branches (up to 3).
+    path("workspace/branches/", branch_views.branches, name="branches"),
+    path("workspace/branches/<int:branch_id>/edit/", branch_views.edit_branch, name="branch-edit"),
+    path("workspace/branches/<int:branch_id>/remove/", branch_views.remove_branch, name="branch-remove"),
 
     # LP-10 and LP-11: Listing management.
     path(
@@ -78,6 +84,20 @@ urlpatterns = [
         name="publish-listing",
     ),
 
+    # LP-58: Mark sold out and Delete draft, from the offer list.
+    path(
+        "workspace/listings/<int:listing_id>/sold-out/",
+        offer_actions.mark_sold_out,
+        name="mark-sold-out",
+    ),
+    path(
+        "workspace/listings/<int:listing_id>/delete/",
+        offer_actions.delete_draft,
+        name="delete-draft",
+    ),
+    # LP-58: /business is the restaurant's area; it is the workspace.
+    path("business/", RedirectView.as_view(pattern_name="workspace", query_string=True), name="business"),
+
     # LP-12: Stock adjustments.
     path(
         "workspace/listings/<int:listing_id>/stock/",
@@ -95,9 +115,12 @@ urlpatterns = [
 # LP-37: the restaurant's three-step request and its status. Kept in its own
 # block so other cards can add routes above without touching these lines.
 from frontend import apply_views  # noqa: E402
+from frontend import review_again_views  # noqa: E402
 
 urlpatterns += [
     path("workspace/apply/", apply_views.restaurant_apply, name="restaurant-apply"),
     path("workspace/apply/<int:step>/", apply_views.restaurant_apply, name="restaurant-apply"),
     path("workspace/request/", apply_views.request_status, name="request-status"),
+    # LP-45: a rejected restaurant asks for review again.
+    path("workspace/request/review-again/", review_again_views.review_again, name="request-review-again"),
 ]

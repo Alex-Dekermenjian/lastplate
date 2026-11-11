@@ -16,6 +16,7 @@ from django.views.decorators.http import require_POST
 from . import services
 from .account_views import customer_required
 from .browse_views import offer_for_display
+from .listing_photos import photo_url
 from .services import ServiceUnavailable
 
 CART_KEY = "cart"
@@ -24,7 +25,8 @@ NO_LONGER_AVAILABLE = "Sorry, that food is no longer available."
 
 
 def empty_cart():
-    return {"shop_id": None, "shop_name": "", "lines": {}, "prices": {}, "titles": {}}
+    return {"shop_id": None, "shop_name": "", "shop_logo": "", "branch_id": None, "branch_name": "",
+            "lines": {}, "prices": {}, "titles": {}}
 
 
 def get_cart(request):
@@ -41,6 +43,12 @@ def save_cart(request, cart):
         request.session[CART_KEY] = cart
     else:
         request.session.pop(CART_KEY, None)
+
+
+def place_name(cart):
+    """ "ZWZ · Hamra" for a restaurant with several branches, else "ZWZ"."""
+    name = cart.get("shop_name") or ""
+    return f"{name} · {cart['branch_name']}" if cart.get("branch_name") else name
 
 
 def money(value):
@@ -90,12 +98,16 @@ def add_to_cart(request, listing_id):
 
     cart = get_cart(request)
     shop = offer["shop"]
-    if cart["lines"] and cart["shop_id"] != shop.get("id"):
+    # LP-68: a cart holds food from one branch. A cart saved before branches
+    # (no branch) still only needs the same restaurant.
+    branch = offer.get("branch") if isinstance(offer.get("branch"), dict) else {}
+    other_branch = cart.get("branch_id") is not None and branch.get("id") is not None and cart["branch_id"] != branch["id"]
+    if cart["lines"] and (cart["shop_id"] != shop.get("id") or other_branch):
         if request.POST.get("start_new") != "1":
             # One restaurant per cart: ask before clearing the other one.
             return render(request, "frontend/cart_switch.html", {
                 "offer": offer_for_display(offer),
-                "current_shop": cart["shop_name"],
+                "current_shop": place_name(cart),
                 "back": back_url(request, ""),
             })
         cart = empty_cart()
@@ -106,7 +118,12 @@ def add_to_cart(request, listing_id):
     if wanted > free:
         messages.info(request, f"Only {free} left of {offer.get('title') or 'this food'}.")
         wanted = free
-    cart.update(shop_id=shop.get("id"), shop_name=shop.get("name") or "")
+    cart.update(
+        shop_id=shop.get("id"), shop_name=shop.get("name") or "", shop_logo=shop.get("logo_display") or "",
+        branch_id=branch.get("id"),
+        # Named in the cart only when the restaurant has several branches.
+        branch_name=(branch.get("name") or "") if (shop.get("branch_count") or 1) > 1 else "",
+    )
     cart["lines"][key] = wanted
     cart["prices"][key] = str(offer.get("discounted_price"))
     cart.setdefault("titles", {})[key] = offer.get("title") or ""
@@ -186,6 +203,8 @@ def view_cart(request):
 
     return render(request, "frontend/cart.html", {
         "cart": cart,
+        # LP-66: carts saved before the logo was kept simply show the initial.
+        "shop_logo": photo_url(cart.get("shop_logo")),
         "lines": lines,
         "total": total,
         "unavailable": unavailable,

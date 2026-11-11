@@ -20,7 +20,7 @@ from django.views.decorators.http import require_POST
 from . import services, tokens
 from .browse_views import lebanon_time, pickup_window
 from .listing_photos import photo_url
-from .forms import LoginForm, ShopProfileForm, SignUpForm
+from .forms import PROFILE_IMAGES, LoginForm, ShopProfileForm, SignUpForm
 from .services import ServiceUnavailable
 
 ACCOUNT_KEY = "account"
@@ -74,13 +74,51 @@ def listing_summary(listing, shop):
         elif free is not None and free <= 0:
             hidden_because = "it has sold out. Add stock to show it again."
 
+    # LP-68: which branch the offer is at, when the restaurant has several.
+    branch = listing.get("branch_details") if isinstance(listing.get("branch_details"), dict) else {}
+    several_branches = len(shop.get("branches") or []) > 1
+
     return {
+        "branch_name": branch.get("name", "") if several_branches else "",
         "status_label": LISTING_STATUS_LABELS.get(listing.get("status"), listing.get("status")),
         "pickup_window": pickup_window(start, end) if start and end else "",
         "pickup_ended": pickup_ended,
         "hidden_because": hidden_because,
         "visible_to_customers": published and not hidden_because,
+        # LP-58: which tab of the offer list it belongs to.
+        "tab": offer_tab(listing.get("status"), pickup_ended),
+        "can_mark_sold_out": published and not pickup_ended and (free is None or free > 0),
     }
+
+
+# LP-58: the owner's offers in three tabs.
+OFFER_TABS = [
+    ("live", "Live"),
+    ("drafts", "Drafts"),
+    ("ended", "Ended"),
+]
+
+
+def offer_tab(status, pickup_ended):
+    if status == "DRAFT":
+        return "drafts"
+    if status == "PUBLISHED" and not pickup_ended:
+        return "live"
+    return "ended"
+
+
+def offer_tabs(listings, wanted):
+    """The tabs with their counts, and which one is open: the one asked
+    for, else Live when there is something live, else Drafts."""
+    counts = {key: 0 for key, _ in OFFER_TABS}
+    for listing in listings:
+        counts[listing["tab"]] += 1
+    if wanted not in counts:
+        wanted = "live" if counts["live"] or not counts["drafts"] else "drafts"
+    return [
+        {"key": key, "label": label, "count": counts[key], "active": key == wanted}
+        for key, label in OFFER_TABS
+    ], wanted
 
 
 def unapproved_shop_page(shop):
@@ -350,6 +388,8 @@ def workspace(request):
             for listing in listings
         ]
 
+    tabs, active_tab = offer_tabs(listings, request.GET.get("tab"))
+
     return render(
         request,
         "frontend/workspace.html",
@@ -359,6 +399,8 @@ def workspace(request):
             "status_explanation": explanation,
             "listings": listings,
             "listings_unavailable": listings_unavailable,
+            "offer_tabs": tabs,
+            "active_tab": active_tab,
         },
     )
 
@@ -379,10 +421,11 @@ def shop_profile(request):
         return redirect("restaurant-apply")
 
     if request.method == "POST":
-        form = ShopProfileForm(request.POST)
+        form = ShopProfileForm(request.POST, request.FILES, current_area=(shop or {}).get("area"))
         if form.is_valid():
+            details, images = form.details_and_images()
             try:
-                save_status, body = authenticated_call(request, services.update_shop, form.cleaned_data)
+                save_status, body = authenticated_call(request, services.update_shop, details, images)
             except ServiceUnavailable:
                 form.add_error(None, PROFILE_UNAVAILABLE)
             else:
@@ -395,13 +438,23 @@ def shop_profile(request):
                 else:
                     form.add_error(None, PROFILE_UNAVAILABLE)
     elif status == 200:
-        form = ShopProfileForm(initial={field: shop.get(field, "") for field in ShopProfileForm.base_fields})
+        form = ShopProfileForm(
+            initial={field: shop.get(field, "") for field in ShopProfileForm.base_fields if field not in PROFILE_IMAGES},
+            current_area=shop.get("area"),
+        )
     else:
         form = None  # cannot show current values without the shop service
 
     shop = shop if status == 200 else None
     status_label = STATUS_EXPLANATIONS.get(shop["approval_status"], (shop["approval_status"], ""))[0] if shop else ""
-    return render(request, "frontend/shop_profile.html", {"form": form, "shop": shop, "status_label": status_label})
+    return render(request, "frontend/shop_profile.html", {
+        "form": form,
+        "shop": shop,
+        "status_label": status_label,
+        # LP-59: what customers see now, above the fields that change it.
+        "logo_url": photo_url((shop or {}).get("logo_display")),
+        "cover_url": photo_url((shop or {}).get("photo_display")),
+    })
 
 
 @operator_required

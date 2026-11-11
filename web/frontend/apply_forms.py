@@ -9,6 +9,8 @@ import re
 
 from django import forms
 
+from .area_field import AreaField, area_choices
+
 # The stored value is the readable word itself (Marketplace Shop.category).
 CATEGORIES = ["Bakery", "Café", "Restaurant", "Sushi", "Pastry", "Grocery", "Other"]
 
@@ -71,33 +73,76 @@ class RestaurantInfoForm(forms.Form):
 
 
 class LocationForm(forms.Form):
-    """Step 2 of 3. The map position is optional until a map pin exists."""
+    """Step 2 of 3. LP-65: the area is picked from the Lebanon places list."""
 
     address = forms.CharField(
         label="Address", min_length=5, max_length=255,
         help_text="Where customers collect their food, for example 12 Bliss Street, Beirut.",
         widget=forms.TextInput(attrs={"autocomplete": "street-address"}),
     )
-    area = forms.CharField(
-        label="Area", min_length=2, max_length=100,
-        help_text="Neighbourhood customers can filter by, for example Hamra.",
-        widget=forms.TextInput(attrs={"autocomplete": "address-level2"}),
+    # LP-65: no map, so the latitude/longitude boxes are gone.
+    area = AreaField()
+    # LP-68: this is the first branch; up to two more can be added below.
+    branch_name = forms.CharField(
+        label="Branch name (optional)", required=False, max_length=100,
+        help_text="Customers see it after your restaurant's name. Leave empty to use your area, for example Hamra.",
     )
-    latitude = forms.DecimalField(
-        label="Latitude (optional)", required=False, min_value=-90, max_value=90, max_digits=9, decimal_places=6,
-        widget=forms.TextInput(attrs={"inputmode": "decimal"}),
-    )
-    longitude = forms.DecimalField(
-        label="Longitude (optional)", required=False, min_value=-180, max_value=180, max_digits=9, decimal_places=6,
-        widget=forms.TextInput(attrs={"inputmode": "decimal"}),
-    )
+
+    def __init__(self, *args, current_area=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        # An area typed before LP-65 stays allowed until the owner changes it.
+        self.fields["area"].choices = area_choices(current_area)
 
     def clean(self):
         cleaned = super().clean()
-        latitude, longitude = cleaned.get("latitude"), cleaned.get("longitude")
-        if not self.errors and (latitude is None) != (longitude is None):
-            self.add_error("longitude", "Enter both latitude and longitude, or leave both empty.")
+        names = [(cleaned.get("branch_name") or cleaned.get("area") or "").strip().lower()]
+        for number in range(1, OTHER_BRANCHES + 1):
+            values = {part: (cleaned.get(f"other_{number}_{part}") or "").strip() for part in BRANCH_PARTS}
+            if any(values.values()) and not all(values.values()):
+                for part, value in values.items():
+                    if not value:
+                        self.add_error(f"other_{number}_{part}", "Fill in the name, address and area, or leave all three empty.")
+            elif all(values.values()):
+                if values["name"].lower() in names:
+                    self.add_error(f"other_{number}_name", "Give each branch a different name.")
+                names.append(values["name"].lower())
         return cleaned
+
+    def other_groups(self):
+        """The extra branches, for the template: a heading and three fields each."""
+        groups = []
+        for number in range(1, OTHER_BRANCHES + 1):
+            fields = [self[f"other_{number}_{part}"] for part in BRANCH_PARTS]
+            groups.append({
+                "number": number + 1,
+                "fields": fields,
+                "open": any(field.value() for field in fields) or any(field.errors for field in fields),
+            })
+        return groups
+
+
+# LP-68: up to two more branches (three in total), each all-or-nothing.
+OTHER_BRANCHES = 2
+BRANCH_PARTS = ("name", "address", "area")
+for _number in range(1, OTHER_BRANCHES + 1):
+    LocationForm.base_fields[f"other_{_number}_name"] = forms.CharField(
+        label="Branch name", required=False, min_length=2, max_length=100,
+        help_text="For example Achrafieh.",
+    )
+    LocationForm.base_fields[f"other_{_number}_address"] = forms.CharField(
+        label="Street address", required=False, min_length=5, max_length=255,
+    )
+    LocationForm.base_fields[f"other_{_number}_area"] = AreaField(required=False)
+
+
+def other_branches(values):
+    """The extra branches an owner filled in, from the saved step answers."""
+    branches = []
+    for number in range(1, OTHER_BRANCHES + 1):
+        branch = {part: (values.get(f"other_{number}_{part}") or "").strip() for part in BRANCH_PARTS}
+        if all(branch.values()):
+            branches.append(branch)
+    return branches
 
 
 class PhotosForm(forms.Form):
@@ -110,7 +155,8 @@ class PhotosForm(forms.Form):
     )
     logo = forms.FileField(
         label="Logo (optional)", required=False,
-        help_text="JPEG or PNG, up to 5 MB.",
+        # LP-66: logos are shown in a small circle, where long word logos are hard to read.
+        help_text="Shown in a small circle. A square logo or app icon works best. JPEG or PNG, up to 5 MB.",
         widget=forms.ClearableFileInput(attrs={"accept": "image/jpeg,image/png"}),
     )
     accept_conditions = forms.BooleanField(

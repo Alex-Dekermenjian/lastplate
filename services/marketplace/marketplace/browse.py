@@ -10,6 +10,7 @@ Shop details come from one extra query for the whole page, never one query
 per listing.
 """
 
+from django.db.models import Count, Q
 from django.utils import timezone
 
 from .models import Listing, Shop
@@ -23,7 +24,8 @@ def _approved_shops():
 
 
 def _open_listings(now):
-    return Listing.objects.filter(
+    # LP-68: each offer's branch comes in the same query.
+    return Listing.objects.select_related("branch").filter(
         status=Listing.Status.PUBLISHED,
         pickup_end__gt=now,
         shop_id__in=_approved_shops().values("id"),
@@ -36,7 +38,10 @@ def _with_shops(listings):
     The shop is re-checked here, so a shop rejected between the two queries
     is still left out.
     """
-    shops = _approved_shops().in_bulk({listing.shop_id for listing in listings})
+    # LP-68: and how many branches each has, in the same query.
+    shops = _approved_shops().annotate(
+        active_branch_count=Count("branches", filter=Q(branches__removed_at__isnull=True)),
+    ).in_bulk({listing.shop_id for listing in listings})
 
     return [
         (listing, shops[listing.shop_id])

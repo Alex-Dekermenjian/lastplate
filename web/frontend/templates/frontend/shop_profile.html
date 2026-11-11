@@ -9,8 +9,23 @@
     <p class="muted">Status: <span class="status status--{{ shop.approval_status }}">{{ status_label }}</span></p>
   {% endif %}
   {% if form %}
-    <p class="muted">These details are shown to customers. Editing them does not change your approval status.</p>
-    <form method="post" novalidate>
+    <p class="muted">These details are shown to customers. Editing them does not change your approval status or your offers.</p>
+    {# LP-59: what customers see now; the logo and cover photo fields below replace them. #}
+    <div class="profile-preview" aria-label="How customers see your restaurant">
+      {% if cover_url %}
+        <img class="profile-preview__cover" src="{{ cover_url }}" alt="Your current cover photo">
+      {% else %}
+        <div class="profile-preview__cover profile-preview__cover--empty">No cover photo yet</div>
+      {% endif %}
+      <div class="profile-preview__name">
+        {% include "frontend/_shop_logo.html" with name=shop.name logo=logo_url size="large" %}
+        <div>
+          {% if shop.category %}<p class="eyebrow">{{ shop.category }}</p>{% endif %}
+          <strong>{{ shop.name }}</strong>
+        </div>
+      </div>
+    </div>
+    <form method="post" enctype="multipart/form-data" novalidate>
       {% csrf_token %}
       {% include "frontend/_form.html" %}
       <button class="button button--primary button--block" type="submit">Save profile</button>

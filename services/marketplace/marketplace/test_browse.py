@@ -140,6 +140,8 @@ class BrowseListingsTests(MarketplaceTestCase):
                 "category": "Other",
                 "photo_display": None,
                 "logo_display": None,
+                # LP-68: every restaurant has at least its main branch.
+                "branch_count": 1,
             },
         )
 

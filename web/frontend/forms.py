@@ -1,5 +1,11 @@
 from django import forms
 
+from .apply_forms import CATEGORIES, check_image
+from .area_field import AreaField, area_choices
+
+# LP-59: the images an owner can replace after approval.
+PROFILE_IMAGES = ("logo", "photo")
+
 
 # LP-56: the only account types anyone can sign up for. There is no admin or
 # staff choice; any other value fails validation.
@@ -85,6 +91,8 @@ class ShopProfileForm(forms.Form):
     """Length rules mirror Marketplace for quick feedback; Marketplace is the
     authority and its errors (including phone-number checks) are shown too."""
 
+    field_order = ["name", "category", "address", "area", "public_contact", "logo", "photo"]
+
     name = forms.CharField(
         label="Shop name", min_length=2, max_length=150,
         widget=forms.TextInput(attrs={"autocomplete": "organization"}),
@@ -94,11 +102,15 @@ class ShopProfileForm(forms.Form):
         help_text="Where customers collect their food.",
         widget=forms.TextInput(attrs={"autocomplete": "street-address"}),
     )
-    area = forms.CharField(
-        label="Area", min_length=2, max_length=100,
-        help_text="Neighbourhood customers can filter by, for example Hamra.",
-        widget=forms.TextInput(attrs={"autocomplete": "address-level2"}),
+    # LP-59: owners can change their category, logo and cover photo after
+    # approval too. An empty file box keeps the current image.
+    category = forms.ChoiceField(
+        label="Category",
+        choices=[(value, value) for value in CATEGORIES],
+        error_messages={"invalid_choice": "Choose a category from the list."},
     )
+    # LP-65: picked from the Lebanon places list.
+    area = AreaField()
     public_contact = forms.CharField(
         label="Shop phone number", max_length=32,
         help_text="Shown to customers so they can call the shop, for example +961 1 234 567. "
@@ -106,3 +118,37 @@ class ShopProfileForm(forms.Form):
         widget=forms.TextInput(attrs={"type": "tel", "inputmode": "tel", "autocomplete": "off"}),
     )
 
+    logo = forms.FileField(
+        label="Logo", required=False,
+        help_text="Leave empty to keep your current logo. A square logo or app icon works best. JPEG or PNG, up to 5 MB.",
+        widget=forms.FileInput(attrs={"accept": "image/jpeg,image/png"}),
+    )
+    photo = forms.FileField(
+        label="Cover photo", required=False,
+        help_text="Leave empty to keep your current cover photo. JPEG or PNG, up to 5 MB.",
+        widget=forms.FileInput(attrs={"accept": "image/jpeg,image/png"}),
+    )
+
+    def __init__(self, *args, current_area=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        # LP-65: an area typed before the list stays allowed until changed.
+        self.fields["area"].choices = area_choices(current_area)
+
+    def clean_logo(self):
+        return self._checked_image("logo")
+
+    def clean_photo(self):
+        return self._checked_image("photo")
+
+    def _checked_image(self, name):
+        image = self.cleaned_data.get(name)
+        if image:
+            check_image(image)
+        return image
+
+    def details_and_images(self):
+        """(text fields, {image field: new file}) for Marketplace; images not
+        chosen are left out, so the current ones stay."""
+        details = {name: value for name, value in self.cleaned_data.items() if name not in PROFILE_IMAGES}
+        images = {name: self.cleaned_data[name] for name in PROFILE_IMAGES if self.cleaned_data.get(name)}
+        return details, images

@@ -406,3 +406,175 @@ p { margin: 0 0 12px; }
 }
 .cart-total { display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 16px; font-size: 18px; }
 .cart-total strong { font-size: 24px; }
+
+/* LP-66: a restaurant's logo as a round badge. Any shape is cropped to the
+   circle without stretching; with no logo, the first letter is shown. */
+.shop-logo {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  overflow: hidden; border-radius: 50%; border: 2px solid var(--surface);
+  background: var(--tint); color: var(--btn); font-weight: 800; line-height: 1;
+  vertical-align: middle; box-shadow: 0 0 0 1px var(--border);
+}
+/* Logos are tidied into square badge images when uploaded (Marketplace
+   logo_processing), so the whole logo always fits the circle. contain keeps
+   any older, untidied logo whole too. */
+.shop-logo:has(.shop-logo__image) { background: #FFFFFF; }
+.shop-logo__image { width: 100%; height: 100%; object-fit: contain; display: block; }
+.shop-logo--small { width: 40px; height: 40px; font-size: 18px; margin-right: 10px; }
+.shop-logo--large { width: 80px; height: 80px; font-size: 34px; border-width: 3px; }
+.restaurant__heading { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+.restaurant__heading h1 { margin: 0; }
+.restaurant__heading .eyebrow { margin: 0 0 2px; }
+.offer-card__shop, .shop-name { display: flex; align-items: center; flex-wrap: wrap; }
+
+/* LP-65: the area search box and its list of Lebanon places. */
+.area-combo { position: relative; }
+.area-combo__select {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.area-combo__list {
+  position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px);
+  max-height: 280px; overflow-y: auto; margin: 0; padding: 6px 0; list-style: none;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-input);
+  box-shadow: var(--shadow);
+}
+.area-combo__group {
+  padding: 10px 14px 4px; font-size: 12px; font-weight: 800; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--text-2);
+}
+.area-combo__option { min-height: 44px; display: flex; align-items: center; padding: 0 14px; cursor: pointer; }
+.area-combo__option:hover, .area-combo__option.is-active { background: var(--tint); color: var(--btn); }
+.area-combo__option[aria-selected="true"] { font-weight: 800; }
+.area-combo__empty { padding: 12px 14px; color: var(--text-2); }
+
+/* LP-59: the owner's view of their restaurant above the profile form. */
+.profile-preview { margin: 16px 0 20px; border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.profile-preview__cover { display: block; width: 100%; height: 140px; object-fit: cover; }
+.profile-preview__cover--empty {
+  display: flex; align-items: center; justify-content: center;
+  background: var(--tint); color: var(--text-2); font-weight: 700;
+}
+.profile-preview__name { display: flex; align-items: center; gap: 12px; padding: 0 16px 14px; margin-top: -32px; }
+.profile-preview__name .eyebrow { margin: 28px 0 0; }
+
+/* LP-68: choosing branches (and a quantity for each) when posting food. */
+.branch-picker { border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; margin: 0 0 16px; }
+.branch-picker legend { font-weight: 800; padding: 0 6px; }
+.branch-picker__row {
+  display: grid; grid-template-columns: auto 1fr 110px; align-items: center; gap: 10px;
+  padding: 10px 0; border-top: 1px solid var(--border);
+}
+.branch-picker__row:first-of-type { border-top: 0; }
+.branch-picker__row input[type="checkbox"] { width: 22px; height: 22px; }
+.branch-picker__name { display: grid; gap: 2px; margin: 0; }
+.branch-picker__qty { display: grid; gap: 2px; margin: 0; font-size: 13px; font-weight: 700; color: var(--text-2); }
+.branch-picker__qty input { min-height: 44px; }
+.pickup-at { padding: 12px 14px; background: var(--tint); border-radius: 12px; }
+
+/* LP-68: the Branches page and branch labels. */
+.branch-list { display: grid; gap: 12px; margin: 16px 0; padding: 0; list-style: none; }
+.branch-card { border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; }
+.branch-card__name { margin: 0; font-size: 20px; }
+.branch-card__counts { margin: 4px 0 0; font-size: 14px; color: var(--text-2); font-weight: 700; }
+.branch-card__edit { margin: 10px 0 6px; }
+.branch-card__edit summary, .branch-add summary { cursor: pointer; font-weight: 700; color: var(--btn); min-height: 44px; display: flex; align-items: center; }
+.branch-card__edit form, .branch-add form { margin-top: 12px; }
+.branch-add { margin-top: 8px; }
+.branch-add summary { justify-content: center; list-style: none; }
+.branch-add summary::-webkit-details-marker { display: none; }
+.branch-tag { margin: 2px 0 6px; font-weight: 800; color: var(--btn); }
+.apply-branch { border: 1px solid var(--border); border-radius: 16px; padding: 4px 14px; margin: 0 0 14px; }
+.apply-branch summary { cursor: pointer; font-weight: 800; color: var(--btn); min-height: 44px; display: flex; align-items: center; }
+
+/* LP-68: branch tabs on a restaurant's page. */
+.branch-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 6px; }
+.branch-tabs__tab {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 14px;
+  border: 2px solid var(--border); border-radius: 999px; color: var(--text); font-weight: 800; text-decoration: none;
+}
+.branch-tabs__tab[aria-current="page"] { border-color: var(--btn); background: var(--tint); color: var(--btn); }
+.branch-tabs__count { font-size: 13px; color: var(--text-2); }
+
+/* LP-45: a rejected restaurant asks for review again. */
+.review-again__steps { margin: 0 0 12px; padding-left: 20px; }
+.review-again__steps li { margin-bottom: 6px; }
+.review-again__note {
+  width: 100%; min-height: 88px; padding: 12px 14px; font: inherit; color: var(--text);
+  background: var(--surface); border: 1px solid var(--input-border); border-radius: var(--radius-input);
+}
+.review-again__note:focus { outline: 3px solid var(--btn); outline-offset: 1px; border-color: var(--btn); }
+.console-filter { margin: 12px 0; font-size: 14px; }
+
+/* LP-69: the food search bar (home page and Browse food). */
+.home-food { margin-top: 24px; }
+.home-food__title { margin: 0 0 12px; }
+.food-search {
+  margin: 16px 0 0; padding: 16px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius-card); box-shadow: var(--shadow);
+}
+.food-search .field { margin-bottom: 12px; }
+.food-search__row { display: grid; gap: 0 12px; }
+.food-search__actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.food-search__actions .button { flex: 1 1 140px; }
+
+/* The type of food dropdown on the offer form looks like the other boxes. */
+.offer-form select {
+  width: 100%; min-height: 48px; padding: 12px 14px; font: inherit; color: var(--text);
+  background: var(--surface); border: 1px solid var(--input-border); border-radius: var(--radius-input);
+}
+.offer-form select:focus { outline: 3px solid var(--btn); outline-offset: 1px; border-color: var(--btn); }
+/* LP-58: the owner's area: status banner, offer tabs and compact rows.
+   (Replaces the inline styles the workspace page used to have.) */
+.status-banner {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  margin: 8px 0 20px; padding: 14px 16px; border-radius: var(--radius-input); background: var(--tint);
+}
+.status-banner--REJECTED { background: var(--danger-tint); }
+.status-banner__text { margin: 0; flex: 1 1 200px; }
+.workspace-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.workspace-note { margin-top: 16px; }
+.workspace-offers { margin-top: 24px; }
+.offer-tabs { display: flex; gap: 8px; margin: 8px 0 16px; border-bottom: 2px solid var(--border); }
+.offer-tabs__tab {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 8px 12px;
+  margin-bottom: -2px; border-bottom: 3px solid transparent;
+  color: var(--text-2); font-weight: 800; text-decoration: none;
+}
+.offer-tabs__tab[aria-current="page"] { color: var(--btn); border-bottom-color: var(--btn); }
+.offer-tabs__count {
+  min-width: 22px; padding: 0 6px; border-radius: var(--radius-pill);
+  background: var(--tint); color: var(--btn-hover); font-size: 13px; text-align: center;
+}
+.offer-panel__empty { margin: 12px 0; }
+.offer-rows { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.offer-row { padding: 12px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+.offer-row .notice { margin: 10px 0 0; font-size: 14px; }
+.offer-row__main { display: grid; grid-template-columns: 72px 1fr; gap: 12px; align-items: start; }
+.offer-row__photo { display: block; width: 72px; height: 72px; border-radius: 12px; object-fit: cover; }
+.offer-row__photo--empty {
+  display: flex; align-items: center; justify-content: center; padding: 4px; text-align: center;
+  background: var(--tint); color: var(--text-2); font-size: 11px; line-height: 1.2;
+}
+.offer-row__title { margin: 0; font-size: 17px; }
+.offer-row__text .offer-card__kind { margin: 0 0 4px; }
+.offer-row__text .branch-tag { margin: 2px 0 0; font-size: 14px; }
+.offer-row__facts { margin: 4px 0 0; font-size: 14px; }
+.offer-row__status { margin: 2px 0 0; font-size: 13px; }
+.offer-row__actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin-top: 10px; }
+.offer-row__actions form { margin: 0; }
+.offer-row__details { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 6px; }
+.offer-row__details > summary {
+  min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 800; color: var(--btn);
+}
+.confirm > summary { list-style: none; cursor: pointer; }
+.confirm > summary::-webkit-details-marker { display: none; }
+.confirm[open] { flex-basis: 100%; padding: 12px; border-radius: 12px; background: var(--tint); }
+.confirm form p { margin: 8px 0; }
+.button--danger { background: var(--danger); border-color: var(--danger); color: #FFFFFF; }
+.button--danger:hover { background: #8E1B12; border-color: #8E1B12; color: #FFFFFF; }
+.stock-form { margin-top: 12px; }
+.stock-form__box { border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.stock-form__box input { width: 100%; }
+.stock-form__box .button { margin-top: 8px; }
+.confirm > summary.link-button { display: inline-flex; align-items: center; }

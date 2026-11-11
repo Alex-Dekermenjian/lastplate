@@ -61,6 +61,10 @@ def console_restaurants(request):
     status, shops = call(request, services.admin_shops, approval_status)
     if status == 200:
         shops = [{**shop, "applied_at": lebanon_time(shop.get("created_at"))} for shop in shops]
+    # LP-45: the Pending list can show only restaurants that asked again.
+    sent_again_only = tab == "pending" and request.GET.get("again") == "1"
+    if status == 200 and sent_again_only:
+        shops = [shop for shop in shops if shop.get("review_requests")]
 
     return render(request, "frontend/console_restaurants.html", {
         "tabs": TABS,
@@ -68,6 +72,7 @@ def console_restaurants(request):
         "shops": shops if status == 200 else [],
         "unavailable": status != 200,
         "console_page": "restaurants",
+        "sent_again_only": sent_again_only,
     })
 
 
