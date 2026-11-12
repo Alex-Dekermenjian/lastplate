@@ -10,7 +10,7 @@ from django.test import SimpleTestCase, TransactionTestCase
 
 APP = "marketplace"
 LISTING_0002 = "0002_listing_allergens_listing_ingredients_listing_photo"
-LATEST = "0011_review_again"
+LATEST = "0012_allocation"
 
 
 def migrate_to(*names):

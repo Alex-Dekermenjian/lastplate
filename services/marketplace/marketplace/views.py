@@ -59,6 +59,7 @@ from .serializers import (
 )
 from .owner_actions import DraftDeleteError, delete_draft, mark_sold_out
 from .review_again import ReviewAgainError, request_review_again
+from .stock import with_committed
 from .stock_service import StockAdjustmentError, adjust_stock
 
 
@@ -605,9 +606,10 @@ def my_listings(request):
 
     # Never accept a shop ID from the browser.
     # Return drafts and published listings owned by this shop only.
-    listings = Listing.objects.filter(
+    # LP-20: held and sold units are counted in the same query.
+    listings = with_committed(Listing.objects.filter(
         shop_id=shop.id
-    ).order_by("-created_at")
+    )).order_by("-created_at")
 
     serializer = ListingSerializer(
         listings,

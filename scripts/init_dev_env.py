@@ -5,6 +5,8 @@ pair in .keys/, and, unless --compose-only is given, a .env file in each
 service folder for running that service outside Docker against the Compose
 PostgreSQL. --keys-only creates just the key pair. Existing files are never
 overwritten; missing service files reuse the passwords already in compose.env.
+Settings added later (such as the LP-20 service key) are appended to existing
+files that lack them; nothing already there is changed.
 Secrets are generated randomly and never printed.
 
 Usage (PowerShell, from the repository root):
@@ -28,6 +30,16 @@ KEY_DIR = ROOT / ".keys"
 PRIVATE_KEY = KEY_DIR / "jwt-private.pem"
 PUBLIC_KEY = KEY_DIR / "jwt-public.pem"
 
+# LP-20: the key Reservations sends to Marketplace's internal stock API
+# (docs/microservices-plan.md §4). One key per caller/callee pair.
+SERVICE_KEY_SETTINGS = {
+    "RESERVATIONS_TO_MARKETPLACE_KEY": lambda: secrets.token_urlsafe(32),
+}
+# Which service .env gets which compose.env value, under which name.
+SERVICE_ENV_KEYS = {
+    "marketplace": {"RESERVATIONS_SERVICE_KEY": "RESERVATIONS_TO_MARKETPLACE_KEY"},
+}
+
 
 def read_env(path):
     values = {}
@@ -46,10 +58,27 @@ def write_new(path, lines):
     print(f"created {path.relative_to(ROOT)}")
 
 
+def append_missing(path, values):
+    """Add settings a file lacks, at its end. Never changes existing lines."""
+    existing = read_env(path)
+    missing = {key: value for key, value in values.items() if key not in existing}
+    if not missing:
+        return existing
+    text = path.read_text(encoding="utf-8")
+    with path.open("a", encoding="utf-8", newline="\n") as handle:
+        if text and not text.endswith("\n"):
+            handle.write("\n")
+        handle.write("\n".join(f"{key}={value}" for key, value in missing.items()) + "\n")
+    print(f"added {', '.join(missing)} to {path.relative_to(ROOT)}")
+    return {**existing, **missing}
+
+
 def compose_values():
     if COMPOSE_ENV.exists():
         print("kept existing compose.env")
-        return read_env(COMPOSE_ENV)
+        return append_missing(
+            COMPOSE_ENV, {key: make() for key, make in SERVICE_KEY_SETTINGS.items()}
+        )
 
     values = {
         "POSTGRES_ADMIN_PASSWORD": secrets.token_urlsafe(24),
@@ -58,6 +87,8 @@ def compose_values():
     for name in SERVICES:
         values[f"{name.upper()}_DB_PASSWORD"] = secrets.token_urlsafe(24)
         values[f"{name.upper()}_SECRET_KEY"] = secrets.token_urlsafe(50)
+    for key, make in SERVICE_KEY_SETTINGS.items():
+        values[key] = make()
     write_new(
         COMPOSE_ENV,
         ["# Private local Docker Compose settings. Never commit this file."]
@@ -68,8 +99,13 @@ def compose_values():
 
 def write_service_env(name, folder, values):
     path = folder / ".env"
+    service_keys = {
+        env_name: values[compose_name]
+        for env_name, compose_name in SERVICE_ENV_KEYS.get(name, {}).items()
+    }
     if path.exists():
         print(f"kept existing {path.relative_to(ROOT)}")
+        append_missing(path, service_keys)
         return
 
     lines = [
@@ -84,6 +120,7 @@ def write_service_env(name, folder, values):
         "DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost",
         "HEALTH_EXPOSE_DETAILS=True",
     ]
+    lines += [f"{key}={value}" for key, value in service_keys.items()]
     if name == "web":
         lines += [
             "ACCOUNTS_SERVICE_URL=http://127.0.0.1:8001",
