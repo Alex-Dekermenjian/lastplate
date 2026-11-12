@@ -10,7 +10,7 @@ open decisions are in [microservices-plan.md](microservices-plan.md).
 | --- | --- | --- |
 | Accounts (`services/accounts`, port 8001) | Email-based user model with roles, its migration, Django admin login, health endpoints; LP-7 APIs: shop-operator registration, RS256 token sign-in, refresh, logout (refresh-token blacklist), `/api/users/me/`, throttling; 9 original tests + health and auth API tests | Web sign-in/registration pages and the Pending shop (rest of LP-7) |
 | Marketplace (`services/marketplace`, port 8002) | Own database, health endpoints; LP-7: verifies Accounts tokens with the public key only, minimal `Shop` (one per operator, Pending), `POST /api/shops/` (idempotent), `GET /api/shops/me/`; LP-8: shop profile (pickup address, area, public contact) via `PATCH /api/shops/me/`; LP-9: team-admin shop review in Django admin (`/admin/`) | Listings, stock (LP-10 to LP-13) |
-| Reservations (`services/reservations`, port 8003) | Runnable empty service, own database, health endpoints | All reservation logic (Sprint 2) |
+| Reservations (`services/reservations`, port 8003) | Own database, health endpoints; LP-17: `Order`, `OrderLine` (copy of the offer when ordered) and `OrderEvent` (history) tables, one status-change function, pickup codes, "pick up by" time, read-only team-admin view (`/admin/`) | Checkout and the order APIs (LP-19 onwards) |
 | Web frontend (`web`, port 8000) | Server-side sessions; home page; LP-56: one login page (`/login/`) and sign-up for customers and restaurants (`/signup/`), customer account page (`/account/`), POST sign-out, workspace with shop status (`/workspace/`), LP-37: three-step restaurant request (`/workspace/apply/`) and its status page (`/workspace/request/`); LP-8: shop profile page (`/workspace/profile/`); LP-10 and LP-11: create, edit and publish offers with photos; LP-12: stock adjustments; LP-13: public offers (`/offers/`) | Customer accounts, reservations (Sprint 2) |
 | Docker Compose | PostgreSQL with one database and login role per service; all four apps | Production deployment (LP-15) |
 | CI | Checks and tests per service; Compose smoke check | Cross-service feature integration tests |
@@ -184,6 +184,30 @@ add the permission **marketplace | shop | Can approve or reject shops**.
 The admin refuses approval when the profile is incomplete or the confirmation box is
 unticked, and refuses rejection without a reason. Rules:
 [database-design.md](database-design.md).
+
+## Look at orders in the Reservations admin (LP-17)
+
+Checkout does not exist yet (LP-19), so orders are only visible to team admins in
+Reservations' own Django admin. It has its own team-admin accounts, as Marketplace does.
+Create one once:
+
+```powershell
+docker compose --env-file compose.env exec reservations python manage.py createsuperuser
+```
+
+Add a clearly fictional sample order (development only). **Orders can never be deleted**,
+not even from the database, so each sample stays in your local data:
+
+```powershell
+docker compose --env-file compose.env exec reservations python manage.py make_sample_order --ordered-at 18:15
+docker compose --env-file compose.env exec reservations python manage.py make_sample_order --ordered-at 20:30 --then shop-cancel
+```
+
+Then open http://127.0.0.1:8003/admin/reservations/order/. The admin is read-only: no
+add, edit or delete. All times are Beirut time. "Pick up by" is the order time (or the
+window's start, if ordered earlier) plus `PICKUP_HOLD_MINUTES` (default 60), never later
+than the window's end. For a 2-minute demo hold, add `PICKUP_HOLD_MINUTES: "2"` to the
+`reservations` environment in a local Compose override file.
 
 ## 6. Run one service outside Docker
 
