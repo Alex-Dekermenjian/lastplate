@@ -37,20 +37,74 @@ HEALTH_EXPOSE_DETAILS = os.environ.get("HEALTH_EXPOSE_DETAILS", "False").lower()
 
 
 # Application definition
-# Users live in the Accounts service, so Django's auth and admin apps are not
-# installed here. Callers will be identified by Accounts-issued tokens.
+# Customers and shop operators live in the Accounts service and will be
+# identified by Accounts-issued tokens. Django's auth tables here hold only
+# local team admins for this service's own admin (LP-17), as in Marketplace.
 
 INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
     "rest_framework",
     "reservations",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+        },
+    },
+]
+
+# Browsers share cookies across ports on one host, so these names keep an admin
+# sign-in here from replacing a session of the web frontend or another admin.
+SESSION_COOKIE_NAME = "reservations_admin_sessionid"
+CSRF_COOKIE_NAME = "reservations_admin_csrftoken"
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+
+def _pickup_hold_minutes(raw):
+    """Minutes an order is held after it is placed (or the window opens)."""
+    try:
+        minutes = int(raw)
+    except (TypeError, ValueError):
+        minutes = 0
+    if minutes < 1:
+        from django.core.exceptions import ImproperlyConfigured
+
+        raise ImproperlyConfigured("PICKUP_HOLD_MINUTES must be a whole number of minutes, at least 1.")
+    return minutes
+
+
+# LP-17: "pick up by" = placed time (or window opening) + this, capped at the
+# window's end. 60 by default; the demo can set PICKUP_HOLD_MINUTES=2.
+PICKUP_HOLD_MINUTES = _pickup_hold_minutes(os.environ.get("PICKUP_HOLD_MINUTES", "60"))
 
 WSGI_APPLICATION = "config.wsgi.application"
 

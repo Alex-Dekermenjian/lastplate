@@ -65,7 +65,7 @@ lastplate/
 | --- | --- | --- |
 | Accounts | User, password hash, role, login, token issuing | none |
 | Marketplace | Shop (profile, approval), Listing, StockAdjustment, Allocation | `operator_user_id`, `reservation_ref` |
-| Reservations | Reservation, agreed-term snapshot, ReservationEvent | `customer_user_id`, `listing_id`, `shop_id` |
+| Reservations | Order, OrderLine (agreed-term snapshot), OrderEvent (LP-17; called Reservation/ReservationEvent below) | `customer_user_id`, `listing_id`, `shop_id`, `branch_id` |
 
 Changes from `docs/database-design.md`:
 
