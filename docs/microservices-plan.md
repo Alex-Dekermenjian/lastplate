@@ -187,8 +187,12 @@ authentication, not by the network. Planned rules:
 - A missing, unknown or wrong key returns 401/403. Reservations must treat that
   as a configuration fault (§6), never as a stock rejection.
 
-Not implemented yet: the first internal endpoint arrives with Sprint 2
-allocations. Health endpoints are public and expose no data except, when
+**Implemented (LP-20)** for Marketplace's `/internal/allocations` endpoints:
+`marketplace/service_auth.py`. Only `reservations` is allowed. Its key is
+`RESERVATIONS_SERVICE_KEY` (and `RESERVATIONS_SERVICE_KEY_PREVIOUS` during a
+changeover), filled from `compose.env` by `scripts/init_dev_env.py`. Missing
+headers give 401; an unknown caller, a wrong key or a caller the endpoint does
+not allow give 403. Health endpoints are public and expose no data except, when
 `HEALTH_EXPOSE_DETAILS` is on (development and CI only), the connected
 database name.
 
@@ -219,7 +223,7 @@ Full request/response examples go in `docs/api/<service>.md` before coding.
 | `GET /api/admin/shops?status=PENDING` | staff | Review queue |
 | `POST /api/admin/shops/{id}/approve`, `/reject` | staff | Decision; reject needs a reason |
 | `GET /internal/shops/by-operator/{user_id}` | Reservations | Which shop an operator runs |
-| `POST /internal/allocations` | Reservations | Allocate stock (Sprint 2, §6) |
+| `POST /internal/allocations` | Reservations | Allocate stock (§6; implemented in LP-20, as are the four below) |
 | `GET /internal/allocations/{ref}` | Reservations | Read allocation result |
 | `POST /internal/allocations/{ref}/release` | Reservations | Customer cancellation or expiry |
 | `POST /internal/allocations/{ref}/consume` | Reservations | Collection |

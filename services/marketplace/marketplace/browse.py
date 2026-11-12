@@ -14,7 +14,7 @@ from django.db.models import Count, Q
 from django.utils import timezone
 
 from .models import Listing, Shop
-from .stock import free_quantity
+from .stock import free_quantity, with_committed
 
 
 def _approved_shops():
@@ -24,12 +24,13 @@ def _approved_shops():
 
 
 def _open_listings(now):
-    # LP-68: each offer's branch comes in the same query.
-    return Listing.objects.select_related("branch").filter(
+    # LP-68: each offer's branch comes in the same query. LP-20: and so do
+    # its held and sold units, so free stock needs no extra query per offer.
+    return with_committed(Listing.objects.select_related("branch").filter(
         status=Listing.Status.PUBLISHED,
         pickup_end__gt=now,
         shop_id__in=_approved_shops().values("id"),
-    )
+    ))
 
 
 def _with_shops(listings):

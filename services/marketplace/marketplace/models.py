@@ -398,3 +398,90 @@ class StockAdjustment(models.Model):
 
     def __str__(self):
         return f"{self.quantity_change:+d} on listing {self.listing_id}"
+
+
+# LP-20: stock committed to one reservation (docs/microservices-plan.md §6)
+class Allocation(models.Model):
+    """
+    Marketplace's record of the units it holds or sold for one reservation.
+
+    reservation_ref is the Reservations reference (a UUID it creates before
+    calling). It is unique, so a repeated call always finds the same row and
+    never takes stock twice. Only HELD moves; every other status is final.
+    HELD and CONSUMED count against free stock (stock.committed_quantity).
+    """
+
+    class Status(models.TextChoices):
+        HELD = "HELD", "Held"
+        CONSUMED = "CONSUMED", "Sold"
+        RELEASED = "RELEASED", "Released"
+        SHOP_CANCELLED = "SHOP_CANCELLED", "Cancelled by the restaurant"
+        REJECTED = "REJECTED", "Rejected"
+
+    # Why a reserve call was refused. Stored, so a retry gets the same answer.
+    class RejectReason(models.TextChoices):
+        NOT_PUBLISHED = "not_published", "The offer is not published"
+        SHOP_NOT_APPROVED = "shop_not_approved", "The restaurant is not approved"
+        PICKUP_ENDED = "pickup_ended", "The pickup window has ended"
+        TERMS_CHANGED = "terms_changed", "The offer changed since the customer saw it"
+        NOT_ENOUGH_STOCK = "not_enough_stock", "Not enough left"
+
+    # Statuses that count against free stock.
+    COMMITTED = (Status.HELD, Status.CONSUMED)
+
+    reservation_ref = models.UUIDField(unique=True)
+    listing = models.ForeignKey(
+        Listing,
+        on_delete=models.PROTECT,
+        related_name="allocations",
+    )
+    # Units asked for. 0 only for a release that arrived before any reserve
+    # call (a "tombstone", so a late reserve call cannot take stock).
+    quantity = models.PositiveIntegerField()
+    status = models.CharField(max_length=20, choices=Status.choices)
+    reject_reason = models.CharField(
+        max_length=30,
+        choices=RejectReason.choices,
+        blank=True,
+        default="",
+    )
+
+    # The offer's terms when the units were held, so later edits never
+    # change what the customer agreed to (plan §6 step 4).
+    title = models.CharField(max_length=200, blank=True)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    pickup_start = models.DateTimeField(null=True, blank=True)
+    pickup_end = models.DateTimeField(null=True, blank=True)
+    terms_revision = models.PositiveIntegerField(null=True, blank=True)
+    shop_id = models.PositiveBigIntegerField()
+    branch_id = models.PositiveBigIntegerField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    # When it left HELD (released, sold or cancelled by the restaurant).
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["listing", "status"], name="mkt_allocation_listing_status"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(status__in=["HELD", "CONSUMED", "RELEASED", "SHOP_CANCELLED", "REJECTED"]),
+                name="marketplace_allocation_valid_status",
+            ),
+            # Units held or sold are always at least one.
+            models.CheckConstraint(
+                condition=~Q(status__in=["HELD", "CONSUMED", "SHOP_CANCELLED"]) | Q(quantity__gte=1),
+                name="marketplace_allocation_held_quantity_positive",
+            ),
+            # A reason exactly when rejected.
+            models.CheckConstraint(
+                condition=(Q(status="REJECTED") & ~Q(reject_reason=""))
+                | (~Q(status="REJECTED") & Q(reject_reason="")),
+                name="marketplace_allocation_reason_only_when_rejected",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.status} {self.quantity} of listing {self.listing_id} ({self.reservation_ref})"

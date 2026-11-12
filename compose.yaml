@@ -87,6 +87,10 @@ services:
       DB_HOST: postgres
       DB_PORT: "5432"
       JWT_PUBLIC_KEY_FILE: /run/lastplate-keys/jwt-public.pem
+      # LP-20: the key Reservations must send to /internal/ (from compose.env,
+      # never Git). If it is missing, every internal call is refused: run
+      # scripts/init_dev_env.py again to add it.
+      RESERVATIONS_SERVICE_KEY: ${RESERVATIONS_TO_MARKETPLACE_KEY:-}
     volumes:
       # Only Accounts' public key, read-only: Marketplace can verify tokens but
       # never sign them. Fails clearly if scripts/init_dev_env.py has not run.

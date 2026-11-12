@@ -9,7 +9,7 @@ open decisions are in [microservices-plan.md](microservices-plan.md).
 | Part | Implemented now | Planned, not built |
 | --- | --- | --- |
 | Accounts (`services/accounts`, port 8001) | Email-based user model with roles, its migration, Django admin login, health endpoints; LP-7 APIs: shop-operator registration, RS256 token sign-in, refresh, logout (refresh-token blacklist), `/api/users/me/`, throttling; 9 original tests + health and auth API tests | Web sign-in/registration pages and the Pending shop (rest of LP-7) |
-| Marketplace (`services/marketplace`, port 8002) | Own database, health endpoints; LP-7: verifies Accounts tokens with the public key only, minimal `Shop` (one per operator, Pending), `POST /api/shops/` (idempotent), `GET /api/shops/me/`; LP-8: shop profile (pickup address, area, public contact) via `PATCH /api/shops/me/`; LP-9: team-admin shop review in Django admin (`/admin/`) | Listings, stock (LP-10 to LP-13) |
+| Marketplace (`services/marketplace`, port 8002) | Own database, health endpoints; LP-7: verifies Accounts tokens with the public key only, minimal `Shop` (one per operator, Pending), `POST /api/shops/` (idempotent), `GET /api/shops/me/`; LP-8: shop profile (pickup address, area, public contact) via `PATCH /api/shops/me/`; LP-9: team-admin shop review in Django admin (`/admin/`); LP-20: internal stock API for Reservations (`/internal/allocations`, service key only), allocations in the admin | Listings, stock (LP-10 to LP-13) |
 | Reservations (`services/reservations`, port 8003) | Own database, health endpoints; LP-17: `Order`, `OrderLine` (copy of the offer when ordered) and `OrderEvent` (history) tables, one status-change function, pickup codes, "pick up by" time, read-only team-admin view (`/admin/`) | Checkout and the order APIs (LP-19 onwards) |
 | Web frontend (`web`, port 8000) | Server-side sessions; home page; LP-56: one login page (`/login/`) and sign-up for customers and restaurants (`/signup/`), customer account page (`/account/`), POST sign-out, workspace with shop status (`/workspace/`), LP-37: three-step restaurant request (`/workspace/apply/`) and its status page (`/workspace/request/`); LP-8: shop profile page (`/workspace/profile/`); LP-10 and LP-11: create, edit and publish offers with photos; LP-12: stock adjustments; LP-13: public offers (`/offers/`) | Customer accounts, reservations (Sprint 2) |
 | Docker Compose | PostgreSQL with one database and login role per service; all four apps | Production deployment (LP-15) |
@@ -75,6 +75,12 @@ install the new packages). It keeps your existing settings and only adds the
 missing key pair. Then rebuild Accounts:
 `docker compose --env-file compose.env up -d --build accounts`. Accounts will
 not start without its keys.
+
+**Set up before LP-20?** Run the same command once more. It adds only the new
+`RESERVATIONS_TO_MARKETPLACE_KEY` to `compose.env` (and `RESERVATIONS_SERVICE_KEY` to
+`services\marketplace\.env`), never prints it, and changes nothing else. Then rebuild
+Marketplace: `docker compose --env-file compose.env up -d --build --wait marketplace`.
+Without the key, Marketplace refuses every internal stock call.
 
 ## 4. Run everything with Docker Compose
 
@@ -208,6 +214,23 @@ add, edit or delete. All times are Beirut time. "Pick up by" is the order time (
 window's start, if ordered earlier) plus `PICKUP_HOLD_MINUTES` (default 60), never later
 than the window's end. For a 2-minute demo hold, add `PICKUP_HOLD_MINUTES: "2"` to the
 `reservations` environment in a local Compose override file.
+
+## Try the stock API (LP-20)
+
+Marketplace is the only service that changes stock. Reservations will call its internal
+API (`/internal/allocations`) with the `X-Service-Name: reservations` and `X-Service-Key`
+headers. Until checkout exists (LP-19), try it with this script, which plays Reservations.
+It reads the key from `compose.env` and never prints it. Use the ID of a published offer:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\stock_api.py offer 17
+.\.venv\Scripts\python.exe scripts\stock_api.py reserve 17 --quantity 1
+.\.venv\Scripts\python.exe scripts\stock_api.py release <ref> --listing 17
+.\.venv\Scripts\python.exe scripts\stock_api.py consume <ref> --listing 17
+.\.venv\Scripts\python.exe scripts\stock_api.py reserve 17 --no-key
+```
+
+Allocations are listed, read-only, at http://127.0.0.1:8002/admin/marketplace/allocation/.
 
 ## 6. Run one service outside Docker
 
