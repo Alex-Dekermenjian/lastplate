@@ -21,6 +21,7 @@
         {% endif %}
         {% if request.session.account %}
           {% if request.session.account.role == "SHOP_OPERATOR" %}
+            <a class="site-nav__link" href="{% url 'today-orders' %}">Today's orders <span data-orders-badge data-url="{% url 'orders-badge' %}" aria-live="polite" aria-label="Active reserved orders">—</span></a>
             <a class="button button--secondary" href="{% url 'workspace' %}">Workspace</a>
           {% elif request.session.account.role == "ADMIN" %}
             <a class="button button--secondary" href="{% url 'console' %}">Console</a>
@@ -51,5 +52,8 @@
   </div>
   {# LP-65: the searchable area list (does nothing on pages without one). #}
   <script src="{% static 'js/area-picker.js' %}" defer></script>
+  {% if request.session.account.role == "SHOP_OPERATOR" %}
+    <script src="{% static 'js/orders-badge.js' %}" defer></script>
+  {% endif %}
 </body>
 </html>

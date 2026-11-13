@@ -93,7 +93,7 @@ def _place_fields(place):
     return {name: str(place.get(name) or "").strip()[:size] for name, size in PLACE_FIELDS.items()}
 
 
-def create_order(*, customer_user_id, shop_id, branch_id, request_key, lines, now=None, place=None):
+def create_order(*, customer_user_id, shop_id, branch_id, request_key, lines, now=None, place=None, customer_first_name=""):
     """Store a new PROCESSING order with its item copies and first history row.
 
     LP-78: `place` (shop_name, branch_name, pickup_address, shop_phone) is
@@ -120,6 +120,7 @@ def create_order(*, customer_user_id, shop_id, branch_id, request_key, lines, no
             with transaction.atomic():
                 order = Order.objects.create(
                     customer_user_id=customer_user_id,
+                    customer_first_name=customer_first_name[:150],
                     shop_id=shop_id,
                     branch_id=branch_id,
                     request_key=request_key,

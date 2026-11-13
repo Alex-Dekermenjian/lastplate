@@ -21,12 +21,25 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from .allocation_service import AllocationError, consume, release, reserve, shop_cancel
-from .models import Allocation
+from .models import Allocation, Shop
 from .service_auth import internal_endpoint
 
 ONLY_RESERVATIONS = ("reservations",)
 # More than any one order can need, and far below PositiveIntegerField's limit.
 MAX_QUANTITY = 1000
+
+
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+@internal_endpoint(ONLY_RESERVATIONS)
+def shop_by_operator(request, user_id):
+    shop = Shop.objects.filter(operator_user_id=user_id).first()
+    if shop is None:
+        return Response({"code": "not_found", "detail": "No such shop."}, status=404)
+    return Response({"id": shop.id, "branches": [
+        {"id": branch.id, "name": branch.name} for branch in shop.branches.all()
+    ]})
 
 
 def _error(code, detail, http_status, **extra):
