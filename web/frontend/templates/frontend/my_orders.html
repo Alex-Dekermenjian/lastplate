@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}My orders — LastPlate{% endblock %}
+
+{% block content %}
+<section class="card card--wide">
+  <h1>My orders</h1>
+
+  {% if unavailable %}
+    <p class="notice notice--warning" role="alert">{{ unavailable }}</p>
+    <a class="button button--secondary button--block" href="{% url 'my-orders' %}">Try again</a>
+
+  {% elif not active_orders and not past_orders %}
+    <p>No orders yet.</p>
+    <a class="button button--primary button--block" href="{% url 'browse-offers' %}">Browse food</a>
+
+  {% else %}
+    <h2>Active</h2>
+    {% if active_orders %}
+      <ul class="order-list">
+        {% for order in active_orders %}{% include "frontend/_order_row.html" %}{% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">Nothing waiting for pickup.</p>
+    {% endif %}
+
+    {% if past_orders %}
+      <h2>Past</h2>
+      <ul class="order-list">
+        {% for order in past_orders %}{% include "frontend/_order_row.html" %}{% endfor %}
+      </ul>
+    {% endif %}
+  {% endif %}
+</section>
+<script src="{% static 'js/countdown.js' %}" defer></script>
+{% endblock %}

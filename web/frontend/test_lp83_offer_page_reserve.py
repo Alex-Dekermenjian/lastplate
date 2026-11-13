@@ -25,7 +25,13 @@ DONUTS = offer(id=42, title="Glazed donuts", discounted_price="1.50", free_quant
                shop={"id": 3, "name": "Cedar Bakery", "area": "Hamra", "public_contact": "+961 1 234 567"})
 ORDER = {"reservation_ref": "0b8d1f0e-6c1e-4a59-9a43-6d3f8d2b0c11", "status": "CONFIRMED",
          "status_label": "Reserved", "pickup_code": "TM9AY3", "pick_up_by": "2026-11-19T17:15:00+00:00",
-         "total_cash": "3.00", "shop_id": 3, "branch_id": 7, "lines": []}
+         "total_cash": "3.00", "shop_id": 3, "branch_id": 7, "created_at": "2026-11-19T16:15:00+00:00",
+         # LP-78: saved with the order at checkout.
+         "shop_name": "Cedar Bakery", "branch_name": "", "pickup_address": "12 Bliss Street, Beirut",
+         "shop_phone": "+961 1 234 567", "cancelled_by": None, "collected_at": None,
+         "lines": [{"listing_id": 42, "title": "Glazed donuts", "quantity": 2, "unit_price": "1.50",
+                    "pickup_start": "2026-11-19T16:00:00+00:00", "pickup_end": "2026-11-19T19:00:00+00:00"}]}
+ORDER_PAGE = reverse("order-detail", args=[ORDER["reservation_ref"]])
 ADMIN = {**CUSTOMER, "id": 99, "email": "admin@example.test", "role": "ADMIN"}
 
 
@@ -94,24 +100,30 @@ class ReserveHereTests(OfferPageTestCase):
         self.assertEqual(sent_key, key)
         self.assertEqual(lines, [{"listing_id": 42, "quantity": 2, "expected_unit_price": "1.50"}])
 
-    def test_order_placed_shows_code_time_and_cash(self):
-        response, _, _ = self.press(after={**DONUTS, "free_quantity": 1})
-        for text in ("Order placed!", 'class="pickup-code">TM9AY3<', "Pick up by <strong>Thu 19 Nov, 19:15</strong>",
-                     "Pay <strong>$3.00</strong> in cash at pickup."):
+    def test_reserve_lands_on_the_order_page_with_the_code_and_total(self):
+        # LP-78: was the one-time "Order placed!" message; now the order page.
+        key = self.key(self.page())
+        with patch_service("create_reservation", return_value=(201, ORDER)), \
+                patch_service("get_order", return_value=(200, ORDER)):
+            response = self.client.post(self.reserve_url, {"request_key": key, "quantity": 2}, follow=True)
+        self.assertEqual(response.redirect_chain[-1][0], ORDER_PAGE)
+        for text in ("TM9AY3", "Pay $3.00 in cash at pickup.", "Pick up by <strong>19:15</strong>",
+                     "Show this code at the counter"):
             self.assertContains(response, text, html=False)
-        self.assertNotIn(NOTICE_KEY, self.client.session)  # shown once
+        self.assertNotIn(NOTICE_KEY, self.client.session)
 
     def test_the_left_number_drops(self):
         response, _, _ = self.press(quantity=2, after={**DONUTS, "free_quantity": 1})
         self.assertContains(response, "1 left")
         self.assertEqual(list(response.context["quantities"]), [1])
 
-    def test_the_last_ones_ordered_here_then_shows_sold_out_with_the_order(self):
-        response, _, _ = self.press(quantity=3, after_status=404)
-        self.assertEqual(response.status_code, 404)
-        self.assertContains(response, "Order placed!", status_code=404)
-        self.assertContains(response, "TM9AY3", status_code=404)
-        self.assertContains(response, "<strong>Sold out</strong>", status_code=404)
+    def test_the_last_ones_ordered_here_go_to_the_order_page_and_the_offer_says_sold_out(self):
+        key = self.key(self.page())
+        with patch_service("create_reservation", return_value=(201, ORDER)):
+            response = self.client.post(self.reserve_url, {"request_key": key, "quantity": 3})
+        self.assertRedirects(response, ORDER_PAGE, fetch_redirect_response=False)
+        later = self.page(status=404)  # back on the offer page: none left
+        self.assertContains(later, "<strong>Sold out</strong>", status_code=404)
 
     def test_the_cart_is_left_alone(self):
         self.add(43)

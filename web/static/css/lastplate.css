@@ -585,3 +585,25 @@ p { margin: 0 0 12px; }
 /* LP-83: Reserve at the bottom of an offer page. */
 .offer-reserve { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border, #ddd); }
 .offer-reserve__closed { font-size: 1.2em; }
+
+/* LP-78: the order page shown at the counter, and My orders. */
+.order-page__status { margin: 0 0 12px; }
+.status-badge { display: inline-block; padding: 2px 10px; border-radius: var(--radius-pill); background: var(--bg); border: 1px solid var(--border); font-size: 14px; font-weight: 700; }
+.status-badge--active { background: var(--tint); border-color: var(--accent); }
+.order-code { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 20px 12px; margin: 0 0 16px; border-radius: var(--radius-card); background: var(--tint); text-align: center; }
+.order-code__label { font-size: 14px; }
+.order-code__value { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: clamp(36px, 13vw, 56px); letter-spacing: 0.12em; line-height: 1.1; word-break: break-all; }
+.order-code__hint { font-size: 14px; }
+.order-code--done { background: var(--bg); opacity: 0.55; }
+.order-deadline { text-align: center; margin: 0 0 16px; }
+.countdown { font-weight: 700; }
+.countdown--passed { color: var(--danger); }
+.order-items { list-style: none; padding: 0; margin: 0 0 8px; }
+.order-items li { display: flex; flex-wrap: wrap; gap: 4px 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.order-items__total { margin-left: auto; font-weight: 700; }
+.order-pay { font-weight: 700; }
+.order-list { list-style: none; padding: 0; margin: 0 0 16px; display: grid; gap: 10px; }
+.order-row { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-input); background: var(--surface); color: var(--text); text-decoration: none; }
+.order-row--done { opacity: 0.75; }
+.order-row__top, .order-row__bottom { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 8px; }
+.order-row__items { overflow-wrap: anywhere; }

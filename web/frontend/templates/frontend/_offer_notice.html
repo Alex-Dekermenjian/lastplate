@@ -1,13 +1,4 @@
 {# LP-83: the result of pressing Reserve on an offer page, shown once. #}
 {% if notice %}
-  {% if notice.placed %}
-    <div class="notice notice--success" role="status">
-      <p><strong>Order placed!</strong></p>
-      <p>Pickup code: <strong class="pickup-code">{{ notice.placed.pickup_code }}</strong></p>
-      <p>Pick up by <strong>{{ notice.placed.pick_up_by }}</strong>.</p>
-      <p>Pay <strong>${{ notice.placed.total }}</strong> in cash at pickup.</p>
-    </div>
-  {% else %}
-    <p class="notice notice--{% if notice.kind == 'warning' %}warning{% elif notice.kind == 'info' %}info{% else %}error{% endif %}" role="alert">{{ notice.text }}</p>
-  {% endif %}
+  <p class="notice notice--{% if notice.kind == 'warning' %}warning{% elif notice.kind == 'info' %}info{% else %}error{% endif %}" role="alert">{{ notice.text }}</p>
 {% endif %}

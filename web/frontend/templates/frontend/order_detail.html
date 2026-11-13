@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{% if order %}Order {{ order.pickup_code }}{% else %}Your order{% endif %} — LastPlate{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'my-orders' %}">← My orders</a></p>
+
+{% if unavailable %}
+  <section class="card card--wide">
+    <h1>Your order</h1>
+    <p class="notice notice--warning" role="alert">{{ unavailable }}</p>
+    <a class="button button--secondary button--block" href="{{ request.path }}">Try again</a>
+  </section>
+
+{% elif not_found %}
+  <section class="card card--wide">
+    <h1>We can't find this order</h1>
+    <p>It isn't one of your orders.</p>
+    <a class="button button--primary button--block" href="{% url 'my-orders' %}">See my orders</a>
+  </section>
+
+{% else %}
+  {# LP-78: the page the customer shows at the counter. #}
+  <article class="card card--wide order-page{% if not order.active %} order-page--done{% endif %}">
+    <p class="order-page__status"><span class="status-badge{% if order.active %} status-badge--active{% endif %}">{{ order.status_label }}</span></p>
+
+    <div class="order-code{% if not order.active %} order-code--done{% endif %}">
+      <span class="order-code__label">Pickup code</span>
+      <strong class="order-code__value" aria-label="Pickup code {{ order.pickup_code }}">{{ order.pickup_code }}</strong>
+      {% if order.active %}<span class="order-code__hint">Show this code at the counter</span>{% endif %}
+    </div>
+
+    {% if order.active %}
+      <p class="order-deadline">
+        Pick up by <strong>{{ order.pick_up_by_time }}</strong>
+        <span class="muted">({{ order.pick_up_by_day }})</span>
+        <br>
+        <span class="countdown{% if order.time_passed %} countdown--passed{% endif %}"
+              {% if not order.time_passed %}data-deadline="{{ order.deadline_iso }}"{% endif %}>{{ order.countdown }}</span>
+      </p>
+    {% endif %}
+
+    <h2>Items</h2>
+    <ul class="order-items">
+      {% for item in order.items %}
+        <li><span>{{ item.quantity }} × {{ item.title }}</span> <span class="muted">${{ item.unit_price }} each</span> <span class="order-items__total">${{ item.line_total }}</span></li>
+      {% endfor %}
+    </ul>
+    <p class="cart-total"><span>Total</span><strong>${{ order.total }}</strong></p>
+    {% if order.active %}<p class="order-pay">Pay ${{ order.total }} in cash at pickup.</p>{% endif %}
+
+    <h2>Where</h2>
+    <dl class="details">
+      <dt>Restaurant</dt>
+      <dd>{{ order.place.name|default:"Restaurant" }}{% if order.place.branch %} · {{ order.place.branch }}{% endif %}</dd>
+      {% if order.place.address %}
+        <dt>Address</dt>
+        <dd>{{ order.place.address }}</dd>
+      {% endif %}
+      {% if order.place.phone %}
+        <dt>Phone</dt>
+        <dd><a href="tel:{{ order.place.phone|cut:' ' }}">{{ order.place.phone }}</a></dd>
+      {% endif %}
+      <dt>Pickup time</dt>
+      <dd>{{ order.pickup_window }} <span class="muted">(Lebanon time)</span></dd>
+    </dl>
+  </article>
+  <script src="{% static 'js/countdown.js' %}" defer></script>
+{% endif %}
+{% endblock %}

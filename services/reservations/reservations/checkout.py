@@ -184,6 +184,20 @@ def _snapshots(items):
     return snapshots
 
 
+def place_from_offer(offer):
+    """LP-78: where to collect, as Marketplace showed it at checkout."""
+    shop = offer.get("shop") if isinstance(offer.get("shop"), dict) else {}
+    branch = offer.get("branch") if isinstance(offer.get("branch"), dict) else {}
+    several = (shop.get("branch_count") or 1) > 1
+    return {
+        "shop_name": shop.get("name") or "",
+        # Named only when the restaurant has several branches, as on every page.
+        "branch_name": (branch.get("name") or "") if several else "",
+        "pickup_address": branch.get("address") or offer.get("pickup_address") or "",
+        "shop_phone": shop.get("public_contact") or "",
+    }
+
+
 def _lock_customer(customer_user_id):
     """Held until the transaction ends, so one customer's checkouts (two tabs,
     a double click) are counted and saved one at a time."""
@@ -228,6 +242,7 @@ def _save_processing_order(customer_user_id, request_key, items, now):
             request_key=request_key,
             lines=_snapshots(items),
             now=now,
+            place=place_from_offer(first),
         )
     return order, True
 

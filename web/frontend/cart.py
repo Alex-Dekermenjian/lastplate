@@ -29,7 +29,6 @@ from .services import ServiceUnavailable
 CART_KEY = "cart"
 UNAVAILABLE = "We can't reach the food service right now. Please try again in a few minutes."
 NO_LONGER_AVAILABLE = "Sorry, that food is no longer available."
-PLACED_KEY = "placed_order"
 TRY_AGAIN = "We couldn't place your order. Nothing was reserved yet. Please press Reserve again."
 
 
@@ -234,7 +233,6 @@ def view_cart(request):
 
     return render(request, "frontend/cart.html", {
         "request_key": key,
-        "placed": request.session.pop(PLACED_KEY, None),
         "has_gone": any(not line["available"] for line in lines),
         "cart": cart,
         # LP-66: carts saved before the logo was kept simply show the initial.
@@ -273,16 +271,6 @@ def _apply_problems(request, cart, problems):
     cart["problems"] = shown
 
 
-def _placed_summary(cart, order):
-    moment = lebanon_time(order.get("pick_up_by"))
-    return {
-        "pickup_code": order.get("pickup_code") or "",
-        "pick_up_by": f"{moment:%a} {moment.day} {moment:%b}, {moment:%H:%M}" if moment else "",
-        "total": order.get("total_cash") or "",
-        "place": place_name(cart),
-    }
-
-
 @customer_required
 @require_POST
 def checkout(request):
@@ -310,11 +298,10 @@ def checkout(request):
         return redirect("cart")
 
     data = data if isinstance(data, dict) else {}
-    if status in (200, 201) and data.get("pickup_code"):
-        # LP-78 will show a full confirmation page; for now a short message.
-        request.session[PLACED_KEY] = _placed_summary(cart, data)
+    if status in (200, 201) and data.get("pickup_code") and data.get("reservation_ref"):
+        # LP-78: straight to the order page the customer shows at the counter.
         save_cart(request, empty_cart())
-        return redirect("cart")
+        return redirect("order-detail", reservation_ref=data["reservation_ref"])
     if status == 202:
         messages.warning(request, data.get("detail") or TRY_AGAIN)
         return redirect("cart")
