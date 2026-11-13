@@ -38,6 +38,8 @@ SERVICE_KEY_SETTINGS = {
 # Which service .env gets which compose.env value, under which name.
 SERVICE_ENV_KEYS = {
     "marketplace": {"RESERVATIONS_SERVICE_KEY": "RESERVATIONS_TO_MARKETPLACE_KEY"},
+    # LP-19: Reservations sends the same key when it calls Marketplace.
+    "reservations": {"MARKETPLACE_SERVICE_KEY": "RESERVATIONS_TO_MARKETPLACE_KEY"},
 }
 
 

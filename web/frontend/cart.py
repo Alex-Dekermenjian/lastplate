@@ -4,24 +4,33 @@ The cart lives only in the server-side session: no database table and no
 reservation, so stock is not held until checkout (LP-19). Every add and
 every cart page view re-reads each offer from Marketplace, so quantities
 never go above what is left and sold-out offers show as no longer available.
+
+LP-19: "Reserve" sends the cart to Reservations, which rechecks every item
+and holds the stock. The cart page carries a request_key that stays the same
+while the cart does, so a double click or a retry gives one order; any change
+to the cart starts a new attempt with a new key.
 """
 
+import uuid
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from . import services
-from .account_views import customer_required
-from .browse_views import offer_for_display
+from .account_views import authenticated_call, customer_required
+from .browse_views import lebanon_time, offer_for_display
 from .listing_photos import photo_url
 from .services import ServiceUnavailable
 
 CART_KEY = "cart"
 UNAVAILABLE = "We can't reach the food service right now. Please try again in a few minutes."
 NO_LONGER_AVAILABLE = "Sorry, that food is no longer available."
+PLACED_KEY = "placed_order"
+TRY_AGAIN = "We couldn't place your order. Nothing was reserved yet. Please press Reserve again."
 
 
 def empty_cart():
@@ -36,6 +45,19 @@ def get_cart(request):
     if not isinstance(cart, dict) or not cart.get("lines"):
         return empty_cart()
     return cart
+
+
+def new_attempt(cart):
+    """The cart changed: the next Reserve is a new checkout with a new key."""
+    cart.pop("request_key", None)
+    cart.pop("problems", None)
+
+
+def request_key(cart):
+    """The key for this cart's checkout, made when the cart page loads."""
+    if not cart.get("request_key"):
+        cart["request_key"] = str(uuid.uuid4())
+    return cart["request_key"]
 
 
 def save_cart(request, cart):
@@ -127,6 +149,7 @@ def add_to_cart(request, listing_id):
     cart["lines"][key] = wanted
     cart["prices"][key] = str(offer.get("discounted_price"))
     cart.setdefault("titles", {})[key] = offer.get("title") or ""
+    new_attempt(cart)
     save_cart(request, cart)
     if wanted:
         messages.success(request, f"Added {offer.get('title') or 'food'} to your cart.")
@@ -161,6 +184,7 @@ def update_cart(request, listing_id):
             cart["lines"][key] += 1
     if not cart["lines"]:
         cart = empty_cart()
+    new_attempt(cart)
     save_cart(request, cart)
     return redirect("cart")
 
@@ -185,9 +209,12 @@ def view_cart(request):
         if quantity > free:
             # Someone else took some: never keep more than is left.
             quantity = cart["lines"][key] = free
+            new_attempt(cart)
             messages.info(request, f"Only {free} left of {offer.get('title') or 'one item'}; we updated your cart.")
         cart["prices"][key] = str(offer.get("discounted_price"))
         cart.setdefault("titles", {})[key] = offer.get("title") or ""
+        # LP-19: so a later "no longer available" can say "Pickup ended".
+        cart.setdefault("ends", {})[key] = offer.get("pickup_end") or ""
         line_total = money(offer.get("discounted_price")) * quantity
         total += line_total
         lines.append({
@@ -198,10 +225,17 @@ def view_cart(request):
             "at_most": quantity >= free,
         })
 
+    problems = cart.get("problems", {})
+    for line in lines:
+        line["problem"] = problems.get(str(line["id"]), "")
+    key = request_key(cart) if cart["lines"] else ""
     if not unavailable:
         save_cart(request, cart)
 
     return render(request, "frontend/cart.html", {
+        "request_key": key,
+        "placed": request.session.pop(PLACED_KEY, None),
+        "has_gone": any(not line["available"] for line in lines),
         "cart": cart,
         # LP-66: carts saved before the logo was kept simply show the initial.
         "shop_logo": photo_url(cart.get("shop_logo")),
@@ -209,3 +243,89 @@ def view_cart(request):
         "total": total,
         "unavailable": unavailable,
     })
+
+
+def _problem_text(cart, problem):
+    """What to show on a cart line; "Pickup ended." when we know it did."""
+    key = str(problem.get("listing_id"))
+    if problem.get("code") == "not_available":
+        end = lebanon_time(cart.get("ends", {}).get(key))
+        if end is not None and end <= timezone.now():
+            return "Pickup ended."
+    return problem.get("detail") or NO_LONGER_AVAILABLE
+
+
+def _apply_problems(request, cart, problems):
+    """Show each problem on its line, and never keep more than is left."""
+    shown = {}
+    for problem in problems:
+        key = str(problem.get("listing_id"))
+        if key not in cart["lines"]:
+            messages.error(request, problem.get("detail") or TRY_AGAIN)
+            continue
+        shown[key] = _problem_text(cart, problem)
+        free = problem.get("free_quantity")
+        if problem.get("code") == "only_n_left" and isinstance(free, int) and free > 0:
+            cart["lines"][key] = min(cart["lines"][key], free)
+        if problem.get("code") == "price_changed" and problem.get("unit_price"):
+            cart["prices"][key] = str(problem["unit_price"])
+    new_attempt(cart)
+    cart["problems"] = shown
+
+
+def _placed_summary(cart, order):
+    moment = lebanon_time(order.get("pick_up_by"))
+    return {
+        "pickup_code": order.get("pickup_code") or "",
+        "pick_up_by": f"{moment:%a} {moment.day} {moment:%b}, {moment:%H:%M}" if moment else "",
+        "total": order.get("total_cash") or "",
+        "place": place_name(cart),
+    }
+
+
+@customer_required
+@require_POST
+def checkout(request):
+    """LP-19: Reserve. Reservations rechecks every item and holds the stock."""
+    cart = get_cart(request)
+    if not cart["lines"]:
+        return redirect("cart")
+
+    key = request.POST.get("request_key") or ""
+    try:
+        key = str(uuid.UUID(key))
+    except ValueError:
+        # An old page: reload the cart, which makes a fresh key.
+        messages.info(request, "Your cart was updated. Please check it and press Reserve again.")
+        return redirect("cart")
+
+    lines = [{"listing_id": int(listing_id), "quantity": quantity,
+              "expected_unit_price": cart["prices"].get(listing_id)}
+             for listing_id, quantity in cart["lines"].items()]
+    try:
+        status, data = authenticated_call(request, services.create_reservation, key, lines)
+    except ServiceUnavailable:
+        # Unknown outcome: keep the same key, so pressing again continues it.
+        messages.error(request, TRY_AGAIN)
+        return redirect("cart")
+
+    data = data if isinstance(data, dict) else {}
+    if status in (200, 201) and data.get("pickup_code"):
+        # LP-78 will show a full confirmation page; for now a short message.
+        request.session[PLACED_KEY] = _placed_summary(cart, data)
+        save_cart(request, empty_cart())
+        return redirect("cart")
+    if status == 202:
+        messages.warning(request, data.get("detail") or TRY_AGAIN)
+        return redirect("cart")
+    if status == 409 and data.get("code") == "cart_changed":
+        _apply_problems(request, cart, data.get("problems") or [])
+        save_cart(request, cart)
+        messages.error(request, "Something in your cart changed, so nothing was reserved. Please check it below.")
+        return redirect("cart")
+
+    if data.get("code") in ("request_key_reused", "not_reserved"):
+        new_attempt(cart)
+        save_cart(request, cart)
+    messages.error(request, data.get("detail") or TRY_AGAIN)
+    return redirect("cart")

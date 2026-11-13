@@ -1,4 +1,4 @@
-"""Calls to the Accounts and Marketplace APIs.
+"""Calls to the Accounts, Marketplace and Reservations APIs.
 
 The frontend never touches another service's database. Each call returns
 (status, data). A timeout, connection failure or 5xx response raises
@@ -29,7 +29,7 @@ def _read_json(response):
 
 
 @sensitive_variables("payload", "token", "body", "headers")
-def _call(service, method, path, payload=None, token=None):
+def _call(service, method, path, payload=None, token=None, timeout=None):
     body = json.dumps(payload).encode() if payload is not None else None
     headers = {"Accept": "application/json"}
 
@@ -49,7 +49,7 @@ def _call(service, method, path, payload=None, token=None):
     try:
         with urlopen(
             request,
-            timeout=settings.SERVICE_API_TIMEOUT_SECONDS,
+            timeout=timeout or settings.SERVICE_API_TIMEOUT_SECONDS,
         ) as response:
             return response.status, _read_json(response)
     except HTTPError as error:
@@ -434,3 +434,14 @@ def update_branch(access, branch_id, changes):
 @sensitive_variables("access")
 def remove_branch(access, branch_id):
     return _call("marketplace", "DELETE", f"/api/shops/me/branches/{int(branch_id)}/", token=access)
+
+
+# LP-19: checkout. The answer can take several Marketplace calls (one per
+# item), so it gets a longer timeout than other calls.
+@sensitive_variables("access")
+def create_reservation(access, request_key, lines):
+    return _call(
+        "reservations", "POST", "/api/reservations",
+        {"request_key": request_key, "lines": lines},
+        token=access, timeout=settings.CHECKOUT_TIMEOUT_SECONDS,
+    )

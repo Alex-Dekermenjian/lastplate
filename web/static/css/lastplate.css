@@ -578,3 +578,6 @@ p { margin: 0 0 12px; }
 .stock-form__box input { width: 100%; }
 .stock-form__box .button { margin-top: 8px; }
 .confirm > summary.link-button { display: inline-flex; align-items: center; }
+
+/* LP-19: the pickup code the customer reads out at the counter. */
+.pickup-code { font-size: 1.5em; letter-spacing: 0.15em; font-family: ui-monospace, Menlo, Consolas, monospace; }

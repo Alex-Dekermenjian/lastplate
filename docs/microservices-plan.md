@@ -233,7 +233,7 @@ Full request/response examples go in `docs/api/<service>.md` before coding.
 
 | Method and path | Caller | Purpose |
 | --- | --- | --- |
-| `POST /api/reservations` | customer | `{listing_id, quantity, request_key, expected_terms_revision}` |
+| `POST /api/reservations` | customer | Implemented in LP-19 for a one-branch cart: `{request_key, lines: [{listing_id, quantity, expected_unit_price}]}`; one allocation per line, all or nothing |
 | `GET /api/reservations`, `GET /api/reservations/{ref}` | customer | Own reservations and status |
 | `POST /api/reservations/{ref}/cancel` | customer | Before pickup start |
 | `GET /api/shop/reservations` | operator | Reservations for own shop |

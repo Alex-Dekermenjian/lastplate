@@ -27,6 +27,8 @@ urlpatterns = [
     path("cart/", cart.view_cart, name="cart"),
     path("cart/add/<int:listing_id>/", cart.add_to_cart, name="cart-add"),
     path("cart/update/<int:listing_id>/", cart.update_cart, name="cart-update"),
+    # LP-19: Reserve, placing the order from the cart.
+    path("cart/checkout/", cart.checkout, name="cart-checkout"),
 
     # LP-56: one login page and one sign-up page for every kind of account.
     path("login/", account_views.login, name="login"),
