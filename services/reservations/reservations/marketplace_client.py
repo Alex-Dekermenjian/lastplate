@@ -84,6 +84,12 @@ def read_offer(listing_id):
     return status, (body if isinstance(body, dict) else None)
 
 
+def operator_shop(user_id):
+    if not settings.MARKETPLACE_SERVICE_KEY:
+        raise MarketplaceUnavailable("Marketplace service key is not configured")
+    return _request("GET", f"/internal/shops/by-operator/{int(user_id)}", internal=True)
+
+
 def _held(body, ref):
     return isinstance(body, dict) and body.get("reservation_ref") == str(ref)
 

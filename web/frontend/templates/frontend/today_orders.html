@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Today's orders — LastPlate{% endblock %}
+{% block content %}
+<section class="card card--wide">
+  <h1>Today's orders</h1>
+  <p class="muted">Reserved orders by pickup deadline · Lebanon time</p>
+  <form method="get" class="orders-filters">
+    <div class="field">
+      <label for="order-search">Pickup code or customer name</label>
+      <input id="order-search" name="q" value="{{ query }}" type="search" maxlength="150">
+    </div>
+    <div class="field">
+      <label for="order-branch">Branch</label>
+      <select id="order-branch" name="branch_id">
+        <option value="">All branches</option>
+        {% for branch in branches %}<option value="{{ branch.id }}"{% if selected_branch == branch.id|stringformat:"s" %} selected{% endif %}>{{ branch.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="button button--primary">Search</button>
+    <a href="{% url 'today-orders' %}">Clear filters</a>
+  </form>
+  {% if unavailable %}
+    <p role="alert">Can't load orders right now. Please check your filters or try again.</p>
+    <a href="{% url 'today-orders' %}">Try again</a>
+  {% else %}
+    {% for order in orders %}
+    <article class="owner-order">
+      <h2><span class="order-code__value">{{ order.pickup_code }}</span> · {{ order.customer_first_name }}</h2>
+      <p>{{ order.branch_name }} · Reserved</p>
+      <ul>{% for item in order.items %}<li>{{ item.quantity }} × {{ item.title }}</li>{% endfor %}</ul>
+      <p>Cash to collect: <strong>${{ order.total|floatformat:2 }}</strong></p>
+      <p>Pick up by <strong>{{ order.pick_up_by_time }}</strong> · <span class="countdown"{% if not order.time_passed %} data-deadline="{{ order.deadline_iso }}"{% endif %}>{{ order.countdown }}</span></p>
+    </article>
+    {% empty %}<p>No Reserved orders match these filters today.</p>{% endfor %}
+  {% endif %}
+</section>
+<script src="{% static 'js/countdown.js' %}" defer></script>
+{% endblock %}

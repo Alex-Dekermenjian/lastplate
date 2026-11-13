@@ -454,5 +454,10 @@ def my_orders(access):
 
 
 @sensitive_variables("access")
+def shop_orders(access, filters=None):
+    return _call("reservations", "GET", "/api/shop/reservations?" + urlencode(filters or {}), token=access)
+
+
+@sensitive_variables("access")
 def get_order(access, reservation_ref):
     return _call("reservations", "GET", f"/api/reservations/{reservation_ref}", token=access)

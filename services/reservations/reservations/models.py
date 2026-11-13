@@ -107,6 +107,7 @@ class Order(models.Model):
 
     # Plain IDs owned by other services: Accounts user, Marketplace shop/branch.
     customer_user_id = models.PositiveBigIntegerField(db_index=True)
+    customer_first_name = models.CharField(max_length=150, blank=True, default="")
     shop_id = models.PositiveBigIntegerField(db_index=True)
     branch_id = models.PositiveBigIntegerField()
 

@@ -62,3 +62,10 @@ class IsCustomer(BasePermission):
 
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_authenticated and request.user.role == CUSTOMER)
+
+
+class IsOperator(BasePermission):
+    message = "Only restaurant operators may view these orders."
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.role == "SHOP_OPERATOR")

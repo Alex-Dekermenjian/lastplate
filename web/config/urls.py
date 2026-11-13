@@ -9,6 +9,7 @@ from django.urls import path
 from django.views.generic import RedirectView
 
 from frontend import account_views, branch_views, browse_views, cart, console_views, health, listing_views, offer_actions, offer_reserve, order_views, views
+from frontend import shop_order_views
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -55,6 +56,8 @@ urlpatterns = [
     ),
 
     path("workspace/", account_views.workspace, name="workspace"),
+    path("workspace/orders/", shop_order_views.today_orders, name="today-orders"),
+    path("workspace/orders/count/", shop_order_views.orders_badge, name="orders-badge"),
     path("workspace/finish-setup/", account_views.finish_setup, name="finish-setup"),
     path("workspace/profile/", account_views.shop_profile, name="shop-profile"),
     # LP-68: the restaurant's branches (up to 3).

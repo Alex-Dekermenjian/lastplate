@@ -81,7 +81,10 @@ def reservations(request):
 
     data = request.data if isinstance(request.data, dict) else {}
     try:
-        result = place_order(request.user.id, data.get("request_key"), data.get("lines"))
+        name = request.auth.get("display_name", "")
+        first = name.split()[0][:150] if isinstance(name, str) and name.split() else ""
+        result = place_order(request.user.id, data.get("request_key"), data.get("lines"),
+                             customer_first_name=first)
     except CheckoutRefused as refused:
         body = {"code": refused.code, "detail": refused.detail}
         if refused.problems:

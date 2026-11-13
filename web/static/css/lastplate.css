@@ -607,3 +607,8 @@ p { margin: 0 0 12px; }
 .order-row--done { opacity: 0.75; }
 .order-row__top, .order-row__bottom { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 8px; }
 .order-row__items { overflow-wrap: anywhere; }
+
+/* LP-42 owner orders */
+.orders-filters { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+.owner-order { border-top: 1px solid #ddd; padding: 16px 0; overflow-wrap: anywhere; }
+[data-orders-badge] { display: inline-block; min-width: 1.5em; text-align: center; font-weight: 800; }
