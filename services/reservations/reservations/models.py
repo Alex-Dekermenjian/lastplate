@@ -124,6 +124,14 @@ class Order(models.Model):
     cancel_reason = models.TextField(blank=True)
     collected_at = models.DateTimeField(null=True, blank=True)
 
+    # LP-78: where to collect, copied from Marketplace at checkout. The README
+    # rule: the agreed address is saved with the order and never changes
+    # later. Empty for orders placed before LP-78.
+    shop_name = models.CharField(max_length=200, blank=True, default="")
+    branch_name = models.CharField(max_length=100, blank=True, default="")
+    pickup_address = models.CharField(max_length=255, blank=True, default="")
+    shop_phone = models.CharField(max_length=150, blank=True, default="")
+
     objects = OrderQuerySet.as_manager()
 
     class Meta:

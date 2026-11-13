@@ -259,6 +259,18 @@ uses the same checkout as the cart (LP-19), so the same rules apply. The page th
 **Order placed!** with the pickup code, the "pick up by" time and the cash total. Visitors,
 restaurant owners and admins see only the offer details. The cart is not changed.
 
+## Order page and My orders (LP-78)
+
+After **Reserve** (in the cart or on an offer page) the customer lands on the order page,
+the page to show at the counter: the big pickup code, the status, the items, "Pay $X in
+cash at pickup", the restaurant, branch address and phone, the pickup time and "Pick up by
+19:15" with a countdown. **My orders** (in the menu, for customers) lists active orders on
+top and past ones below.
+
+The restaurant, branch, address and phone are saved with the order at checkout (README:
+the agreed address never changes later), so the order page works even when Marketplace is
+down. Orders placed before LP-78 show just the restaurant and branch name.
+
 ## 6. Run one service outside Docker
 
 Useful for debugging. Stop that service's container, keep PostgreSQL in

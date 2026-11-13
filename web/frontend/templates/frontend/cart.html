@@ -6,19 +6,8 @@
 <section class="card card--wide">
   <h1>Your cart</h1>
 
-  {% if placed %}
-    {# LP-19: a short confirmation; LP-78 replaces it with a full order page. #}
-    <div class="notice notice--success" role="status">
-      <p><strong>Order placed!</strong> Your food is reserved at {{ placed.place }}.</p>
-      <p>Pickup code: <strong class="pickup-code">{{ placed.pickup_code }}</strong></p>
-      <p>Pick up by <strong>{{ placed.pick_up_by }}</strong> and pay <strong>${{ placed.total }}</strong> in cash at pickup.</p>
-    </div>
-  {% endif %}
-
   {% if unavailable %}
     <p class="notice notice--warning" role="alert">We can't load your cart right now. Please try again in a few minutes.</p>
-  {% elif not lines and placed %}
-    <a class="button button--secondary button--block" href="{% url 'browse-offers' %}">Browse more food</a>
   {% elif not lines %}
     <p>Your cart is empty.</p>
     <a class="button button--primary button--block" href="{% url 'browse-offers' %}">Browse available food</a>

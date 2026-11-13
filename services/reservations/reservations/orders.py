@@ -84,8 +84,20 @@ def _code_is_taken(branch_id, code):
     return Order.objects.filter(branch_id=branch_id, pickup_code=code, status__in=OPEN_STATUSES).exists()
 
 
-def create_order(*, customer_user_id, shop_id, branch_id, request_key, lines, now=None):
+PLACE_FIELDS = {"shop_name": 200, "branch_name": 100, "pickup_address": 255, "shop_phone": 150}
+
+
+def _place_fields(place):
+    """LP-78: the saved pickup place, trimmed to the column sizes."""
+    place = place or {}
+    return {name: str(place.get(name) or "").strip()[:size] for name, size in PLACE_FIELDS.items()}
+
+
+def create_order(*, customer_user_id, shop_id, branch_id, request_key, lines, now=None, place=None):
     """Store a new PROCESSING order with its item copies and first history row.
+
+    LP-78: `place` (shop_name, branch_name, pickup_address, shop_phone) is
+    saved with the order, so later changes in Marketplace never rewrite it.
 
     Contacting Marketplace for stock is the next step (LP-19/LP-20); this only
     stores the row that must exist before that call (§6, step 2).
@@ -115,6 +127,7 @@ def create_order(*, customer_user_id, shop_id, branch_id, request_key, lines, no
                     total_cash=total.quantize(Decimal("0.01")),
                     created_at=created_at,
                     pick_up_by=pick_up_by(created_at, lines),
+                    **_place_fields(place),
                 )
                 OrderLine.objects.bulk_create(
                     OrderLine(

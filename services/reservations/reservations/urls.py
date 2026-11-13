@@ -6,4 +6,6 @@ from . import views
 
 urlpatterns = [
     path("reservations", views.reservations, name="reservations"),
+    # LP-78: one of the customer's own orders.
+    path("reservations/<uuid:ref>", views.reservation_detail, name="reservation-detail"),
 ]

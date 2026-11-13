@@ -61,8 +61,8 @@ def _new_attempt(request, listing_id):
         _save_seen(request, seen)
 
 
-def _notice(request, listing_id, kind, text, placed=None):
-    request.session[NOTICE_KEY] = {"listing_id": int(listing_id), "kind": kind, "text": text, "placed": placed}
+def _notice(request, listing_id, kind, text):
+    request.session[NOTICE_KEY] = {"listing_id": int(listing_id), "kind": kind, "text": text}
 
 
 def pop_notice(request, listing_id):
@@ -115,15 +115,6 @@ def closed_reason(request, listing_id):
     return {"title": entry.get("title") or "", "reason": PICKUP_ENDED if _ended(entry.get("ends")) else SOLD_OUT}
 
 
-def _placed_summary(order):
-    moment = lebanon_time(order.get("pick_up_by"))
-    return {
-        "pickup_code": order.get("pickup_code") or "",
-        "pick_up_by": f"{moment:%a} {moment.day} {moment:%b}, {moment:%H:%M}" if moment else "",
-        "total": order.get("total_cash") or "",
-    }
-
-
 def _problem_text(entry, problem):
     code = problem.get("code")
     if code == "not_available" and _ended(entry.get("ends")):
@@ -162,10 +153,10 @@ def reserve_offer(request, listing_id):
         return back
 
     data = data if isinstance(data, dict) else {}
-    if status in (200, 201) and data.get("pickup_code"):
+    if status in (200, 201) and data.get("pickup_code") and data.get("reservation_ref"):
+        # LP-78: straight to the order page the customer shows at the counter.
         _new_attempt(request, listing_id)
-        _notice(request, listing_id, "success", "Order placed!", placed=_placed_summary(data))
-        return back
+        return redirect("order-detail", reservation_ref=data["reservation_ref"])
     if status == 202:
         _notice(request, listing_id, "warning", data.get("detail") or TRY_AGAIN)
         return back

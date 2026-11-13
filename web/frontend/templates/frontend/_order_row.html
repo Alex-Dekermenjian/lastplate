@@ -1,0 +1,17 @@
+{# LP-78: one row of My orders; the whole row opens the order page. #}
+<li>
+  <a class="order-row{% if not order.active %} order-row--done{% endif %}" href="{% url 'order-detail' order.ref %}">
+    <span class="order-row__top">
+      <strong>{{ order.place.name|default:"Restaurant" }}{% if order.place.branch %} · {{ order.place.branch }}{% endif %}</strong>
+      <span class="status-badge{% if order.active %} status-badge--active{% endif %}">{{ order.status_label }}</span>
+    </span>
+    <span class="order-row__items">{{ order.items_summary }}</span>
+    <span class="order-row__bottom muted">
+      <span>{{ order.date }} · ${{ order.total }}</span>
+      {% if order.active %}
+        <span class="countdown{% if order.time_passed %} countdown--passed{% endif %}"
+              {% if not order.time_passed %}data-deadline="{{ order.deadline_iso }}"{% endif %}>{{ order.countdown }}</span>
+      {% endif %}
+    </span>
+  </a>
+</li>

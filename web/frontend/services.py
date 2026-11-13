@@ -445,3 +445,14 @@ def create_reservation(access, request_key, lines):
         {"request_key": request_key, "lines": lines},
         token=access, timeout=settings.CHECKOUT_TIMEOUT_SECONDS,
     )
+
+
+# LP-78: the customer's own orders (Reservations answers only for this token's customer).
+@sensitive_variables("access")
+def my_orders(access):
+    return _call("reservations", "GET", "/api/reservations", token=access)
+
+
+@sensitive_variables("access")
+def get_order(access, reservation_ref):
+    return _call("reservations", "GET", f"/api/reservations/{reservation_ref}", token=access)

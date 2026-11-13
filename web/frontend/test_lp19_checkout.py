@@ -8,7 +8,7 @@ import uuid
 
 from django.urls import reverse
 
-from .cart import CART_KEY, PLACED_KEY, TRY_AGAIN
+from .cart import CART_KEY, TRY_AGAIN
 from .services import ServiceUnavailable
 from .test_accounts import patch_service
 from .test_lp56_login_signup import CUSTOMER, OPERATOR
@@ -17,7 +17,14 @@ from .test_lp62_cart import BREAD, CROISSANTS, CartTestCase, offers
 ORDER = {
     "reservation_ref": "0b8d1f0e-6c1e-4a59-9a43-6d3f8d2b0c11", "status": "CONFIRMED", "status_label": "Reserved",
     "pickup_code": "TM9AY3", "pick_up_by": "2026-11-19T17:15:00+00:00", "total_cash": "7.50",
-    "shop_id": 3, "branch_id": 7, "lines": [],
+    "shop_id": 3, "branch_id": 7, "created_at": "2026-11-19T16:15:00+00:00",
+    # LP-78: saved with the order at checkout.
+    "shop_name": "Cedar Bakery", "branch_name": "", "pickup_address": "12 Bliss Street, Beirut",
+    "shop_phone": "+961 1 234 567", "cancelled_by": None, "collected_at": None,
+    "lines": [{"listing_id": 42, "title": "Croissant Box", "quantity": 1, "unit_price": "4.50",
+               "pickup_start": "2026-11-19T16:00:00+00:00", "pickup_end": "2026-11-19T19:00:00+00:00"},
+              {"listing_id": 43, "title": "Bread Bag", "quantity": 1, "unit_price": "3.00",
+               "pickup_start": "2026-11-19T16:00:00+00:00", "pickup_end": "2026-11-19T19:00:00+00:00"}],
 }
 
 
@@ -44,7 +51,8 @@ class CheckoutTestCase(CartTestCase):
         side_effect = answer if isinstance(answer, Exception) else None
         with patch_service("create_reservation", return_value=None if side_effect else answer,
                            side_effect=side_effect) as call, \
-                patch_service("listing_offer", side_effect=offers(changes)):
+                patch_service("listing_offer", side_effect=offers(changes)), \
+                patch_service("get_order", return_value=(200, ORDER)):
             response = self.client.post(reverse("cart-checkout"), {"request_key": key}, follow=True)
         return response, call, key
 
@@ -67,16 +75,18 @@ class ReserveButtonTests(CheckoutTestCase):
         self.update(43, "increase")
         self.assertNotEqual(self.key_on_page(), first)
 
-    def test_reserve_sends_the_cart_and_shows_the_pickup_code(self):
+    def test_reserve_lands_on_the_order_page_with_the_code_and_total(self):
+        # LP-78: was the one-time "Order placed!" message; now the order page.
         response, call, key = self.reserve()
         access, sent_key, lines = call.call_args.args
         self.assertEqual(sent_key, key)
         self.assertEqual(lines, [{"listing_id": 42, "quantity": 1, "expected_unit_price": "4.50"},
                                  {"listing_id": 43, "quantity": 1, "expected_unit_price": "3.00"}])
-        for text in ("Order placed!", "TM9AY3", "Thu 19 Nov, 19:15", "$7.50", "Cedar Bakery"):
+        self.assertEqual(response.redirect_chain[-1][0], reverse("order-detail", args=[ORDER["reservation_ref"]]))
+        for text in ("TM9AY3", "Pay $7.50 in cash at pickup.", "Pick up by <strong>19:15</strong>", "(Thu 19 Nov)",
+                     "Cedar Bakery"):
             self.assertContains(response, text)
         self.assertEqual(self.lines(), {})  # the cart is emptied
-        self.assertNotIn(PLACED_KEY, self.client.session)  # shown once
 
     def test_reserve_is_post_only(self):
         self.assertEqual(self.client.get(reverse("cart-checkout")).status_code, 405)
