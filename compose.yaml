@@ -118,6 +118,20 @@ services:
       DB_PASSWORD: ${RESERVATIONS_DB_PASSWORD}
       DB_HOST: postgres
       DB_PORT: "5432"
+      # LP-19: verifies customers' sign-in tokens (public key only).
+      JWT_PUBLIC_KEY_FILE: /run/lastplate-keys/jwt-public.pem
+      # LP-19: Marketplace's stock API and the key it expects from
+      # Reservations (the same compose.env value Marketplace gets; never Git).
+      MARKETPLACE_SERVICE_URL: http://marketplace:8000
+      MARKETPLACE_SERVICE_KEY: ${RESERVATIONS_TO_MARKETPLACE_KEY:-}
+    volumes:
+      # Only Accounts' public key, read-only, as for Marketplace.
+      - type: bind
+        source: ./.keys/jwt-public.pem
+        target: /run/lastplate-keys/jwt-public.pem
+        read_only: true
+        bind:
+          create_host_path: false
     ports:
       - "127.0.0.1:8003:8000"
 

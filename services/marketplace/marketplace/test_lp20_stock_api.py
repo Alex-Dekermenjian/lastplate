@@ -5,6 +5,7 @@ write" list. The race test runs on the real PostgreSQL test database, in CI
 too, with 20 threads that each use their own database connection.
 """
 
+import re
 import threading
 import uuid
 from datetime import timedelta
@@ -97,11 +98,13 @@ class MarketplaceOnlyChangesStockTests(StockApiTestCase):
     def test_reservations_code_never_reaches_the_marketplace_database(self):
         settings_text = (RESERVATIONS_DIR / "config" / "settings.py").read_text(encoding="utf-8")
         self.assertEqual(settings_text.count('"ENGINE"'), 1, "Reservations has exactly one database")
+        # Importing Marketplace's code (its models) would mean reading its
+        # database; a module named after it, like marketplace_client, is fine.
+        imports_marketplace = re.compile(r"^\s*(from\s+marketplace[\s.]|import\s+marketplace\b)", re.M)
         for path in RESERVATIONS_DIR.rglob("*.py"):
             text = path.read_text(encoding="utf-8")
             self.assertNotIn("lastplate_marketplace", text, path)
-            self.assertNotIn("from marketplace", text, path)
-            self.assertNotIn("import marketplace", text, path)
+            self.assertIsNone(imports_marketplace.search(text), path)
 
     def test_stock_endpoints_are_internal_only(self):
         # The public API has no way to hold or release stock.

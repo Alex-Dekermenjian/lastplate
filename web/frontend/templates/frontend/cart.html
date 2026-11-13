@@ -6,8 +6,19 @@
 <section class="card card--wide">
   <h1>Your cart</h1>
 
+  {% if placed %}
+    {# LP-19: a short confirmation; LP-78 replaces it with a full order page. #}
+    <div class="notice notice--success" role="status">
+      <p><strong>Order placed!</strong> Your food is reserved at {{ placed.place }}.</p>
+      <p>Pickup code: <strong class="pickup-code">{{ placed.pickup_code }}</strong></p>
+      <p>Pick up by <strong>{{ placed.pick_up_by }}</strong> and pay <strong>${{ placed.total }}</strong> in cash at pickup.</p>
+    </div>
+  {% endif %}
+
   {% if unavailable %}
     <p class="notice notice--warning" role="alert">We can't load your cart right now. Please try again in a few minutes.</p>
+  {% elif not lines and placed %}
+    <a class="button button--secondary button--block" href="{% url 'browse-offers' %}">Browse more food</a>
   {% elif not lines %}
     <p>Your cart is empty.</p>
     <a class="button button--primary button--block" href="{% url 'browse-offers' %}">Browse available food</a>
@@ -26,6 +37,9 @@
               <span class="muted">${{ line.discounted_price }} each · pickup {{ line.pickup_window }}</span>
             {% else %}
               <span class="cart-line__gone">No longer available</span>
+            {% endif %}
+            {% if line.problem %}
+              <span class="cart-line__gone" role="alert">{{ line.problem }}</span>
             {% endif %}
           </div>
 
@@ -61,9 +75,18 @@
       <strong>${{ total }}</strong>
     </p>
 
-    {# LP-19 turns this into the real checkout. #}
-    <button class="button button--primary button--block" type="button" disabled>Checkout</button>
-    <p class="help" style="text-align: center;">Ordering opens soon.</p>
+    {# LP-19: the real checkout. The key stays the same while the cart does. #}
+    {% if has_gone %}
+      <button class="button button--primary button--block" type="button" disabled>Reserve</button>
+      <p class="help" style="text-align: center;">Remove what is no longer available, then reserve.</p>
+    {% else %}
+      <form method="post" action="{% url 'cart-checkout' %}">
+        {% csrf_token %}
+        <input type="hidden" name="request_key" value="{{ request_key }}">
+        <button class="button button--primary button--block" type="submit">Reserve</button>
+      </form>
+      <p class="help" style="text-align: center;">We hold the food for you; you pay in cash at pickup.</p>
+    {% endif %}
   {% endif %}
 </section>
 {% endblock %}

@@ -51,6 +51,7 @@ MARKETPLACE_PUBLIC_URL = os.environ.get("MARKETPLACE_PUBLIC_URL", "http://127.0.
 STAFF_ADMIN_URL = os.environ.get("STAFF_ADMIN_URL", f"{MARKETPLACE_PUBLIC_URL}/admin/")
 SERVICE_TIMEOUT_SECONDS = 2  # health checks on the status page
 SERVICE_API_TIMEOUT_SECONDS = 8  # API calls; registration hashes a password
+CHECKOUT_TIMEOUT_SECONDS = 20  # LP-19: one checkout makes several Marketplace calls
 
 
 # Application definition

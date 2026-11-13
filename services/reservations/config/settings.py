@@ -108,15 +108,40 @@ PICKUP_HOLD_MINUTES = _pickup_hold_minutes(os.environ.get("PICKUP_HOLD_MINUTES",
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-# JSON-only API. Token verification is planned (see docs/microservices-plan.md);
-# until then no request is authenticated and API views deny access unless they
-# explicitly allow it, as the health endpoints do.
+# JSON-only API. LP-19: callers are identified by Accounts-issued access
+# tokens, verified offline with Accounts' public key (docs/microservices-plan.md §4).
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_AUTHENTICATION_CLASSES": ["reservations.authentication.AccessTokenAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "UNAUTHENTICATED_USER": None,
 }
+
+
+def read_key_file(setting, default_path):
+    """Read a PEM key from the path in `setting`, else from `default_path`."""
+    from django.core.exceptions import ImproperlyConfigured
+
+    path = Path(os.environ.get(setting) or default_path)
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        raise ImproperlyConfigured(
+            f"JWT public key not found at {path} ({setting}). "
+            "Run scripts/init_dev_env.py to create local development keys."
+        ) from None
+
+
+# LP-19: Accounts' RS256 public key, enough to verify access tokens, never to
+# create them. This service never receives the private key.
+JWT_PUBLIC_KEY = read_key_file("JWT_PUBLIC_KEY_FILE", BASE_DIR.parent.parent / ".keys" / "jwt-public.pem")
+
+# LP-19: Marketplace's stock API (LP-20). The key is the one Marketplace
+# expects from "reservations"; it lives only in compose.env / .env, never Git.
+MARKETPLACE_SERVICE_URL = os.environ.get("MARKETPLACE_SERVICE_URL", "http://127.0.0.1:8002").rstrip("/")
+MARKETPLACE_SERVICE_KEY = os.environ.get("MARKETPLACE_SERVICE_KEY", "").strip()
+# Short, so a slow Marketplace gives "Try again" quickly (plan §6, step 3).
+MARKETPLACE_TIMEOUT_SECONDS = float(os.environ.get("MARKETPLACE_TIMEOUT_SECONDS", "3"))
 
 
 # Database: this service's own PostgreSQL database and database user.
