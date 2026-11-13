@@ -6,13 +6,17 @@
   <h1>Today's orders</h1>
   <p class="muted">Reserved orders by pickup deadline · Lebanon time</p>
   <form method="get" class="orders-filters">
-    <label for="order-search">Pickup code or customer name</label>
-    <input id="order-search" name="q" value="{{ query }}" type="search" maxlength="150">
-    <label for="order-branch">Branch</label>
-    <select id="order-branch" name="branch_id">
-      <option value="">All branches</option>
-      {% for branch in branches %}<option value="{{ branch.id }}"{% if selected_branch == branch.id|stringformat:"s" %} selected{% endif %}>{{ branch.name }}</option>{% endfor %}
-    </select>
+    <div class="field">
+      <label for="order-search">Pickup code or customer name</label>
+      <input id="order-search" name="q" value="{{ query }}" type="search" maxlength="150">
+    </div>
+    <div class="field">
+      <label for="order-branch">Branch</label>
+      <select id="order-branch" name="branch_id">
+        <option value="">All branches</option>
+        {% for branch in branches %}<option value="{{ branch.id }}"{% if selected_branch == branch.id|stringformat:"s" %} selected{% endif %}>{{ branch.name }}</option>{% endfor %}
+      </select>
+    </div>
     <button type="submit" class="button button--primary">Search</button>
     <a href="{% url 'today-orders' %}">Clear filters</a>
   </form>
