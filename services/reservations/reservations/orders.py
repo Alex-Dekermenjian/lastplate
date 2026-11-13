@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from .models import (
@@ -30,7 +31,7 @@ from .models import (
 
 BEIRUT = ZoneInfo("Asia/Beirut")
 
-# Allowed moves (§6). CANCELLED, COLLECTED, EXPIRED and NOT_RESERVED are final.
+# Allowed ordinary moves (§6). LP-24 adds an explicit guarded Paid undo below.
 ALLOWED_CHANGES = {
     Status.PROCESSING: {Status.CONFIRMED, Status.NOT_RESERVED, Status.CANCELLED, Status.EXPIRED},
     Status.CONFIRMED: {Status.CANCELLED, Status.COLLECTED, Status.EXPIRED},
@@ -81,7 +82,9 @@ def new_pickup_code():
 
 
 def _code_is_taken(branch_id, code):
-    return Order.objects.filter(branch_id=branch_id, pickup_code=code, status__in=OPEN_STATUSES).exists()
+    return Order.objects.filter(branch_id=branch_id, pickup_code=code).filter(
+        Q(status__in=OPEN_STATUSES) | Q(status=Status.COLLECTED, sync_state="CONSUME_PENDING",
+                                      consumption_started_at__isnull=True)).exists()
 
 
 PLACE_FIELDS = {"shop_name": 200, "branch_name": 100, "pickup_address": 255, "shop_phone": 150}
@@ -93,7 +96,7 @@ def _place_fields(place):
     return {name: str(place.get(name) or "").strip()[:size] for name, size in PLACE_FIELDS.items()}
 
 
-def create_order(*, customer_user_id, shop_id, branch_id, request_key, lines, now=None, place=None, customer_first_name=""):
+def create_order(*, customer_user_id, shop_id, branch_id, request_key, lines, now=None, place=None, customer_first_name="", customer_phone=""):
     """Store a new PROCESSING order with its item copies and first history row.
 
     LP-78: `place` (shop_name, branch_name, pickup_address, shop_phone) is
@@ -121,6 +124,7 @@ def create_order(*, customer_user_id, shop_id, branch_id, request_key, lines, no
                 order = Order.objects.create(
                     customer_user_id=customer_user_id,
                     customer_first_name=customer_first_name[:150],
+                    customer_phone=customer_phone,
                     shop_id=shop_id,
                     branch_id=branch_id,
                     request_key=request_key,
@@ -155,7 +159,7 @@ def create_order(*, customer_user_id, shop_id, branch_id, request_key, lines, no
     raise RuntimeError("Could not find a free pickup code for this branch.")
 
 
-def change_status(order, to_status, *, actor, reason="", sync_state=None, expected_status=None, now=None):
+def change_status(order, to_status, *, actor, reason="", sync_state=None, expected_status=None, now=None, undo_collection=False):
     """Move an order to another status and record it in its history.
 
     Locks the row, checks the change is allowed from the status it has now
@@ -165,14 +169,22 @@ def change_status(order, to_status, *, actor, reason="", sync_state=None, expect
     to_status = Status(to_status)
     actor = Actor(actor)
     reason = (reason or "").strip()
-    moment = now or timezone.now()
-
     with transaction.atomic():
         locked = Order.objects.select_for_update().get(pk=order.pk)
+        moment = now or timezone.now()
         from_status = Status(locked.status)
         if expected_status is not None and from_status != Status(expected_status):
             raise InvalidStatusChange(f"The order is {from_status.label}, not {Status(expected_status).label}.")
-        if to_status not in ALLOWED_CHANGES.get(from_status, set()):
+        undo = undo_collection and from_status == Status.COLLECTED and to_status == Status.CONFIRMED
+        if undo:
+            from .collection import UNDO_WINDOW
+            if actor != Actor.SHOP or locked.sync_state != "CONSUME_PENDING" \
+                    or locked.consumption_started_at is not None or locked.collected_at is None \
+                    or moment < locked.collected_at or moment >= locked.collected_at + UNDO_WINDOW:
+                raise InvalidStatusChange("This payment can no longer be undone.")
+            locked.collected_at = None
+            sync_state = "SYNCED"
+        if not undo and to_status not in ALLOWED_CHANGES.get(from_status, set()):
             raise InvalidStatusChange(f"An order that is {from_status.label} cannot become {to_status.label}.")
 
         if to_status == Status.CANCELLED:

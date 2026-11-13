@@ -1,12 +1,27 @@
 """LP-42: thin owner order pages; all selection and ownership is in the API."""
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET
 
 from . import services
-from .account_views import authenticated_call, operator_required
+from .account_views import authenticated_call, operator_required, unapproved_shop_page
 from .order_views import order_for_display
 from .services import ServiceUnavailable
+
+
+def owner_orders_gate(request):
+    """Use the same setup/approval navigation as the restaurant workspace."""
+    try:
+        status, shop = authenticated_call(request, services.my_shop)
+    except ServiceUnavailable:
+        return None  # let the order API report availability, without guessing approval
+    if status == 404:
+        return redirect("restaurant-apply")
+    if status == 200 and isinstance(shop, dict) and shop.get("approval_status"):
+        destination = unapproved_shop_page(shop)
+        if destination:
+            return redirect(destination)
+    return None
 
 
 def load(request, filters):
@@ -28,13 +43,21 @@ def load(request, filters):
 @operator_required
 @require_GET
 def today_orders(request):
-    filters = {key: request.GET.get(key, "") for key in ("q", "branch_id")}
+    gate = owner_orders_gate(request)
+    if gate is not None:
+        return gate
+    filters = {key: request.GET.get(key, "") for key in ("q", "branch_id", "status")}
+    if not filters["status"]:
+        filters.pop("status")
     status, data = load(request, filters)
-    context = {"query": filters["q"], "selected_branch": filters["branch_id"], "unavailable": data is None}
+    context = {"query": filters["q"], "selected_branch": filters["branch_id"], "unavailable": data is None,
+               "paid_tab": filters.get("status") == "COLLECTED"}
     if data is not None:
         try:
             rows = [
                 {**order_for_display(order), "customer_first_name": order.get("customer_first_name") or "Customer",
+                 "collection_version": order.get("collection_version", 0), "can_undo": order.get("can_undo", False),
+                 "branch_id": order.get("branch_id"),
                  "branch_name": order.get("branch_name") or next(
                      (b["name"] for b in data["branches"] if b["id"] == order.get("branch_id")), "Branch")}
                 for order in data["orders"]

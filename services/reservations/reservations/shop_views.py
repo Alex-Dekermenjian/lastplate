@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from .authentication import IsOperator
 from .marketplace_client import MarketplaceUnavailable, operator_shop
 from .models import Order, Status
-from .views import order_data
+from .collection_views import shop_order_data
 
 
 @never_cache
@@ -41,8 +41,10 @@ def shop_reservations(request):
     end = datetime.combine(today + timedelta(days=1), time.min, tzinfo=zone)
     ids = [b["id"] for b in branches]
     orders = Order.objects.filter(shop_id=shop["id"], branch_id__in=ids,
-                                  status=Status.CONFIRMED, pick_up_by__gte=start, pick_up_by__lt=end)
-    count = orders.filter(pick_up_by__gt=now).count()
+                                  status__in=[Status.CONFIRMED, Status.COLLECTED], pick_up_by__gte=start, pick_up_by__lt=end)
+    count = orders.filter(status=Status.CONFIRMED, pick_up_by__gt=now).count()
+    wanted_status = Status.COLLECTED if request.query_params.get("status") == "COLLECTED" else Status.CONFIRMED
+    orders = orders.filter(status=wanted_status)
     branch = request.query_params.get("branch_id", "")
     if branch:
         try:
@@ -58,5 +60,5 @@ def shop_reservations(request):
     rows = []
     if request.query_params.get("count_only") != "1":
         for order in orders.prefetch_related("lines").order_by("pick_up_by", "id"):
-            rows.append({**order_data(order), "customer_first_name": order.customer_first_name or "Customer"})
+            rows.append(shop_order_data(order))
     return Response({"orders": rows, "branches": branches, "count": count})

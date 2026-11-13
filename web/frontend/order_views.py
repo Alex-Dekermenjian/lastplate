@@ -75,6 +75,7 @@ def order_for_display(order, place=None):
         "ref": order.get("reservation_ref") or "",
         "pickup_code": order.get("pickup_code") or "",
         "status_label": status_label,
+        "customer_phone": order.get("customer_phone", "") if active else "",
         "active": active,
         "items": [
             {"title": line.get("title") or "Food", "quantity": line.get("quantity") or 0,
