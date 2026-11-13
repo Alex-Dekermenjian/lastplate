@@ -251,6 +251,14 @@ Marketplace does not answer, the cart asks to press **Reserve** again; that cont
 same order. A customer can have at most 2 orders waiting for pickup. Orders are listed,
 read-only, at http://127.0.0.1:8003/admin/reservations/order/.
 
+## Reserve from an offer page (LP-83)
+
+A signed-in customer can also order one item without the cart: **Browse food** → **View
+offer** → at the bottom of the offer page, choose a **Quantity** and press **Reserve**. It
+uses the same checkout as the cart (LP-19), so the same rules apply. The page then shows
+**Order placed!** with the pickup code, the "pick up by" time and the cash total. Visitors,
+restaurant owners and admins see only the offer details. The cart is not changed.
+
 ## 6. Run one service outside Docker
 
 Useful for debugging. Stop that service's container, keep PostgreSQL in
