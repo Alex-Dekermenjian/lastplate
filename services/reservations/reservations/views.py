@@ -28,7 +28,7 @@ from rest_framework.response import Response
 
 from .authentication import IsCustomer
 from .checkout import CheckoutRefused, TryAgain, place_order
-from .models import Order
+from .models import Order, Status
 
 # LP-78: how many orders "My orders" shows.
 MAX_LISTED = 50
@@ -38,6 +38,7 @@ def order_data(order):
     return {
         "reservation_ref": str(order.reservation_ref),
         "status": order.status,
+        "customer_phone": order.customer_phone if order.status == Status.CONFIRMED else "",
         "status_label": order.status_label,
         # LP-78: who cancelled ("Customer", "Restaurant", "Admin") and when it was paid.
         "cancelled_by": order.get_cancelled_by_display() if order.cancelled_by else None,
@@ -83,8 +84,11 @@ def reservations(request):
     try:
         name = request.auth.get("display_name", "")
         first = name.split()[0][:150] if isinstance(name, str) and name.split() else ""
+        phone = data.get("customer_phone", "")
+        if not isinstance(phone, str) or len(phone) > 32 or any(c not in "+0123456789 ()-" for c in phone):
+            return Response({"code": "invalid_request", "detail": "Enter a valid phone number (up to 32 characters)."}, status=400)
         result = place_order(request.user.id, data.get("request_key"), data.get("lines"),
-                             customer_first_name=first)
+                             customer_first_name=first, customer_phone=phone.strip())
     except CheckoutRefused as refused:
         body = {"code": refused.code, "detail": refused.detail}
         if refused.problems:

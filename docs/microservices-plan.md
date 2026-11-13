@@ -355,8 +355,15 @@ allocation and overselling.
 
 ### Collection and shop cancellation
 
-- Collection (`pickup_start <= now < pickup_end`): set COLLECTED and
-  CONSUME_PENDING, then call consume. HELD → CONSUMED.
+- Collection (LP-24, `pickup_start <= now < pick_up_by`): set COLLECTED,
+  collected_at and CONSUME_PENDING under the order lock. Do not call consume
+  immediately. The restaurant may undo Paid for ten minutes, restoring Reserved
+  with an audit event. LP-25 must durably claim consumption after that window,
+  under the same lock, before calling Marketplace. A claim permanently blocks
+  undo, including after HTTP failures. The timing, version/idempotency rules,
+  per-line allocation references and concurrency contract are specified in
+  [LP-24 collection contract](api/lp24-collection.md). HELD → CONSUMED happens
+  only through that later worker; no worker is implemented by LP-24.
   - **Consumed stock stays unavailable.** CONSUMED still counts in the free
     stock formula, and release is refused on CONSUMED.
   - Until the consume call succeeds, the allocation is still HELD, which also
@@ -392,7 +399,8 @@ These cases were unresolved in the first draft.
    only CONFIRMED rows; case 1 covers late resolution. Shops can collect or
    cancel only CONFIRMED reservations.
 6. **Consume and release retries arrive in either order.** Reservations
-   allows only one terminal transition per reservation. Marketplace moves only
+   serializes status transitions; LP-24's guarded undo is allowed only before
+   consumption is claimed. Marketplace moves only
    from HELD, so a stray release after CONSUMED returns 409 and is flagged
    NEEDS_ATTENTION. Units are never returned.
 7. **Release must match the allocation.** Release, consume and shop-cancel

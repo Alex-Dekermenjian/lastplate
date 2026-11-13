@@ -8,6 +8,9 @@ from .test_lp78_my_orders import make_order
 class OwnerOrderPagesTests(WebAuthTestCase):
     def setUp(self):
         self.sign_in_session()
+        shop = patch_service("my_shop", return_value=(200, APPROVED_SHOP))
+        shop.start()
+        self.addCleanup(shop.stop)
         self.body = {"orders": [{**make_order(), "customer_first_name": "Maya"}],
                      "branches": [{"id": 7, "name": "Hamra"}], "count": 1}
         patcher = patch_service("shop_orders", return_value=(200, self.body))

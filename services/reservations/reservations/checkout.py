@@ -218,7 +218,7 @@ def _existing(customer_user_id, request_key, items):
     return order
 
 
-def _save_processing_order(customer_user_id, request_key, items, now, customer_first_name=""):
+def _save_processing_order(customer_user_id, request_key, items, now, customer_first_name="", customer_phone=""):
     """Step 2. Returns (order, created)."""
     with transaction.atomic():
         _lock_customer(customer_user_id)
@@ -244,6 +244,7 @@ def _save_processing_order(customer_user_id, request_key, items, now, customer_f
             now=now,
             place=place_from_offer(first),
             customer_first_name=customer_first_name,
+            customer_phone=customer_phone,
         )
     return order, True
 
@@ -332,7 +333,7 @@ def _hold_items(order, offers, now):
         return Order.objects.get(pk=order.pk)
 
 
-def place_order(customer_user_id, request_key, lines, now=None, customer_first_name=""):
+def place_order(customer_user_id, request_key, lines, now=None, customer_first_name="", customer_phone=""):
     """Place (or continue) one checkout. Returns CheckoutResult; raises
     CheckoutRefused (nothing reserved) or TryAgain (outcome unknown)."""
     request_key = (request_key or "").strip()
@@ -351,7 +352,7 @@ def place_order(customer_user_id, request_key, lines, now=None, customer_first_n
     if existing is None:
         _recheck(items, now)
         try:
-            order, created = _save_processing_order(customer_user_id, request_key, items, now, customer_first_name)
+            order, created = _save_processing_order(customer_user_id, request_key, items, now, customer_first_name, customer_phone)
         except IntegrityError:
             # The same checkout was saved a moment ago by a parallel request.
             order, created = _existing(customer_user_id, request_key, items), False

@@ -4,8 +4,14 @@
 {% block content %}
 <section class="card card--wide">
   <h1>Today's orders</h1>
-  <p class="muted">Reserved orders by pickup deadline · Lebanon time</p>
+  <p><a href="{% url 'pickup-code' %}">Enter pickup code</a></p>
+  <nav aria-label="Order status">
+    <a href="{% url 'today-orders' %}"{% if not paid_tab %} aria-current="page"{% endif %}>Reserved</a> ·
+    <a href="{% url 'today-orders' %}?status=COLLECTED"{% if paid_tab %} aria-current="page"{% endif %}>Paid</a>
+  </nav>
+  <p class="muted">{% if paid_tab %}Paid{% else %}Reserved{% endif %} orders by pickup deadline · Lebanon time</p>
   <form method="get" class="orders-filters">
+    {% if paid_tab %}<input type="hidden" name="status" value="COLLECTED">{% endif %}
     <div class="field">
       <label for="order-search">Pickup code or customer name</label>
       <input id="order-search" name="q" value="{{ query }}" type="search" maxlength="150">
@@ -18,7 +24,7 @@
       </select>
     </div>
     <button type="submit" class="button button--primary">Search</button>
-    <a href="{% url 'today-orders' %}">Clear filters</a>
+    <a href="{% url 'today-orders' %}{% if paid_tab %}?status=COLLECTED{% endif %}">Clear filters</a>
   </form>
   {% if unavailable %}
     <p role="alert">Can't load orders right now. Please check your filters or try again.</p>
@@ -27,12 +33,23 @@
     {% for order in orders %}
     <article class="owner-order">
       <h2><span class="order-code__value">{{ order.pickup_code }}</span> · {{ order.customer_first_name }}</h2>
-      <p>{{ order.branch_name }} · Reserved</p>
+      <p>{{ order.branch_name }} · {{ order.status_label }}</p>
       <ul>{% for item in order.items %}<li>{{ item.quantity }} × {{ item.title }}</li>{% endfor %}</ul>
-      <p>Cash to collect: <strong>${{ order.total|floatformat:2 }}</strong></p>
-      <p>Pick up by <strong>{{ order.pick_up_by_time }}</strong> · <span class="countdown"{% if not order.time_passed %} data-deadline="{{ order.deadline_iso }}"{% endif %}>{{ order.countdown }}</span></p>
+      <p>{% if order.active %}Cash to collect:{% else %}Cash received:{% endif %} <strong>${{ order.total|floatformat:2 }}</strong></p>
+      {% if order.active %}
+        <p>Pick up by <strong>{{ order.pick_up_by_time }}</strong> · <span class="countdown"{% if not order.time_passed %} data-deadline="{{ order.deadline_iso }}"{% endif %}>{{ order.countdown }}</span></p>
+        {% if order.customer_phone %}<p>Customer phone: {{ order.customer_phone }}</p>{% endif %}
+        <a href="{% url 'pickup-code' %}?branch_id={{ order.branch_id }}">Enter pickup code</a>
+      {% elif order.can_undo %}
+        <form method="post" action="{% url 'pickup-undo' order.ref %}">
+          {% csrf_token %}
+          <input type="hidden" name="branch_id" value="{{ order.branch_id }}">
+          <input type="hidden" name="version" value="{{ order.collection_version }}">
+          <button class="button button--secondary" type="submit">Undo Paid</button>
+        </form>
+      {% endif %}
     </article>
-    {% empty %}<p>No Reserved orders match these filters today.</p>{% endfor %}
+    {% empty %}<p>No {% if paid_tab %}Paid{% else %}Reserved{% endif %} orders match these filters today.</p>{% endfor %}
   {% endif %}
 </section>
 <script src="{% static 'js/countdown.js' %}" defer></script>

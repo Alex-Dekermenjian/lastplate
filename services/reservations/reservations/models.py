@@ -124,6 +124,9 @@ class Order(models.Model):
     cancelled_by = models.CharField(max_length=10, choices=CancelledBy.choices, blank=True)
     cancel_reason = models.TextField(blank=True)
     collected_at = models.DateTimeField(null=True, blank=True)
+    consumption_started_at = models.DateTimeField(null=True, blank=True)
+    collection_version = models.PositiveIntegerField(default=0)
+    customer_phone = models.CharField(max_length=32, blank=True, default="")
 
     # LP-78: where to collect, copied from Marketplace at checkout. The README
     # rule: the agreed address is saved with the order and never changes
@@ -140,10 +143,12 @@ class Order(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["customer_user_id", "request_key"], name="order_unique_request_key"),
             # The code a customer shows at the counter is unique among the
-            # branch's open orders; closed orders may reuse it later.
+            # branch's open orders and Paid orders awaiting the irreversible
+            # consumption claim. Undo must never collide with a new order.
             models.UniqueConstraint(
                 fields=["branch_id", "pickup_code"],
-                condition=Q(status__in=["PROCESSING", "CONFIRMED"]),
+                condition=Q(status__in=["PROCESSING", "CONFIRMED"]) | Q(
+                    status="COLLECTED", sync_state="CONSUME_PENDING", consumption_started_at__isnull=True),
                 name="order_unique_open_pickup_code_per_branch",
             ),
             models.CheckConstraint(condition=Q(pickup_code__regex=PICKUP_CODE_REGEX), name="order_pickup_code_format"),

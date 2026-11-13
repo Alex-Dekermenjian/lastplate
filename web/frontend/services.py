@@ -439,10 +439,10 @@ def remove_branch(access, branch_id):
 # LP-19: checkout. The answer can take several Marketplace calls (one per
 # item), so it gets a longer timeout than other calls.
 @sensitive_variables("access")
-def create_reservation(access, request_key, lines):
+def create_reservation(access, request_key, lines, customer_phone=""):
     return _call(
         "reservations", "POST", "/api/reservations",
-        {"request_key": request_key, "lines": lines},
+        {"request_key": request_key, "lines": lines, **({"customer_phone": customer_phone} if customer_phone else {})},
         token=access, timeout=settings.CHECKOUT_TIMEOUT_SECONDS,
     )
 
@@ -456,6 +456,17 @@ def my_orders(access):
 @sensitive_variables("access")
 def shop_orders(access, filters=None):
     return _call("reservations", "GET", "/api/shop/reservations?" + urlencode(filters or {}), token=access)
+
+
+@sensitive_variables("access", "payload")
+def pickup_lookup(access, payload):
+    return _call("reservations", "POST", "/api/shop/reservations/lookup", payload, token=access)
+
+
+@sensitive_variables("access", "payload")
+def pickup_payment(access, ref, payload, undo=False):
+    action = "undo" if undo else "collect"
+    return _call("reservations", "POST", f"/api/shop/reservations/{ref}/{action}", payload, token=access)
 
 
 @sensitive_variables("access")

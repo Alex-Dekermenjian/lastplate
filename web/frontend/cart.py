@@ -291,7 +291,9 @@ def checkout(request):
               "expected_unit_price": cart["prices"].get(listing_id)}
              for listing_id, quantity in cart["lines"].items()]
     try:
-        status, data = authenticated_call(request, services.create_reservation, key, lines)
+        phone = request.POST.get("customer_phone", "").strip()
+        args = (key, lines, phone) if phone else (key, lines)
+        status, data = authenticated_call(request, services.create_reservation, *args)
     except ServiceUnavailable:
         # Unknown outcome: keep the same key, so pressing again continues it.
         messages.error(request, TRY_AGAIN)

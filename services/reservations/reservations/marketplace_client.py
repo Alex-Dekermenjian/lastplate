@@ -86,6 +86,7 @@ def read_offer(listing_id):
 
 def operator_shop(user_id):
     if not settings.MARKETPLACE_SERVICE_KEY:
+        logger.error("Marketplace service key is not configured; operator ownership lookup is unavailable.")
         raise MarketplaceUnavailable("Marketplace service key is not configured")
     return _request("GET", f"/internal/shops/by-operator/{int(user_id)}", internal=True)
 

@@ -72,6 +72,11 @@
       <form method="post" action="{% url 'cart-checkout' %}">
         {% csrf_token %}
         <input type="hidden" name="request_key" value="{{ request_key }}">
+        <div class="field">
+          <label for="customer-phone">Contact phone (optional)</label>
+          <input id="customer-phone" name="customer_phone" type="tel" maxlength="32" autocomplete="tel">
+          <p class="help">The restaurant can see this only while your order is Reserved.</p>
+        </div>
         <button class="button button--primary button--block" type="submit">Reserve</button>
       </form>
       <p class="help" style="text-align: center;">We hold the food for you; you pay in cash at pickup.</p>
