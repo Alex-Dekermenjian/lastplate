@@ -8,13 +8,22 @@
 {% if unavailable %}
   <section class="card card--wide">
     <h1>Food offer</h1>
+    {% include "frontend/_offer_notice.html" %}
     <p class="notice notice--warning" role="alert">{{ unavailable }}</p>
   </section>
 
 {% elif not_found %}
   <section class="card card--wide">
-    <h1>This offer isn't available</h1>
-    <p>It may have sold out, finished its pickup time, or been removed by the shop.</p>
+    {% if closed %}
+      {# LP-83: this customer saw the offer earlier, so we can say why it is gone. #}
+      <h1>{{ closed.title|default:"Food offer" }}</h1>
+      {% include "frontend/_offer_notice.html" %}
+      <p class="offer-reserve__closed"><strong>{{ closed.reason }}</strong></p>
+    {% else %}
+      <h1>This offer isn't available</h1>
+      {% include "frontend/_offer_notice.html" %}
+      <p>It may have sold out, finished its pickup time, or been removed by the shop.</p>
+    {% endif %}
     <a class="button button--primary" href="{% url 'browse-offers' %}">See available food</a>
   </section>
 
@@ -89,6 +98,31 @@
       {% if offer.is_lastbag %}What's inside a LastBag changes daily. What it may contain comes{% else %}Ingredient and allergen details come{% endif %} from the shop. Ask the shop if you
       have a serious allergy.
     </p>
+
+    {% include "frontend/_offer_notice.html" %}
+
+    {% if can_reserve %}
+      {# LP-83: customers reserve this offer here; paid in cash at pickup. #}
+      <section class="offer-reserve" aria-labelledby="reserve-heading">
+        <h2 id="reserve-heading">Reserve</h2>
+        {% if reserve_closed %}
+          <p class="offer-reserve__closed"><strong>{{ reserve_closed }}</strong></p>
+        {% else %}
+          <form method="post" action="{% url 'offer-reserve' offer.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="request_key" value="{{ request_key }}">
+            <div class="field">
+              <label for="reserve-quantity">Quantity</label>
+              <select name="quantity" id="reserve-quantity">
+                {% for n in quantities %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+              </select>
+            </div>
+            <button class="button button--primary button--block" type="submit">Reserve</button>
+          </form>
+          <p class="help" style="text-align: center;">We hold the food for you; you pay in cash at pickup.</p>
+        {% endif %}
+      </section>
+    {% endif %}
   </article>
 {% endif %}
 {% endblock %}

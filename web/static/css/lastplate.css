@@ -581,3 +581,7 @@ p { margin: 0 0 12px; }
 
 /* LP-19: the pickup code the customer reads out at the counter. */
 .pickup-code { font-size: 1.5em; letter-spacing: 0.15em; font-family: ui-monospace, Menlo, Consolas, monospace; }
+
+/* LP-83: Reserve at the bottom of an offer page. */
+.offer-reserve { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border, #ddd); }
+.offer-reserve__closed { font-size: 1.2em; }
