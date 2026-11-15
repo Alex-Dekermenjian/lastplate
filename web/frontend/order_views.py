@@ -151,7 +151,21 @@ def my_orders(request):
     return render(request, template, {
         "active_orders": [o for o in orders if o["active"]],
         "past_orders": [o for o in orders if not o["active"]],
+        "strikes": strikes_for_display(data.get("strikes")),
     })
+
+
+def strikes_for_display(strikes):
+    """LP-80: what the warning banner on My orders says, or None."""
+    if not isinstance(strikes, dict):
+        return None
+    until = lebanon_time(strikes.get("blocked_until"))
+    count = strikes.get("count") if isinstance(strikes.get("count"), int) else 0
+    if until:
+        return {"blocked": True, "count": count, "until": _clock(until)}
+    if strikes.get("warning"):
+        return {"blocked": False, "count": count, "block_at": strikes.get("block_at") or 3}
+    return None
 
 
 @customer_required

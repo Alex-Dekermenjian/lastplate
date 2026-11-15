@@ -258,3 +258,36 @@ class OrderEvent(models.Model):
 
     def delete(self, *args, **kwargs):
         raise NotDeletable("Order history is never deleted.")
+
+
+class StrikeRemoval(models.Model):
+    """LP-80: the admin removed one Expired order's strike, and why.
+
+    Strikes themselves are not stored: they are the customer's Expired orders
+    of the last 30 days (reservations.strikes). Only removals need a record.
+    Never edited or deleted, so the reason stays on file.
+    """
+
+    order = models.OneToOneField(Order, on_delete=models.PROTECT, related_name="strike_removal")
+    reason = models.TextField()
+    # The Accounts admin who removed it; a plain ID, never a ForeignKey.
+    removed_by_user_id = models.PositiveBigIntegerField()
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+
+    objects = NoDeleteQuerySet.as_manager()
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=~Q(reason=""), name="strikeremoval_reason_required"),
+        ]
+
+    def __str__(self):
+        return f"Strike removed from {self.order}"
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None and not self._state.adding:
+            raise StatusChangeRefused("A removed strike is never edited.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise NotDeletable("Removed strikes are never deleted.")

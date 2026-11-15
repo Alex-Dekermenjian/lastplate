@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Customer — Console — LastPlate{% endblock %}
+{% block header_class %}header-restaurant{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'console-customers' %}">← Customers</a></p>
+
+{% for error in form.non_field_errors %}
+  <p class="notice notice--error" role="alert">{{ error }}</p>
+{% endfor %}
+
+{% if unavailable %}
+  <section class="card">
+    <h1>Customer</h1>
+    <p class="notice notice--warning" role="alert">We can't load this customer right now. Please refresh in a few minutes.</p>
+  </section>
+{% else %}
+  <section class="card card--wide">
+    <h1>{{ customer.first_name }}</h1>
+    <dl class="details">
+      <dt>Account</dt><dd>#{{ customer.customer_user_id }}</dd>
+      <dt>Strikes (last 30 days)</dt><dd>{{ customer.count }}</dd>
+      <dt>Ordering</dt>
+      <dd>{% if customer.blocked_until %}Blocked until {{ customer.blocked_until|date:"D j M Y, H:i" }}{% else %}Allowed{% endif %}</dd>
+    </dl>
+  </section>
+
+  <section class="card card--wide">
+    <h2>Expired orders</h2>
+    {% if not customer.expired_orders %}
+      <p class="muted">No expired orders.</p>
+    {% else %}
+      <ul class="order-list">
+        {% for order in customer.expired_orders %}
+          <li>
+            <p><strong>{{ order.pick_up_by|date:"D j M Y, H:i" }}</strong> · {{ order.shop_name|default:"Restaurant" }}{% if order.branch_name %} ({{ order.branch_name }}){% endif %} · ${{ order.total_cash }}</p>
+            <p class="muted">{% for item in order.items %}{{ item.quantity }} × {{ item.title }}{% if not forloop.last %}, {% endif %}{% endfor %} · code {{ order.pickup_code }}</p>
+            {% if order.removed %}
+              <p class="help">Strike removed {{ order.removed.at|date:"j M Y, H:i" }}: {{ order.removed.reason }}</p>
+            {% elif order.counts %}
+              <form method="post" novalidate class="inline-form">
+                {% csrf_token %}
+                <input type="hidden" name="reservation_ref" value="{{ order.reservation_ref }}">
+                <div class="field">
+                  <label for="reason-{{ forloop.counter }}">Why remove this strike?</label>
+                  <input type="text" name="reason" id="reason-{{ forloop.counter }}" maxlength="1000" required>
+                </div>
+                <button class="button button--secondary" type="submit">Remove strike</button>
+              </form>
+            {% else %}
+              <p class="help">Older than 30 days: no longer a strike.</p>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+      {% for error in form.reason.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+    {% endif %}
+  </section>
+{% endif %}
+{% endblock %}
+
+{% block bottom_bar %}{% include "frontend/_console_bar.html" %}{% endblock %}

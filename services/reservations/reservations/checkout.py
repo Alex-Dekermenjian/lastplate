@@ -83,9 +83,19 @@ class _Item:
 
 
 def customer_is_blocked(customer_user_id):
-    """Hook for LP-80 ("12 · Expired-order strikes"): True stops the customer
-    from ordering. Nobody is blocked until LP-80 fills this in."""
-    return False
+    """LP-80: when the customer may order again (an aware datetime), or None
+    if they may order now. 3 expired orders within 30 days block ordering
+    for 7 days after the 3rd (reservations.strikes)."""
+    from .strikes import strike_status
+    return strike_status(customer_user_id).blocked_until
+
+
+def blocked_detail(until):
+    from .orders import time_text
+    if not isinstance(until, datetime):
+        return "Your account can't place orders right now. You can still browse."
+    return (f"You can't place orders until {time_text(until)} because 3 of your orders expired "
+            "without being picked up. You can still browse.")
 
 
 def item_ref(order, listing_id):
@@ -225,8 +235,9 @@ def _save_processing_order(customer_user_id, request_key, items, now, customer_f
         existing = _existing(customer_user_id, request_key, items)
         if existing is not None:
             return existing, False
-        if customer_is_blocked(customer_user_id):
-            raise CheckoutRefused("customer_blocked", "Your account can't place orders right now.", 403)
+        blocked_until = customer_is_blocked(customer_user_id)
+        if blocked_until:
+            raise CheckoutRefused("customer_blocked", blocked_detail(blocked_until), 403)
         active = Order.objects.filter(customer_user_id=customer_user_id, status__in=ACTIVE_STATUSES).count()
         if active >= MAX_ACTIVE_ORDERS:
             raise CheckoutRefused(

@@ -389,6 +389,23 @@ def admin_review_shop(access, shop_id, decision):
     return _call("marketplace", "POST", f"/api/admin/shops/{int(shop_id)}/review", decision, token=access)
 
 
+# LP-80: customers' expired-order strikes (Reservations, Admin token only).
+@sensitive_variables("access")
+def admin_customers(access):
+    return _call("reservations", "GET", "/api/admin/customers", token=access)
+
+
+@sensitive_variables("access")
+def admin_customer(access, customer_user_id):
+    return _call("reservations", "GET", f"/api/admin/customers/{int(customer_user_id)}", token=access)
+
+
+@sensitive_variables("access")
+def admin_remove_strike(access, reservation_ref, reason):
+    return _call("reservations", "POST", f"/api/admin/strikes/{reservation_ref}/remove",
+                 {"reason": reason}, token=access)
+
+
 # LP-25: before the offers list is shown, Reservations expires late orders so
 # their food is back on sale even if its background timer is asleep. Never
 # makes a page fail or wait long: any problem is ignored (the timer retries).
