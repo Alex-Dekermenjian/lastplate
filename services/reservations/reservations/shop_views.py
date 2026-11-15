@@ -13,12 +13,14 @@ from .authentication import IsOperator
 from .marketplace_client import MarketplaceUnavailable, operator_shop
 from .models import Order, Status
 from .collection_views import shop_order_data
+from .timers import expire_due_orders_quietly
 
 
 @never_cache
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsOperator])
 def shop_reservations(request):
+    expire_due_orders_quietly()  # LP-25: overdue orders leave the Reserved list
     try:
         status, shop = operator_shop(request.user.id)
         if status == 404:

@@ -389,8 +389,22 @@ def admin_review_shop(access, shop_id, decision):
     return _call("marketplace", "POST", f"/api/admin/shops/{int(shop_id)}/review", decision, token=access)
 
 
+# LP-25: before the offers list is shown, Reservations expires late orders so
+# their food is back on sale even if its background timer is asleep. Never
+# makes a page fail or wait long: any problem is ignored (the timer retries).
+EXPIRE_TIMEOUT_SECONDS = 2
+
+
+def expire_late_orders():
+    try:
+        _call("reservations", "POST", "/api/timers/expire", {}, timeout=EXPIRE_TIMEOUT_SECONDS)
+    except Exception:  # noqa: BLE001 - best effort only
+        pass
+
+
 # LP-13: Public marketplace. No token is sent: these pages need no sign-in.
 def browse_listings():
+    expire_late_orders()
     return _call(
         "marketplace",
         "GET",
@@ -399,6 +413,7 @@ def browse_listings():
 
 
 def listing_offer(listing_id):
+    expire_late_orders()
     return _call(
         "marketplace",
         "GET",
@@ -408,6 +423,7 @@ def listing_offer(listing_id):
 
 # LP-39: A restaurant's public page. No token: anyone may open it.
 def restaurant_page(shop_id):
+    expire_late_orders()
     return _call(
         "marketplace",
         "GET",
