@@ -5,6 +5,7 @@ from django.urls import path
 from . import views
 from .shop_views import shop_reservations
 from . import collection_views
+from . import strike_views
 from . import timer_views
 
 urlpatterns = [
@@ -14,6 +15,10 @@ urlpatterns = [
     path("shop/reservations", shop_reservations, name="shop-reservations"),
     # LP-25: the web asks for late orders to expire whenever the offers list is shown.
     path("timers/expire", timer_views.expire, name="timers-expire"),
+    # LP-80: the admin sees customers' strikes and removes one with a reason.
+    path("admin/customers", strike_views.customers, name="admin-customers"),
+    path("admin/customers/<int:customer_user_id>", strike_views.customer, name="admin-customer"),
+    path("admin/strikes/<uuid:ref>/remove", strike_views.remove, name="admin-remove-strike"),
     path("reservations", views.reservations, name="reservations"),
     # LP-78: one of the customer's own orders.
     path("reservations/<uuid:ref>", views.reservation_detail, name="reservation-detail"),

@@ -88,7 +88,7 @@ class ListTests(MyOrdersApiTestCase):
             self.assertIn(field, row)
 
     def test_an_empty_list(self):
-        self.assertEqual(self.client.get(LIST_URL).json(), {"orders": []})
+        self.assertEqual(self.client.get(LIST_URL).json()["orders"], [])  # LP-80 adds "strikes"
 
 
 class NeverShownTests(MyOrdersApiTestCase):

@@ -8,6 +8,7 @@ https://docs.djangoproject.com/en/5.2/topics/http/urls/
 from django.urls import path
 from django.views.generic import RedirectView
 
+from frontend import customer_console_views
 from frontend import account_views, branch_views, browse_views, cart, console_views, health, listing_views, offer_actions, offer_reserve, order_views, views
 from frontend import shop_order_views
 from frontend import pickup_views
@@ -55,6 +56,10 @@ urlpatterns = [
         console_views.console_restaurant,
         name="console-restaurant",
     ),
+    # LP-80: customers with expired-order strikes; the admin can remove one.
+    path("console/customers/", customer_console_views.console_customers, name="console-customers"),
+    path("console/customers/<int:customer_user_id>/", customer_console_views.console_customer,
+         name="console-customer"),
 
     path("workspace/", account_views.workspace, name="workspace"),
     path("workspace/orders/", shop_order_views.today_orders, name="today-orders"),
