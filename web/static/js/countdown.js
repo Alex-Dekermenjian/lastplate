@@ -13,8 +13,16 @@
     return Math.floor(minutes / 60) + " h " + (minutes % 60) + " min left";
   }
 
+  // LP-27: on a page left open past pick-up-by, swap Cancel for the
+  // restaurant's phone (the server refuses a late cancel anyway).
+  function afterDeadline() {
+    document.querySelectorAll("[data-before-deadline]").forEach(function (el) { el.hidden = true; });
+    document.querySelectorAll("[data-after-deadline]").forEach(function (el) { el.hidden = false; });
+  }
+
   function update() {
     var now = Date.now();
+    var passed = false;
     document.querySelectorAll(".countdown[data-deadline]").forEach(function (el) {
       var deadline = Date.parse(el.getAttribute("data-deadline"));
       if (isNaN(deadline)) return;
@@ -24,8 +32,10 @@
       if (minutes < 0) {
         el.classList.add("countdown--passed");
         el.removeAttribute("data-deadline");
+        passed = true;
       }
     });
+    if (passed) afterDeadline();
   }
 
   update();

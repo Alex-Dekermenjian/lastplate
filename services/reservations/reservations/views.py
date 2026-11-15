@@ -27,6 +27,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .authentication import IsCustomer
+from .cancellation import CancelRefused, cancel_by_customer
 from .checkout import CheckoutRefused, TryAgain, place_order
 from .models import Order, Status
 
@@ -111,4 +112,19 @@ def reservation_detail(request, ref):
     order = customer_orders(request).prefetch_related("lines").filter(reservation_ref=ref).first()
     if order is None:
         return Response({"code": "not_found", "detail": "No such order."}, status=status.HTTP_404_NOT_FOUND)
+    return Response(order_data(order))
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsCustomer])
+def reservation_cancel(request, ref):
+    """LP-27: POST /api/reservations/{ref}/cancel (customer token).
+
+    200 the Cancelled order; 404 not one of your orders; 409 already_cancelled,
+    already_paid, expired, or pickup_time_passed (with the shop's phone).
+    """
+    try:
+        order = cancel_by_customer(ref, request.user.id)
+    except CancelRefused as refused:
+        return Response(refused.body, status=refused.http_status)
     return Response(order_data(order))

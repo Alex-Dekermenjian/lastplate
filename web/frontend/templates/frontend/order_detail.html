@@ -65,6 +65,30 @@
       <dt>Pickup time</dt>
       <dd>{{ order.pickup_window }} <span class="muted">(Lebanon time)</span></dd>
     </dl>
+
+    {% if order.active %}
+      {# LP-27: cancel until pick-up-by; after that, call the restaurant. Reservations re-checks both. #}
+      {% if not order.time_passed %}
+        <div class="order-cancel" data-before-deadline>
+          <details class="confirm">
+            <summary class="button button--danger-outline button--block">Cancel order</summary>
+            <form method="post" action="{% url 'order-cancel' order.ref %}">
+              {% csrf_token %}
+              <p>Cancel this order? The food goes back on sale for other customers. This can't be undone.</p>
+              <button class="button button--danger button--block" type="submit">Yes, cancel order</button>
+            </form>
+          </details>
+        </div>
+      {% endif %}
+      <p class="notice notice--warning order-cancel__late" data-after-deadline{% if not order.time_passed %} hidden{% endif %}>
+        The pick-up time has passed, so this order can't be cancelled here.
+        {% if order.place.phone %}
+          Please call {{ order.place.name|default:"the restaurant" }} on <a href="tel:{{ order.place.phone|cut:' ' }}">{{ order.place.phone }}</a>.
+        {% else %}
+          Please contact the restaurant.
+        {% endif %}
+      </p>
+    {% endif %}
   </article>
   <script src="{% static 'js/countdown.js' %}" defer></script>
 {% endif %}

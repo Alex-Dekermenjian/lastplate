@@ -472,3 +472,10 @@ def pickup_payment(access, ref, payload, undo=False):
 @sensitive_variables("access")
 def get_order(access, reservation_ref):
     return _call("reservations", "GET", f"/api/reservations/{reservation_ref}", token=access)
+
+
+# LP-27: the customer cancels their own order; Reservations decides and
+# returns the food to Marketplace.
+@sensitive_variables("access")
+def cancel_order(access, reservation_ref):
+    return _call("reservations", "POST", f"/api/reservations/{reservation_ref}/cancel", {}, token=access)

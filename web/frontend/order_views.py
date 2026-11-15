@@ -15,8 +15,10 @@ service's database.
 
 from decimal import Decimal, InvalidOperation
 
-from django.shortcuts import render
+from django.contrib import messages
+from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from . import services
 from .account_views import authenticated_call, customer_required
@@ -167,3 +169,28 @@ def order_detail(request, reservation_ref):
         return _unavailable(request, template)
 
     return render(request, template, {"order": order_for_display(data, _place(data, {}))})
+
+
+CANCELLED = "Your order is cancelled. The food is back on sale for someone else."
+# The outcome is unknown (the cancel may have gone through), so the page reloads
+# the order and lets it say which.
+CANCEL_UNAVAILABLE = "We couldn't confirm the cancellation. If your order still shows Reserved, please try again."
+
+
+@customer_required
+@require_POST
+def order_cancel(request, reservation_ref):
+    """LP-27: Reservations decides (your own order, still Reserved, before
+    pick-up-by) and puts the food back on sale; this page only reports it."""
+    try:
+        status, data = authenticated_call(request, services.cancel_order, reservation_ref)
+    except ServiceUnavailable:
+        status, data = 503, None
+    if status == 200:
+        messages.success(request, CANCELLED)
+    elif status in (404, 409) and isinstance(data, dict) and data.get("detail"):
+        # Already cancelled, paid, expired, too late (with the shop's phone), or not yours.
+        messages.error(request, data["detail"])
+    else:
+        messages.error(request, CANCEL_UNAVAILABLE)
+    return redirect("order-detail", reservation_ref=reservation_ref)
