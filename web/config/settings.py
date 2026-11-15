@@ -28,11 +28,28 @@ SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
 
-ALLOWED_HOSTS = [
-    host.strip()
-    for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
-    if host.strip()
-]
+def _env_list(name, default=""):
+    return [item.strip() for item in os.environ.get(name, default).split(",") if item.strip()]
+
+
+# LP-46: a Cloudflare quick tunnel (https://<random>.trycloudflare.com) forwards
+# to this service so the demo opens on a phone. These are added to whatever the
+# environment lists, so localhost keeps working.
+TUNNEL_HOST = ".trycloudflare.com"
+TUNNEL_ORIGIN = "https://*.trycloudflare.com"
+
+ALLOWED_HOSTS = _env_list("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost")
+if TUNNEL_HOST not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(TUNNEL_HOST)
+
+CSRF_TRUSTED_ORIGINS = _env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
+if TUNNEL_ORIGIN not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(TUNNEL_ORIGIN)
+
+# The tunnel ends HTTPS and forwards plain HTTP with X-Forwarded-Proto: https.
+# Trusting it lets Django treat those requests as secure (CSRF origin checks,
+# redirects). The port is bound to 127.0.0.1, so only the tunnel can set it.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Readiness responses name the connected database only when this is enabled.
 HEALTH_EXPOSE_DETAILS = os.environ.get("HEALTH_EXPOSE_DETAILS", "False").lower() == "true"
@@ -43,8 +60,8 @@ SERVICE_URLS = {
     "marketplace": os.environ.get("MARKETPLACE_SERVICE_URL", "http://127.0.0.1:8002"),
     "reservations": os.environ.get("RESERVATIONS_SERVICE_URL", "http://127.0.0.1:8003"),
 }
-# The address a visitor's browser uses for Marketplace, which can differ from the
-# service-to-service address above (inside Compose it does).
+# The address a visitor's browser uses for Marketplace. Only the staff admin link
+# below uses it; photos go through this site's /media/ route instead (LP-46).
 MARKETPLACE_PUBLIC_URL = os.environ.get("MARKETPLACE_PUBLIC_URL", "http://127.0.0.1:8002")
 # Where LastPlate team members (staff) land after logging in: the Django admin
 # where shops are reviewed (LP-9). TODO: our own /console page later.
