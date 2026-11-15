@@ -108,7 +108,7 @@ services:
   reservations:
     <<: *service-defaults
     build: ./services/reservations
-    environment:
+    environment: &reservations-environment
       DJANGO_SECRET_KEY: ${RESERVATIONS_SECRET_KEY:?missing from compose.env}
       DJANGO_DEBUG: "True"
       DJANGO_ALLOWED_HOSTS: reservations,127.0.0.1,localhost
@@ -124,7 +124,10 @@ services:
       # Reservations (the same compose.env value Marketplace gets; never Git).
       MARKETPLACE_SERVICE_URL: http://marketplace:8000
       MARKETPLACE_SERVICE_KEY: ${RESERVATIONS_TO_MARKETPLACE_KEY:-}
-    volumes:
+      # LP-25: minutes an order is held. Put PICKUP_HOLD_MINUTES=2 in
+      # compose.env to show expiry in a demo.
+      PICKUP_HOLD_MINUTES: ${PICKUP_HOLD_MINUTES:-60}
+    volumes: &reservations-volumes
       # Only Accounts' public key, read-only, as for Marketplace.
       - type: bind
         source: ./.keys/jwt-public.pem
@@ -134,6 +137,20 @@ services:
           create_host_path: false
     ports:
       - "127.0.0.1:8003:8000"
+
+  # LP-25: the timer job, once a minute: late orders expire and their food goes
+  # back on sale, Paid orders are consumed after the undo window, stuck orders
+  # are cleaned up. Same image and database as Reservations; it serves nothing.
+  # Expiry also happens whenever orders or offers are read, so this is a backup.
+  timers:
+    build: ./services/reservations
+    restart: unless-stopped
+    depends_on:
+      reservations:
+        condition: service_healthy
+    environment: *reservations-environment
+    volumes: *reservations-volumes
+    command: ["python", "manage.py", "run_timers", "--every", "60"]
 
   web:
     <<: *service-defaults

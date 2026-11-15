@@ -29,6 +29,7 @@ from rest_framework.response import Response
 from .authentication import IsCustomer
 from .checkout import CheckoutRefused, TryAgain, place_order
 from .models import Order, Status
+from .timers import expire_due_orders_quietly
 
 # LP-78: how many orders "My orders" shows.
 MAX_LISTED = 50
@@ -76,6 +77,8 @@ def customer_orders(request):
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated, IsCustomer])
 def reservations(request):
+    # LP-25: late orders expire before they are read or counted.
+    expire_due_orders_quietly()
     if request.method == "GET":
         orders = customer_orders(request).prefetch_related("lines").order_by("-created_at", "-id")[:MAX_LISTED]
         return Response({"orders": [order_data(order) for order in orders]})
@@ -108,6 +111,7 @@ def reservations(request):
 def reservation_detail(request, ref):
     """LP-78: one order. Someone else's order is 404, never 403, so a
     reference reveals nothing about orders that are not yours."""
+    expire_due_orders_quietly()  # LP-25
     order = customer_orders(request).prefetch_related("lines").filter(reservation_ref=ref).first()
     if order is None:
         return Response({"code": "not_found", "detail": "No such order."}, status=status.HTTP_404_NOT_FOUND)
