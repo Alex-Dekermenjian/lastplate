@@ -27,10 +27,32 @@ class BranchForm(forms.Form):
         widget=forms.TextInput(attrs={"autocomplete": "street-address"}),
     )
     area = AreaField()
+    # LP-29: a new offer's pickup end starts at this time.
+    closing_time = forms.TimeField(
+        label="Closing time (optional)", required=False,
+        help_text="When this branch closes, Lebanon time. New offers end pickup then by default.",
+        widget=forms.TimeInput(attrs={"type": "time"}, format="%H:%M"),
+    )
 
     def __init__(self, *args, current_area=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["area"].choices = area_choices(current_area)
+
+    def payload(self, had_closing_time=False):
+        """What Marketplace gets. The closing time goes as "HH:MM" when given,
+        as None only to clear one the branch had, and is left out otherwise."""
+        data = dict(self.cleaned_data)
+        closing = data.pop("closing_time", None)
+        if closing:
+            data["closing_time"] = closing.strftime("%H:%M")
+        elif had_closing_time:
+            data["closing_time"] = None
+        return data
+
+
+def short_time(value):
+    """ "22:00:00" -> "22:00"; nothing -> "". """
+    return str(value)[:5] if value else ""
 
 
 def why_not_removable(branch, count):
@@ -59,10 +81,14 @@ def page(request, branches, add_form=None, edit_forms=None, status=200):
             **branch,
             "form": edit_forms.get(branch["id"]) or BranchForm(
                 prefix=f"branch-{branch['id']}",
-                initial={key: branch.get(key, "") for key in ("name", "address", "area")},
+                initial={
+                    **{key: branch.get(key, "") for key in ("name", "address", "area")},
+                    "closing_time": short_time(branch.get("closing_time")),
+                },
                 current_area=branch.get("area"),
             ),
             "open": branch["id"] in edit_forms,
+            "closes_at": short_time(branch.get("closing_time")),
             "blocked": why_not_removable(branch, len(branches)),
         }
         for branch in branches
@@ -104,7 +130,7 @@ def branches(request):
     if not form.is_valid():
         return page(request, current, add_form=form, status=400)
     try:
-        status, body = authenticated_call(request, services.add_branch, form.cleaned_data)
+        status, body = authenticated_call(request, services.add_branch, form.payload())
     except ServiceUnavailable:
         form.add_error(None, UNAVAILABLE)
         return page(request, current, add_form=form, status=503)
@@ -132,7 +158,8 @@ def edit_branch(request, branch_id):
     if not form.is_valid():
         return page(request, current, edit_forms={branch_id: form}, status=400)
     try:
-        status, body = authenticated_call(request, services.update_branch, branch_id, form.cleaned_data)
+        status, body = authenticated_call(request, services.update_branch, branch_id,
+                                             form.payload(had_closing_time=bool(branch.get("closing_time"))))
     except ServiceUnavailable:
         form.add_error(None, UNAVAILABLE)
         return page(request, current, edit_forms={branch_id: form}, status=503)

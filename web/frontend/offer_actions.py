@@ -23,6 +23,12 @@ SOLD_OUT_ERRORS = {
     "no_shop": "You can only change your own offers.",
 }
 
+UNPUBLISH_ERRORS = {
+    "not_published": "Only live offers can be taken down.",
+    "not_owner": "You can only change your own offers.",
+    "no_shop": "You can only change your own offers.",
+}
+
 DELETE_ERRORS = {
     "not_a_draft": "Only drafts can be deleted. A live offer ends or sells out instead.",
     "not_found": "This draft could not be found. It may already be deleted.",
@@ -52,6 +58,35 @@ def mark_sold_out(request, listing_id):
         return back_to("live")
     code = body.get("code") if isinstance(body, dict) else None
     messages.error(request, SOLD_OUT_ERRORS.get(code, "Marking sold out was unsuccessful. Please try again."))
+    return back_to("live")
+
+
+@operator_required
+@require_http_methods(["POST"])
+@approved_shop_required
+def unpublish(request, listing_id):
+    """LP-29: customers stop seeing the offer and nobody new can reserve it.
+    Orders already reserved stay valid and can still be picked up."""
+    try:
+        status, body = authenticated_call(request, services.unpublish_listing, listing_id)
+    except ServiceUnavailable:
+        messages.warning(
+            request,
+            "We couldn't confirm whether the offer was taken down. Check it before trying again.",
+        )
+        return back_to("live")
+    if status == 200:
+        listing = body if isinstance(body, dict) else {}
+        title = listing.get("title") or "Your offer"
+        reserved = listing.get("reserved_quantity") or 0
+        done = f"{title} was taken down. Customers no longer see it."
+        if reserved:
+            done += (f" The {reserved} unit{'s' if reserved != 1 else ''} already reserved stay reserved "
+                     "and can still be picked up.")
+        messages.success(request, done)
+        return back_to("ended")
+    code = body.get("code") if isinstance(body, dict) else None
+    messages.error(request, UNPUBLISH_ERRORS.get(code, "Taking the offer down was unsuccessful. Please try again."))
     return back_to("live")
 
 

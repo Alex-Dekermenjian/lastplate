@@ -1,8 +1,11 @@
 
 """Shop-operator food listing pages (LP-10 and LP-11)."""
 
+from datetime import datetime, time, timedelta
+
 from django.contrib import messages
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from . import services
@@ -195,6 +198,61 @@ def branch_errors(errors, branches, chosen):
     return labelled
 
 
+# ---------- LP-29: the branch's closing time ----------
+
+CONFIRM_AFTER_CLOSING = "confirm_after_closing"
+
+
+def closing_time_of(branch):
+    """A branch's closing time as a time, or None when it has none."""
+    value = str(branch.get("closing_time") or "")[:5]
+    try:
+        return time.fromisoformat(value) if value else None
+    except ValueError:
+        return None
+
+
+def default_pickup_end(branches, now=None):
+    """A new offer's pickup end: the branch's closing time, today (Lebanon
+    time), or tomorrow if it has passed. With several branches, the earliest
+    closing time, so no branch's offer starts out ending after it closes."""
+    closings = [closing for closing in map(closing_time_of, branches) if closing is not None]
+    if not closings:
+        return ""
+    now = timezone.localtime(now)
+    end = timezone.make_aware(datetime.combine(now.date(), min(closings)))
+    if end <= now:
+        end += timedelta(days=1)
+    return end.strftime("%Y-%m-%dT%H:%M")
+
+
+def closing_hint(branches):
+    """'Hamra closes at 22:00.' for the form, or '' when none is set."""
+    parts = []
+    for branch in branches:
+        closing = closing_time_of(branch)
+        if closing is not None:
+            parts.append(f"{branch.get('name') or 'This branch'} closes at {closing:%H:%M}")
+    return " · ".join(parts) + "." if parts else ""
+
+
+def closing_warning(response):
+    """Marketplace's 'pickup ends after closing' warning, taken out of the
+    field errors so the form shows it with its confirm box instead."""
+    if not isinstance(response, dict) or CONFIRM_AFTER_CLOSING not in response:
+        return "", response
+    rest = {key: value for key, value in response.items() if key != CONFIRM_AFTER_CLOSING}
+    problems = response[CONFIRM_AFTER_CLOSING]
+    warning = " ".join(str(item) for item in problems) if isinstance(problems, list) else str(problems)
+    return warning, rest
+
+
+def add_confirm(post, listing_data):
+    """The owner ticked 'Yes, customers can pick up after closing time'."""
+    if post.get(CONFIRM_AFTER_CLOSING):
+        listing_data[CONFIRM_AFTER_CLOSING] = True
+
+
 @operator_required
 @require_http_methods(["GET", "POST"])
 @approved_shop_required
@@ -212,10 +270,12 @@ def create_listing(request):
             "frontend/create_listing.html",
             {
                 "kind": offer_kind(request.GET.get("kind")),
-                "form_values": {},
+                # LP-29: pickup ends when the branch closes, unless changed.
+                "form_values": {"pickup_end": default_pickup_end(branches)},
                 "branches": branch_rows(branches),
                 "several_branches": several,
                 "food_types": type_choices(),
+                "closing_hint": closing_hint(branches),
             },
         )
 
@@ -226,6 +286,7 @@ def create_listing(request):
 
     if kind == LASTBAG:
         listing_data["kind"] = LASTBAG
+    add_confirm(request.POST, listing_data)
 
     chosen = chosen_branches(request.POST, branches) if several else []
     if several:
@@ -244,6 +305,7 @@ def create_listing(request):
                 "branches": branch_rows(branches, request.POST),
                 "several_branches": several,
                 "food_types": type_choices(),
+                "closing_hint": closing_hint(branches),
                 **context,
             },
             status=status,
@@ -285,15 +347,19 @@ def create_listing(request):
         )
 
     if status == 400:
+        warning, response = closing_warning(response)
         shared = response
         if isinstance(response, dict):
             shared = {key: value for key, value in response.items() if key != "branches"}
         field_errors = labelled_errors(shared, kind)
         field_errors.update(branch_errors(response, branches, chosen))
+        if warning and not field_errors:
+            return form_page(400, closing_warning=warning)
         return form_page(
             400,
             error="Please correct the listing details and try again.",
             field_errors=field_errors,
+            closing_warning=warning,
         )
 
     if status != 201:
@@ -423,12 +489,14 @@ def edit_listing(request, listing_id):
         "branches": branch_rows(branches, selected=listing.get("branch")),
         "several_branches": len(branches) > 1,
         "food_types": type_choices(listing.get("category")),
+        "closing_hint": closing_hint(branches),
     }
 
     if request.method == "GET":
         return render(request, template, context)
 
     listing_data = listing_data_from(request.POST, kind)
+    add_confirm(request.POST, listing_data)
     known = {str(branch["id"]) for branch in branches}
     if len(branches) > 1 and request.POST.get("branch") in known:
         listing_data["branch"] = int(request.POST["branch"])
@@ -436,7 +504,7 @@ def edit_listing(request, listing_id):
 
     context["form_values"] = {
         **listing,
-        **listing_data,
+        **{key: value for key, value in listing_data.items() if key != CONFIRM_AFTER_CLOSING},
     }
 
     # Only a type of food from the list; a draft's older typed category may
@@ -475,8 +543,11 @@ def edit_listing(request, listing_id):
         return render(request, template, context, status=503)
 
     if update_status == 400:
-        context["error"] = "Please correct the listing details."
+        warning, response = closing_warning(response)
+        context["closing_warning"] = warning
         context["field_errors"] = labelled_errors(response, kind)
+        if context["field_errors"] or not warning:
+            context["error"] = "Please correct the listing details."
         return render(request, template, context, status=400)
 
     if update_status == 404:
@@ -665,6 +736,15 @@ def adjust_stock(request, listing_id):
         return redirect("workspace")
 
     code = response.get("code") if isinstance(response, dict) else None
+    reserved = response.get("already_reserved") if isinstance(response, dict) else None
+    if code == "below_committed" and isinstance(reserved, int):
+        # LP-29: say exactly how low the stock can go.
+        messages.error(
+            request,
+            f"Already reserved: {reserved}. You can't lower the stock below {reserved}, "
+            "because customers already reserved those units.",
+        )
+        return redirect("workspace")
     messages.error(
         request,
         STOCK_ERROR_MESSAGES.get(

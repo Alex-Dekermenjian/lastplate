@@ -18,6 +18,8 @@
           <div>
             <h2 class="branch-card__name">{{ branch.name }}{% if forloop.first %} <span class="badge">Main</span>{% endif %}</h2>
             <p class="muted">{{ branch.address }}{% if branch.area %} · {{ branch.area }}{% endif %}</p>
+            {# LP-29 #}
+            <p class="muted">{% if branch.closes_at %}Closes at {{ branch.closes_at }}{% else %}No closing time set{% endif %}</p>
             <p class="branch-card__counts">
               {{ branch.live_offers }} live offer{{ branch.live_offers|pluralize }} ·
               {{ branch.draft_offers }} draft{{ branch.draft_offers|pluralize }}

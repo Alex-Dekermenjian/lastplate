@@ -80,6 +80,13 @@ urlpatterns = [
         name="listing_sold_out",
     ),
 
+    # LP-29: the owner takes a published offer down; reservations stay.
+    path(
+        "listings/<int:pk>/unpublish",
+        views.unpublish_listing,
+        name="listing_unpublish",
+    ),
+
     # LP-12: Stock adjustments (POST) and their history (GET)
     path(
         "listings/<int:pk>/stock-adjustments",
