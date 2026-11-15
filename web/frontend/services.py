@@ -406,6 +406,27 @@ def admin_remove_strike(access, reservation_ref, reason):
                  {"reason": reason}, token=access)
 
 
+# LP-43: every order, the revenue and orders that need attention (Admin token only).
+@sensitive_variables("access")
+def admin_orders(access, filters):
+    return _call("reservations", "GET", f"/api/admin/orders?{urlencode(filters)}", token=access)
+
+
+@sensitive_variables("access")
+def admin_revenue(access):
+    return _call("reservations", "GET", "/api/admin/revenue", token=access)
+
+
+@sensitive_variables("access")
+def admin_attention(access):
+    return _call("reservations", "GET", "/api/admin/attention", token=access)
+
+
+@sensitive_variables("access")
+def admin_retry_order(access, reservation_ref):
+    return _call("reservations", "POST", f"/api/admin/orders/{reservation_ref}/retry", {}, token=access)
+
+
 # LP-60: the admin suspends/restores a restaurant, removes an offer, and
 # blocks/unblocks a customer. Marketplace and Reservations check the Admin token.
 @sensitive_variables("access")
