@@ -24,6 +24,10 @@
   {# LP-78: the page the customer shows at the counter. #}
   <article class="card card--wide order-page{% if not order.active %} order-page--done{% endif %}">
     <p class="order-page__status"><span class="status-badge{% if order.active %} status-badge--active{% endif %}">{{ order.status_label }}</span></p>
+    {% if order.shop_cancel_reason %}
+      {# LP-79: why the restaurant cancelled. #}
+      <p class="notice notice--error order-page__reason">The restaurant cancelled this order: {{ order.shop_cancel_reason }}</p>
+    {% endif %}
 
     <div class="order-code{% if not order.active %} order-code--done{% endif %}">
       <span class="order-code__label">Pickup code</span>

@@ -5,11 +5,16 @@ from django.urls import path
 from . import views
 from .shop_views import shop_reservations
 from . import collection_views
+from . import shop_cancel_views
 
 urlpatterns = [
     path("shop/reservations/lookup", collection_views.lookup, name="pickup-lookup"),
     path("shop/reservations/<uuid:ref>/collect", collection_views.collect, name="collect-order"),
     path("shop/reservations/<uuid:ref>/undo", collection_views.collect, {"undo": True}, name="undo-order"),
+    # LP-79: the restaurant cancels one order, or all of a branch's for today, with a reason.
+    path("shop/reservations/<uuid:ref>/cancel", shop_cancel_views.shop_cancel, name="shop-cancel-order"),
+    path("shop/reservations/cancel-all", shop_cancel_views.shop_cancel_all, name="shop-cancel-all"),
+    path("admin/shop-cancellations", shop_cancel_views.shop_cancellations, name="shop-cancellations"),
     path("shop/reservations", shop_reservations, name="shop-reservations"),
     path("reservations", views.reservations, name="reservations"),
     # LP-78: one of the customer's own orders.

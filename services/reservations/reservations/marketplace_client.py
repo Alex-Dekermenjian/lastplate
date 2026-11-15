@@ -134,3 +134,25 @@ def release(ref, listing_id):
         return True
     logger.error("Unexpected release answer %s for %s", status, ref)
     return False
+
+
+def shop_cancel(ref, listing_id, actor_user_id, reason):
+    """LP-79: the restaurant cancelled, so the held units leave stock instead
+    of going back on sale. True only when Marketplace confirmed it (200 with
+    status SHOP_CANCELLED); Marketplace answers a repeat the same way and
+    never adjusts stock twice."""
+    if not settings.MARKETPLACE_SERVICE_KEY:
+        logger.error("MARKETPLACE_SERVICE_KEY is not set; Marketplace will refuse every stock call.")
+        return False
+    try:
+        status, body = _request("POST", f"/internal/allocations/{ref}/shop-cancel", {
+            "listing_id": int(listing_id),
+            "actor_user_id": int(actor_user_id),
+            "reason": str(reason),
+        }, internal=True)
+    except MarketplaceUnavailable:
+        return False
+    if status == 200 and _held(body, ref) and body.get("status") == "SHOP_CANCELLED":
+        return True
+    logger.error("Unexpected shop-cancel answer %s for %s", status, ref)
+    return False

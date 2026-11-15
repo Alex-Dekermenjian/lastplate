@@ -43,6 +43,8 @@ def order_data(order):
         "status_label": order.status_label,
         # LP-78: who cancelled ("Customer", "Restaurant", "Admin") and when it was paid.
         "cancelled_by": order.get_cancelled_by_display() if order.cancelled_by else None,
+        # LP-79: why it was cancelled, so the customer sees the restaurant's reason.
+        "cancel_reason": order.cancel_reason if order.status == Status.CANCELLED else "",
         "collected_at": order.collected_at.isoformat() if order.collected_at else None,
         "pickup_code": order.pickup_code,
         "pick_up_by": order.pick_up_by.isoformat(),

@@ -64,6 +64,9 @@ urlpatterns = [
     path("workspace/orders/pickup/", pickup_views.pickup, name="pickup-code"),
     path("workspace/orders/<uuid:reservation_ref>/paid/", pickup_views.payment, name="pickup-paid"),
     path("workspace/orders/<uuid:reservation_ref>/undo/", pickup_views.payment, {"undo": True}, name="pickup-undo"),
+    # LP-79: the restaurant cancels an order, or all of a branch's for today, with a reason.
+    path("workspace/orders/<uuid:reservation_ref>/cancel/", shop_order_views.cancel_order, name="shop-cancel-order"),
+    path("workspace/orders/cancel-all/", shop_order_views.cancel_all_today, name="shop-cancel-all"),
     path("workspace/finish-setup/", account_views.finish_setup, name="finish-setup"),
     path("workspace/profile/", account_views.shop_profile, name="shop-profile"),
     # LP-68: the restaurant's branches (up to 3).
