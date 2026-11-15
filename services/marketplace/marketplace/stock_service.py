@@ -13,11 +13,13 @@ MAX_TOTAL_QUANTITY = 2147483647
 class StockAdjustmentError(Exception):
     """An adjustment was refused. code and detail go into the API error."""
 
-    def __init__(self, code, detail, http_status=400):
+    def __init__(self, code, detail, http_status=400, **extra):
         super().__init__(detail)
         self.code = code
         self.detail = detail
         self.http_status = http_status
+        # LP-29: numbers the page can show (for example already_reserved).
+        self.extra = extra
 
 
 def adjust_stock(listing_id, shop_id, quantity_change, reason, actor_user_id):
@@ -83,11 +85,15 @@ def adjust_stock(listing_id, shop_id, quantity_change, reason, actor_user_id):
 
         committed = committed_quantity(listing)
 
+        # LP-29: never below what customers already reserved (HELD) or
+        # picked up (CONSUMED). The page shows "Already reserved: N".
         if new_total < committed:
             raise StockAdjustmentError(
                 "below_committed",
-                f"Stock cannot go below the {committed} units already "
-                "reserved or collected.",
+                f"Stock can't go below {committed}: customers already "
+                f"reserved {committed} unit{'s' if committed != 1 else ''}.",
+                already_reserved=committed,
+                lowest_total=committed,
             )
 
         if new_total > MAX_TOTAL_QUANTITY:

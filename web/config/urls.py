@@ -94,6 +94,12 @@ urlpatterns = [
         offer_actions.mark_sold_out,
         name="mark-sold-out",
     ),
+    # LP-29: take a published offer down; reservations stay valid.
+    path(
+        "workspace/listings/<int:listing_id>/unpublish/",
+        offer_actions.unpublish,
+        name="unpublish-listing",
+    ),
     path(
         "workspace/listings/<int:listing_id>/delete/",
         offer_actions.delete_draft,

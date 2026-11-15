@@ -53,7 +53,7 @@ STATUS_EXPLANATIONS = {
 LISTING_STATUS_LABELS = {
     "DRAFT": "Draft",
     "PUBLISHED": "Published",
-    "WITHDRAWN": "Withdrawn",
+    "WITHDRAWN": "Taken down",
 }
 
 
@@ -66,7 +66,9 @@ def listing_summary(listing, shop):
     free = listing.get("free_quantity")
 
     hidden_because = ""
-    if published:
+    if listing.get("status") == "WITHDRAWN":
+        hidden_because = "you took it down. Orders already reserved can still be picked up."
+    elif published:
         if shop.get("approval_status") != "APPROVED":
             hidden_because = "your shop isn't approved."
         elif pickup_ended:
@@ -88,6 +90,38 @@ def listing_summary(listing, shop):
         # LP-58: which tab of the offer list it belongs to.
         "tab": offer_tab(listing.get("status"), pickup_ended),
         "can_mark_sold_out": published and not pickup_ended and (free is None or free > 0),
+        # LP-29: take it down; orders already reserved stay valid.
+        "can_unpublish": published and not pickup_ended,
+        **offer_counts(listing),
+    }
+
+
+def _count(value):
+    return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+
+def offer_counts(listing):
+    """LP-29: "3 posted · 1 reserved · 2 left · 0 sold" for an offer that was
+    published. reserved = held for orders not picked up yet, sold = picked up,
+    left = free. Stock can't go below already_reserved (reserved + sold)."""
+    if listing.get("status") == "DRAFT":
+        return {"counts_line": "", "already_reserved": 0, "lowest_change": None}
+    posted = _count(listing.get("total_quantity"))
+    reserved = _count(listing.get("reserved_quantity"))
+    sold = _count(listing.get("sold_quantity"))
+    free = listing.get("free_quantity")
+    left = _count(free) if free is not None else max(posted - reserved - sold, 0)
+    committed = listing.get("committed_quantity")
+    already = _count(committed) if committed is not None else reserved + sold
+    return {
+        "counts_line": f"{posted} posted · {reserved} reserved · {left} left · {sold} sold",
+        "posted_count": posted,
+        "reserved_count": reserved,
+        "left_count": left,
+        "sold_count": sold,
+        "already_reserved": already,
+        # The most the owner can remove: what is left, never what is reserved.
+        "lowest_change": -left,
     }
 
 
