@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Needs attention — Console — LastPlate{% endblock %}
+{% block header_class %}header-restaurant{% endblock %}
+
+{% block content %}
+<section class="card card--wide">
+  <p class="eyebrow">Console</p>
+  <h1>Needs attention</h1>
+
+  <nav class="tabs" aria-label="Orders">
+    <a class="tabs__tab" href="{% url 'console-orders' %}">Orders</a>
+    <a class="tabs__tab" href="{% url 'console-revenue' %}">Revenue</a>
+    <a class="tabs__tab" href="{% url 'console-attention' %}" aria-current="page">Needs attention{% if orders %} ({{ orders|length }}){% endif %}</a>
+  </nav>
+
+  <p class="help">Orders where Reservations and Marketplace disagree: Marketplace gave an unexpected answer about the food's stock. Retry asks Marketplace again. The order's status never changes here.</p>
+
+  {% if unavailable %}
+    <p class="notice notice--warning" role="alert">We can't load this list right now. Please refresh in a few minutes.</p>
+  {% elif not orders %}
+    <p class="muted">Nothing needs attention. Both services agree on every order.</p>
+  {% else %}
+    <ul class="order-list">
+      {% for order in orders %}
+        <li class="order-row">
+          <span class="order-row__top">
+            <strong>{{ order.pickup_code }} · {{ order.shop_name }}{% if order.branch_name %} · {{ order.branch_name }}{% endif %}</strong>
+            <span class="status-badge">{{ order.status_label }}</span>
+          </span>
+          <span>{{ order.problem }}</span>
+          <span class="order-row__items muted">{% for item in order.items %}{{ item.quantity }} × {{ item.title }}{% if not forloop.last %}, {% endif %}{% endfor %} · ${{ order.total_cash }}</span>
+          <span class="muted">{{ order.customer_first_name }} (account #{{ order.customer_user_id }}) · placed {{ order.created_at|date:"D j M, H:i" }}</span>
+          {% if order.can_retry %}
+            <form method="post" action="{% url 'console-retry-order' order.reservation_ref %}">
+              {% csrf_token %}
+              <button class="button button--secondary" type="submit">Retry</button>
+            </form>
+          {% else %}
+            <p class="muted">Retry isn't available for this order from here. Ask the developers to check it.</p>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block bottom_bar %}{% include "frontend/_console_bar.html" %}{% endblock %}

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Orders — Console — LastPlate{% endblock %}
+{% block header_class %}header-restaurant{% endblock %}
+
+{% block content %}
+<section class="card card--wide">
+  <p class="eyebrow">Console</p>
+  <h1>All orders</h1>
+
+  <nav class="tabs" aria-label="Orders">
+    <a class="tabs__tab" href="{% url 'console-orders' %}" aria-current="page">Orders</a>
+    <a class="tabs__tab" href="{% url 'console-revenue' %}">Revenue</a>
+    <a class="tabs__tab" href="{% url 'console-attention' %}">Needs attention{% if needs_attention %} ({{ needs_attention }}){% endif %}</a>
+  </nav>
+
+  {% if needs_attention %}
+    <p class="notice notice--warning" role="status">
+      {{ needs_attention }} order{{ needs_attention|pluralize }} need{{ needs_attention|pluralize:"s," }} attention.
+      <a href="{% url 'console-attention' %}">Open the list</a>
+    </p>
+  {% endif %}
+
+  <form method="get" class="orders-filters" aria-label="Filter orders">
+    <div class="field">
+      <label for="order-code">Pickup code</label>
+      <input id="order-code" name="code" value="{{ filters.code|default:'' }}" maxlength="12"
+             autocomplete="off" autocapitalize="characters" placeholder="e.g. K7M2QX">
+    </div>
+    <div class="field">
+      <label for="order-status">Status</label>
+      <select id="order-status" name="status">
+        <option value="">Any status</option>
+        {% for status in statuses %}<option value="{{ status.status }}"{% if filters.status == status.status %} selected{% endif %}>{{ status.label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="order-shop">Restaurant</label>
+      <select id="order-shop" name="shop_id">
+        <option value="">Every restaurant</option>
+        {% for shop in shops %}<option value="{{ shop.shop_id }}"{% if filters.shop_id == shop.shop_id|stringformat:"s" %} selected{% endif %}>{{ shop.shop_name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="order-date">Day placed (Lebanon time)</label>
+      <input id="order-date" type="date" name="date" value="{{ filters.date|default:'' }}">
+    </div>
+    <button class="button button--primary" type="submit">Show orders</button>
+    {% if filtered %}<a href="{% url 'console-orders' %}">Clear filters</a>{% endif %}
+  </form>
+
+  {% if unavailable %}
+    <p class="notice notice--warning" role="alert">We can't load orders right now. Please refresh in a few minutes.</p>
+  {% elif not orders %}
+    <p class="muted">{% if filtered %}No orders match these filters.{% else %}No orders yet.{% endif %}</p>
+  {% else %}
+    <p class="muted">{{ count }} order{{ count|pluralize }}{% if filtered %} match{{ count|pluralize:"es," }}{% endif %} · newest first · Lebanon time</p>
+    <ul class="order-list">
+      {% for order in orders %}
+        <li class="order-row{% if order.status != 'CONFIRMED' %} order-row--done{% endif %}">
+          <span class="order-row__top">
+            <strong>{{ order.pickup_code }} · {{ order.shop_name }}{% if order.branch_name %} · {{ order.branch_name }}{% endif %}</strong>
+            <span class="status-badge{% if order.status == 'CONFIRMED' %} status-badge--active{% endif %}">{{ order.status_label }}</span>
+          </span>
+          <span class="order-row__items">{% for item in order.items %}{{ item.quantity }} × {{ item.title }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+          <span class="order-row__bottom muted">
+            <span>{{ order.customer_first_name }} (account #{{ order.customer_user_id }}) · ${{ order.total_cash }}</span>
+            <span>Placed {{ order.created_at|date:"D j M, H:i" }}</span>
+          </span>
+          {% if order.status == "COLLECTED" and order.collected_at %}<span class="muted">Paid {{ order.collected_at|date:"D j M, H:i" }}</span>{% endif %}
+          {% if order.status == "CONFIRMED" %}<span class="muted">Pick up by {{ order.pick_up_by|date:"D j M, H:i" }}</span>{% endif %}
+          {% if order.status == "CANCELLED" %}<span class="muted">Cancelled by {% if order.cancelled_by == "SHOP" %}the restaurant{% elif order.cancelled_by == "ADMIN" %}an admin{% else %}the customer{% endif %}{% if order.cancel_reason %}: {{ order.cancel_reason }}{% endif %}</span>{% endif %}
+          {% if order.needs_attention %}<a href="{% url 'console-attention' %}">Needs attention</a>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    {% if pages > 1 %}
+      <nav class="pager" aria-label="Pages">
+        {% if previous_page %}<a href="?{% for key, value in query_without_page.items %}{{ key }}={{ value|urlencode }}&amp;{% endfor %}page={{ previous_page }}">Newer</a>{% endif %}
+        <span class="muted">Page {{ page }} of {{ pages }}</span>
+        {% if next_page %}<a href="?{% for key, value in query_without_page.items %}{{ key }}={{ value|urlencode }}&amp;{% endfor %}page={{ next_page }}">Older</a>{% endif %}
+      </nav>
+    {% endif %}
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block bottom_bar %}{% include "frontend/_console_bar.html" %}{% endblock %}

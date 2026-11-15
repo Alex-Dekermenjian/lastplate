@@ -107,33 +107,37 @@ def expire_due_orders_quietly():
         return 0
 
 
+def consume_order(pk, now=None):
+    """Claim one Paid order, then consume every item. True once synced.
+    (LP-43: the admin's Retry uses this for one order.)"""
+    order = claim_consumption(pk, now=now)
+    if order is None:
+        return False  # undone, or not old enough, since the list was read
+    results = [market.stock_call("consume", item_ref(order, line.listing_id), line.listing_id)
+               for line in order.lines.all()]
+    if all(result == market.DONE for result in results):
+        with transaction.atomic():
+            locked = Order.objects.select_for_update().get(pk=pk)
+            # Only if the same Paid and the same claim still apply (LP-24 contract).
+            if locked.status == Status.COLLECTED and locked.sync_state == SyncState.CONSUME_PENDING \
+                    and locked.collection_version == order.collection_version \
+                    and locked.consumption_started_at is not None:
+                locked.sync_state = SyncState.SYNCED
+                locked.save(update_fields=["sync_state"])
+                return True
+    elif market.FAULT in results:
+        # The claim stays: never undo, never release a sold item.
+        Order.objects.filter(pk=pk, sync_state=SyncState.CONSUME_PENDING).update(
+            sync_state=SyncState.NEEDS_ATTENTION)
+    return False
+
+
 def consume_paid_orders(now=None, limit=BATCH):
     """Paid orders past the undo window: claim, then consume every item."""
     now = now or timezone.now()
     paid = Order.objects.filter(status=Status.COLLECTED, sync_state=SyncState.CONSUME_PENDING,
                                 collected_at__lte=now - UNDO_WINDOW)
-    done = 0
-    for pk in _ids(paid, limit):
-        order = claim_consumption(pk, now=now)
-        if order is None:
-            continue  # undone, or not old enough, since the list was read
-        results = [market.stock_call("consume", item_ref(order, line.listing_id), line.listing_id)
-                   for line in order.lines.all()]
-        if all(result == market.DONE for result in results):
-            with transaction.atomic():
-                locked = Order.objects.select_for_update().get(pk=pk)
-                # Only if the same Paid and the same claim still apply (LP-24 contract).
-                if locked.status == Status.COLLECTED and locked.sync_state == SyncState.CONSUME_PENDING \
-                        and locked.collection_version == order.collection_version \
-                        and locked.consumption_started_at is not None:
-                    locked.sync_state = SyncState.SYNCED
-                    locked.save(update_fields=["sync_state"])
-                    done += 1
-        elif market.FAULT in results:
-            # The claim stays: never undo, never release a sold item.
-            Order.objects.filter(pk=pk, sync_state=SyncState.CONSUME_PENDING).update(
-                sync_state=SyncState.NEEDS_ATTENTION)
-    return done
+    return sum(1 for pk in _ids(paid, limit) if consume_order(pk, now))
 
 
 def resolve_stuck_orders(now=None, limit=BATCH):

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Revenue — Console — LastPlate{% endblock %}
+{% block header_class %}header-restaurant{% endblock %}
+
+{% block content %}
+<section class="card card--wide">
+  <p class="eyebrow">Console</p>
+  <h1>Revenue</h1>
+
+  <nav class="tabs" aria-label="Orders">
+    <a class="tabs__tab" href="{% url 'console-orders' %}">Orders</a>
+    <a class="tabs__tab" href="{% url 'console-revenue' %}" aria-current="page">Revenue</a>
+    <a class="tabs__tab" href="{% url 'console-attention' %}">Needs attention{% if revenue.needs_attention %} ({{ revenue.needs_attention }}){% endif %}</a>
+  </nav>
+
+  {% if unavailable %}
+    <p class="notice notice--warning" role="alert">We can't load the numbers right now. Please refresh in a few minutes.</p>
+  {% else %}
+    <p class="help">Revenue is cash from Paid orders only, counted on the day it was paid (Lebanon time). Customers pay the restaurant at pickup.</p>
+
+    <h2>Paid orders</h2>
+    <ul class="stat-grid">
+      <li class="stat"><a href="{% url 'console-orders' %}?status=COLLECTED">
+        <span class="stat__value">${{ revenue.today.revenue }}</span>
+        <span class="stat__label">Today · {{ revenue.today.paid_orders }} order{{ revenue.today.paid_orders|pluralize }}</span>
+      </a></li>
+      <li class="stat"><a href="{% url 'console-orders' %}?status=COLLECTED">
+        <span class="stat__value">${{ revenue.week.revenue }}</span>
+        <span class="stat__label">This week{% if week_start %} (since {{ week_start|date:"D j M" }}){% endif %} · {{ revenue.week.paid_orders }} order{{ revenue.week.paid_orders|pluralize }}</span>
+      </a></li>
+      <li class="stat"><a href="{% url 'console-orders' %}?status=COLLECTED">
+        <span class="stat__value">${{ revenue.all_time.revenue }}</span>
+        <span class="stat__label">All time · {{ revenue.all_time.paid_orders }} order{{ revenue.all_time.paid_orders|pluralize }}</span>
+      </a></li>
+    </ul>
+
+    <h2>Whole marketplace</h2>
+    <ul class="stat-grid">
+      <li class="stat"><a href="{% url 'console-orders' %}">
+        <span class="stat__value">{{ revenue.orders }}</span>
+        <span class="stat__label">Orders placed</span>
+      </a></li>
+      <li class="stat"><a href="{% url 'console-orders' %}?status=COLLECTED">
+        <span class="stat__value">{{ revenue.all_time.items_saved }}</span>
+        <span class="stat__label">Items saved (Paid)</span>
+      </a></li>
+      <li class="stat"><a href="{% url 'console-orders' %}?status=EXPIRED">
+        <span class="stat__value">{{ revenue.expired_orders }}</span>
+        <span class="stat__label">Expired orders</span>
+      </a></li>
+    </ul>
+
+    <h2>By restaurant</h2>
+    <p class="muted">Highest revenue first.</p>
+    {% if not revenue.shops %}
+      <p class="muted">No orders yet.</p>
+    {% else %}
+      <ol class="shop-list">
+        {% for shop in revenue.shops %}
+          <li>
+            <a class="shop-list__item" href="{% url 'console-orders' %}?shop_id={{ shop.shop_id }}">
+              <span class="order-row__top"><strong>{{ shop.shop_name }}</strong><strong>${{ shop.revenue }}</strong></span>
+              <span class="muted">
+                {{ shop.paid_orders }} Paid of {{ shop.orders }} order{{ shop.orders|pluralize }}
+                · {{ shop.items_saved }} item{{ shop.items_saved|pluralize }} saved
+                · {{ shop.expired_orders }} expired
+                · {{ shop.shop_cancellations }} cancelled by the restaurant
+              </span>
+            </a>
+          </li>
+        {% endfor %}
+      </ol>
+    {% endif %}
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block bottom_bar %}{% include "frontend/_console_bar.html" %}{% endblock %}

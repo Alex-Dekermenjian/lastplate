@@ -20,6 +20,7 @@ from frontend import (
     listing_views,
     offer_actions,
     offer_reserve,
+    order_console_views,
     order_views,
     pickup_views,
     shop_order_views,
@@ -84,6 +85,13 @@ urlpatterns = [
          name="console-block-customer"),
     path("console/customers/<int:customer_user_id>/unblock/", customer_console_views.unblock_customer,
          name="console-unblock-customer"),
+
+    # LP-43: every order, the revenue, and orders that need attention.
+    path("console/orders/", order_console_views.console_orders, name="console-orders"),
+    path("console/revenue/", order_console_views.console_revenue, name="console-revenue"),
+    path("console/attention/", order_console_views.console_attention, name="console-attention"),
+    path("console/attention/<uuid:reservation_ref>/retry/", order_console_views.retry_order,
+         name="console-retry-order"),
 
     path("workspace/", account_views.workspace, name="workspace"),
     path("workspace/orders/", shop_order_views.today_orders, name="today-orders"),
