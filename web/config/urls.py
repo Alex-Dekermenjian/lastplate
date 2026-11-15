@@ -37,6 +37,8 @@ urlpatterns = [
     # LP-78: the customer's order page (shown at the counter) and My orders.
     path("orders/", order_views.my_orders, name="my-orders"),
     path("orders/<uuid:reservation_ref>/", order_views.order_detail, name="order-detail"),
+    # LP-27: the customer cancels before the pick-up-by time.
+    path("orders/<uuid:reservation_ref>/cancel/", order_views.order_cancel, name="order-cancel"),
 
     # LP-56: one login page and one sign-up page for every kind of account.
     path("login/", account_views.login, name="login"),
@@ -62,6 +64,9 @@ urlpatterns = [
     path("workspace/orders/pickup/", pickup_views.pickup, name="pickup-code"),
     path("workspace/orders/<uuid:reservation_ref>/paid/", pickup_views.payment, name="pickup-paid"),
     path("workspace/orders/<uuid:reservation_ref>/undo/", pickup_views.payment, {"undo": True}, name="pickup-undo"),
+    # LP-79: the restaurant cancels an order, or all of a branch's for today, with a reason.
+    path("workspace/orders/<uuid:reservation_ref>/cancel/", shop_order_views.cancel_order, name="shop-cancel-order"),
+    path("workspace/orders/cancel-all/", shop_order_views.cancel_all_today, name="shop-cancel-all"),
     path("workspace/finish-setup/", account_views.finish_setup, name="finish-setup"),
     path("workspace/profile/", account_views.shop_profile, name="shop-profile"),
     # LP-68: the restaurant's branches (up to 3).

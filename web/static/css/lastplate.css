@@ -602,6 +602,12 @@ p { margin: 0 0 12px; }
 .order-items li { display: flex; flex-wrap: wrap; gap: 4px 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
 .order-items__total { margin-left: auto; font-weight: 700; }
 .order-pay { font-weight: 700; }
+/* LP-27: "Cancel order" is a red outline (design 4), confirmed in a tint box. */
+.order-cancel { margin-top: 20px; }
+.order-cancel .confirm[open] > summary { margin-bottom: 4px; }
+.order-cancel__late { margin: 20px 0 0; }
+.button--danger-outline { background: var(--surface); color: var(--danger); border-color: var(--danger); }
+.button--danger-outline:hover { background: var(--danger-tint); color: var(--danger); border-color: var(--danger); }
 .order-list { list-style: none; padding: 0; margin: 0 0 16px; display: grid; gap: 10px; }
 .order-row { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-input); background: var(--surface); color: var(--text); text-decoration: none; }
 .order-row--done { opacity: 0.75; }
@@ -612,3 +618,10 @@ p { margin: 0 0 12px; }
 .orders-filters { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
 .owner-order { border-top: 1px solid #ddd; padding: 16px 0; overflow-wrap: anywhere; }
 [data-orders-badge] { display: inline-block; min-width: 1.5em; text-align: center; font-weight: 800; }
+
+/* LP-79: the restaurant cancels with a reason (same confirm box as LP-27). */
+.owner-cancel-all { margin: 0 0 16px; }
+.owner-order__cancel { margin-top: 12px; }
+.cancel-reasons { border: 0; padding: 0; margin: 8px 0; }
+.cancel-reasons legend { font-weight: 700; padding: 0; margin-bottom: 4px; }
+.cancel-reasons .check { margin: 0; }

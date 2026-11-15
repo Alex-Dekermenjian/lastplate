@@ -69,3 +69,12 @@ class IsOperator(BasePermission):
 
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_authenticated and request.user.role == "SHOP_OPERATOR")
+
+
+class IsAdmin(BasePermission):
+    """LP-79: the LastPlate administrator (Accounts role ADMIN), as in Marketplace."""
+
+    message = "Only the LastPlate administrator can do this."
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.role == "ADMIN")
