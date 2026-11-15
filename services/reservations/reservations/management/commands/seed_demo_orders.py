@@ -14,9 +14,12 @@ restaurant's and admin's screens show them), otherwise clearly fictional ones.
 These orders never touch Marketplace stock: no food is held, sold or put
 back, so "left" numbers on offers don't change. Every order is created
 already synced with Marketplace, so the timer job never consumes or releases
-anything for them. (A Reserved one that later expires asks Marketplace to
-release a hold that never existed; Marketplace records that and changes no
-stock.) Running the command again adds nothing: each order has a fixed
+anything for them. The one exception: a Reserved one that later expires asks
+Marketplace to release a hold that never existed, and Marketplace records a
+zero-unit release and changes no stock. Fictional offers don't exist in
+Marketplace, so that call would fail and the order would land on the admin's
+"Needs attention" list: with fictional offers, the three Reserved orders are
+skipped. Running the command again adds nothing: each order has a fixed
 request key for the chosen customer.
 """
 
@@ -133,13 +136,17 @@ class Command(BaseCommand):
             self.stdout.write(f"Using offers from {offers[0].place['shop_name'] or 'a restaurant'} (Marketplace).")
         else:
             offers = FICTIONAL_OFFERS
-            self.stdout.write("Marketplace lists no offers right now; using fictional ones.")
+            self.stdout.write("Marketplace lists no offers right now; using fictional ones. Reserved orders need "
+                              "a real offer, so they are skipped: publish an offer and run this again to add them.")
 
         now = timezone.now()
         created = 0
         for number, final, actor, reason, hours_ago, items in PLAN:
             key = f"{KEY_PREFIX}{number:02d}"
             if Order.objects.filter(customer_user_id=customer_id, request_key=key).exists():
+                continue
+            if final == Status.CONFIRMED and offers is FICTIONAL_OFFERS:
+                # Its expiry would ask Marketplace about an offer that doesn't exist.
                 continue
             self._create(customer_id, options["customer_name"], key, final, actor, reason,
                          now - timedelta(hours=hours_ago), [(offers[i % len(offers)], qty) for i, qty in items], now)

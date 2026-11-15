@@ -99,6 +99,30 @@ class SeedDemoOrdersTests(TestCase):
         self.assertEqual(order.shop_id, FICTIONAL_ID)
         self.assertIn("fictional", order.lines.first().title)
 
+    def test_fictional_offers_skip_reserved_orders(self):
+        # Their expiry would ask Marketplace about offers that don't exist and
+        # land on the admin's Needs attention list (found with LP-43).
+        with marketplace([]):
+            out = self.seed()
+        self.assertEqual(Counter(self.seeded().values_list("status", flat=True)),
+                         {Status.COLLECTED: 3, Status.CANCELLED: 2, Status.EXPIRED: 2})
+        self.assertIn("Reserved orders need a real offer", out)
+        # Once Marketplace lists an offer, running again adds the Reserved ones.
+        with marketplace():
+            self.seed()
+        self.assertEqual(self.seeded().filter(status=Status.CONFIRMED).count(), 3)
+
+    def test_a_reserved_fake_order_that_expires_ends_synced(self):
+        with marketplace():
+            self.seed()
+        later = timezone.now() + timedelta(hours=3)
+        with mock.patch.object(market, "stock_call", return_value=market.DONE) as stock_call:
+            run_timers(now=later)
+        # Marketplace records a zero-unit release for each item; no stock changes there.
+        self.assertTrue(all(call.args[0] == "release" for call in stock_call.call_args_list))
+        self.assertEqual(Counter(self.seeded().values_list("status", flat=True))[Status.EXPIRED], 5)
+        self.assertFalse(self.seeded().exclude(sync_state=SyncState.SYNCED).exists())
+
     @override_settings(DEBUG=False)
     def test_refuses_when_debug_is_off(self):
         with marketplace(), self.assertRaisesMessage(CommandError, "local development only"):

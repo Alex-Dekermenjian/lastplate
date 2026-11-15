@@ -230,7 +230,10 @@ docker compose --env-file compose.env exec reservations python manage.py seed_de
 ```
 
 - They use a real restaurant branch and its offers when Marketplace lists any, so the
-  restaurant's Today's orders and the admin see them; otherwise fictional ones.
+  restaurant's Today's orders and the admin see them; otherwise fictional ones. With
+  fictional offers the 3 Reserved orders are skipped (when they expired, Marketplace
+  wouldn't know their offers and they would show on the admin's "Needs attention" list).
+  Publish an offer and run the command again to add them.
 - `--customer-id` is an Accounts user ID; use your test customer's ID to see the orders in
   their My orders. The default is a fictional customer (999001).
 - **They never change Marketplace stock**: nothing is held, sold or put back, so "left"
