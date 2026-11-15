@@ -14,10 +14,15 @@ from frontend import (
     browse_views,
     cart,
     console_views,
+    customer_console_views,
     health,
     listing_photos,
     listing_views,
     offer_actions,
+    offer_reserve,
+    order_views,
+    pickup_views,
+    shop_order_views,
     views,
 )
 
@@ -31,6 +36,8 @@ urlpatterns = [
         browse_views.offer_detail,
         name="offer-detail",
     ),
+    # LP-83: a customer reserves one offer from its page.
+    path("offers/<int:listing_id>/reserve/", offer_reserve.reserve_offer, name="offer-reserve"),
     # LP-39: a restaurant's page with everything it has left.
     path("restaurants/<int:shop_id>/", browse_views.restaurant_detail, name="restaurant-detail"),
 
@@ -38,6 +45,12 @@ urlpatterns = [
     path("cart/", cart.view_cart, name="cart"),
     path("cart/add/<int:listing_id>/", cart.add_to_cart, name="cart-add"),
     path("cart/update/<int:listing_id>/", cart.update_cart, name="cart-update"),
+    # LP-19: Reserve, placing the order from the cart.
+    path("cart/checkout/", cart.checkout, name="cart-checkout"),
+
+    # LP-78: the customer's order page (shown at the counter) and My orders.
+    path("orders/", order_views.my_orders, name="my-orders"),
+    path("orders/<uuid:reservation_ref>/", order_views.order_detail, name="order-detail"),
 
     # LP-56: one login page and one sign-up page for every kind of account.
     path("login/", account_views.login, name="login"),
@@ -56,8 +69,28 @@ urlpatterns = [
         console_views.console_restaurant,
         name="console-restaurant",
     ),
+    # LP-80: customers with expired-order strikes; the admin can remove one.
+    path("console/customers/", customer_console_views.console_customers, name="console-customers"),
+    path("console/customers/<int:customer_user_id>/", customer_console_views.console_customer,
+         name="console-customer"),
+    # LP-60: suspend/restore a restaurant, remove an offer, block/unblock a customer.
+    path("console/restaurants/<int:shop_id>/suspend/", customer_console_views.suspend_restaurant,
+         name="console-suspend-restaurant"),
+    path("console/restaurants/<int:shop_id>/restore/", customer_console_views.restore_restaurant,
+         name="console-restore-restaurant"),
+    path("console/restaurants/<int:shop_id>/offers/<int:listing_id>/remove/", customer_console_views.remove_offer,
+         name="console-remove-offer"),
+    path("console/customers/<int:customer_user_id>/block/", customer_console_views.block_customer,
+         name="console-block-customer"),
+    path("console/customers/<int:customer_user_id>/unblock/", customer_console_views.unblock_customer,
+         name="console-unblock-customer"),
 
     path("workspace/", account_views.workspace, name="workspace"),
+    path("workspace/orders/", shop_order_views.today_orders, name="today-orders"),
+    path("workspace/orders/count/", shop_order_views.orders_badge, name="orders-badge"),
+    path("workspace/orders/pickup/", pickup_views.pickup, name="pickup-code"),
+    path("workspace/orders/<uuid:reservation_ref>/paid/", pickup_views.payment, name="pickup-paid"),
+    path("workspace/orders/<uuid:reservation_ref>/undo/", pickup_views.payment, {"undo": True}, name="pickup-undo"),
     path("workspace/finish-setup/", account_views.finish_setup, name="finish-setup"),
     path("workspace/profile/", account_views.shop_profile, name="shop-profile"),
     # LP-68: the restaurant's branches (up to 3).

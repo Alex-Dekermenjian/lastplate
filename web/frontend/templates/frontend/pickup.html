@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Collect an order — LastPlate{% endblock %}
+{% block content %}
+<section class="card card--wide">
+  <h1>Collect an order</h1>
+  <p><a href="{% url 'today-orders' %}">Back to today's orders</a></p>
+  {% if error %}<p class="notice notice--error" role="alert">{{ error }}</p>{% endif %}
+  {% if expiry %}<p>Pickup deadline: <strong>{{ expiry|date:"D j M, H:i" }}</strong> (Lebanon time)</p>{% endif %}
+  {% if branches %}
+  <form method="post" action="{% url 'pickup-code' %}">
+    {% csrf_token %}
+    <div class="field"><label for="pickup-branch">Branch</label>
+      <select id="pickup-branch" name="branch_id" required>
+        <option value="">Choose a branch</option>
+        {% for branch in branches %}<option value="{{ branch.id }}"{% if selected_branch == branch.id|stringformat:"s" %} selected{% endif %}>{{ branch.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field"><label for="pickup-code">Six-character pickup code</label>
+      <input id="pickup-code" name="pickup_code" minlength="6" maxlength="6" required autocomplete="off" autocapitalize="characters">
+    </div>
+    <button class="button button--primary" type="submit">Find order</button>
+  </form>
+  {% endif %}
+  {% if order %}
+    <h2>{{ order.pickup_code }} · {{ order.customer_first_name }}</h2>
+    <p class="status-badge">{{ order.status_label }}</p>
+    <ul>{% for item in order.items %}<li>{{ item.quantity }} × {{ item.title }}</li>{% endfor %}</ul>
+    <p>Cash total: <strong>${{ order.total|floatformat:2 }}</strong></p>
+    <p>Pickup deadline: {{ order.pick_up_by }} (Lebanon time)</p>
+    {% if order.customer_phone %}<p>Customer phone: {{ order.customer_phone }}</p>{% endif %}
+    {% if order.active and not order.time_passed %}
+    <form method="post" action="{% url 'pickup-paid' order.ref %}">
+      {% csrf_token %}
+      <input type="hidden" name="branch_id" value="{{ order.branch_id }}">
+      <input type="hidden" name="version" value="{{ order.version }}">
+      <div class="check"><input id="cash-received" name="cash_received" value="yes" type="checkbox" required>
+        <label for="cash-received">Cash received: ${{ order.total|floatformat:2 }}</label></div>
+      <button class="button button--primary" type="submit">Paid</button>
+    </form>
+    {% elif order.can_undo %}
+    <form method="post" action="{% url 'pickup-undo' order.ref %}">
+      {% csrf_token %}
+      <input type="hidden" name="branch_id" value="{{ order.branch_id }}">
+      <input type="hidden" name="version" value="{{ order.version }}">
+      <p>Payment can be undone within 10 minutes.</p>
+      <button class="button button--secondary" type="submit">Undo Paid</button>
+    </form>
+    {% endif %}
+  {% endif %}
+  {% if retry %}
+    <form method="post" action="{% if retry.undo %}{% url 'pickup-undo' retry.ref %}{% else %}{% url 'pickup-paid' retry.ref %}{% endif %}">
+      {% csrf_token %}
+      <input type="hidden" name="branch_id" value="{{ retry.branch_id }}">
+      <input type="hidden" name="version" value="{{ retry.version }}">
+      {% if retry.cash_received %}<input type="hidden" name="cash_received" value="yes">{% endif %}
+      <button class="button button--secondary" type="submit">Retry the same request</button>
+    </form>
+  {% endif %}
+</section>
+{% endblock %}

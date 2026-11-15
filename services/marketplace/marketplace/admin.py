@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib import admin
 
-from .models import Shop
+from .models import Allocation, Shop
 from .shop_review import record_review, review_errors
 
 REVIEW_PERMISSION = "marketplace.review_shop"
@@ -83,3 +83,22 @@ class ShopAdmin(admin.ModelAdmin):
         if not {"approval_status", "rejection_reason"} & set(form.changed_data):
             return
         record_review(obj, obj.approval_status, obj.rejection_reason, reviewer=request.user)
+
+
+# LP-20: team admins can see stock held, sold and returned for reservations.
+# Read-only: allocations change only through the internal stock API.
+@admin.register(Allocation)
+class AllocationAdmin(admin.ModelAdmin):
+    list_display = ("reservation_ref", "listing", "quantity", "status", "reject_reason", "created_at", "finished_at")
+    list_filter = ("status", "reject_reason")
+    search_fields = ("=reservation_ref", "=listing__id", "listing__title")
+    list_select_related = ("listing",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

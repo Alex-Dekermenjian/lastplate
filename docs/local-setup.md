@@ -9,8 +9,8 @@ open decisions are in [microservices-plan.md](microservices-plan.md).
 | Part | Implemented now | Planned, not built |
 | --- | --- | --- |
 | Accounts (`services/accounts`, port 8001) | Email-based user model with roles, its migration, Django admin login, health endpoints; LP-7 APIs: shop-operator registration, RS256 token sign-in, refresh, logout (refresh-token blacklist), `/api/users/me/`, throttling; 9 original tests + health and auth API tests | Web sign-in/registration pages and the Pending shop (rest of LP-7) |
-| Marketplace (`services/marketplace`, port 8002) | Own database, health endpoints; LP-7: verifies Accounts tokens with the public key only, minimal `Shop` (one per operator, Pending), `POST /api/shops/` (idempotent), `GET /api/shops/me/`; LP-8: shop profile (pickup address, area, public contact) via `PATCH /api/shops/me/`; LP-9: team-admin shop review in Django admin (`/admin/`) | Listings, stock (LP-10 to LP-13) |
-| Reservations (`services/reservations`, port 8003) | Runnable empty service, own database, health endpoints | All reservation logic (Sprint 2) |
+| Marketplace (`services/marketplace`, port 8002) | Own database, health endpoints; LP-7: verifies Accounts tokens with the public key only, minimal `Shop` (one per operator, Pending), `POST /api/shops/` (idempotent), `GET /api/shops/me/`; LP-8: shop profile (pickup address, area, public contact) via `PATCH /api/shops/me/`; LP-9: team-admin shop review in Django admin (`/admin/`); LP-20: internal stock API for Reservations (`/internal/allocations`, service key only), allocations in the admin | Listings, stock (LP-10 to LP-13) |
+| Reservations (`services/reservations`, port 8003) | Own database, health endpoints; LP-17: `Order`, `OrderLine` (copy of the offer when ordered) and `OrderEvent` (history) tables, one status-change function, pickup codes, "pick up by" time, read-only team-admin view (`/admin/`); LP-19: checkout (`POST /api/reservations`, customer token), holds stock through Marketplace's stock API | Order pages, cancelling, collecting, the timer job (LP-21 onwards) |
 | Web frontend (`web`, port 8000) | Server-side sessions; home page; LP-56: one login page (`/login/`) and sign-up for customers and restaurants (`/signup/`), customer account page (`/account/`), POST sign-out, workspace with shop status (`/workspace/`), LP-37: three-step restaurant request (`/workspace/apply/`) and its status page (`/workspace/request/`); LP-8: shop profile page (`/workspace/profile/`); LP-10 and LP-11: create, edit and publish offers with photos; LP-12: stock adjustments; LP-13: public offers (`/offers/`) | Customer accounts, reservations (Sprint 2) |
 | Docker Compose | PostgreSQL with one database and login role per service; all four apps | Production deployment (LP-15) |
 | CI | Checks and tests per service; Compose smoke check | Cross-service feature integration tests |
@@ -75,6 +75,16 @@ install the new packages). It keeps your existing settings and only adds the
 missing key pair. Then rebuild Accounts:
 `docker compose --env-file compose.env up -d --build accounts`. Accounts will
 not start without its keys.
+
+**Set up before LP-20?** Run the same command once more. It adds only the new
+`RESERVATIONS_TO_MARKETPLACE_KEY` to `compose.env` (and `RESERVATIONS_SERVICE_KEY` to
+`services\marketplace\.env`), never prints it, and changes nothing else. Then rebuild
+Marketplace: `docker compose --env-file compose.env up -d --build --wait marketplace`.
+Without the key, Marketplace refuses every internal stock call.
+
+**Set up before LP-19?** Run the same command once more: it adds the same key to
+`services\reservations\.env` as `MARKETPLACE_SERVICE_KEY`. Docker Compose already passes
+it to the Reservations container. Then rebuild: `docker compose --env-file compose.env up -d --build --wait`.
 
 ## 4. Run everything with Docker Compose
 
@@ -184,6 +194,82 @@ add the permission **marketplace | shop | Can approve or reject shops**.
 The admin refuses approval when the profile is incomplete or the confirmation box is
 unticked, and refuses rejection without a reason. Rules:
 [database-design.md](database-design.md).
+
+## Look at orders in the Reservations admin (LP-17)
+
+Checkout does not exist yet (LP-19), so orders are only visible to team admins in
+Reservations' own Django admin. It has its own team-admin accounts, as Marketplace does.
+Create one once:
+
+```powershell
+docker compose --env-file compose.env exec reservations python manage.py createsuperuser
+```
+
+Add a clearly fictional sample order (development only). **Orders can never be deleted**,
+not even from the database, so each sample stays in your local data:
+
+```powershell
+docker compose --env-file compose.env exec reservations python manage.py make_sample_order --ordered-at 18:15
+docker compose --env-file compose.env exec reservations python manage.py make_sample_order --ordered-at 20:30 --then shop-cancel
+```
+
+Then open http://127.0.0.1:8003/admin/reservations/order/. The admin is read-only: no
+add, edit or delete. All times are Beirut time. "Pick up by" is the order time (or the
+window's start, if ordered earlier) plus `PICKUP_HOLD_MINUTES` (default 60), never later
+than the window's end. For a 2-minute demo hold, add `PICKUP_HOLD_MINUTES: "2"` to the
+`reservations` environment in a local Compose override file.
+
+## Try the stock API (LP-20)
+
+Marketplace is the only service that changes stock. Reservations will call its internal
+API (`/internal/allocations`) with the `X-Service-Name: reservations` and `X-Service-Key`
+headers. Until checkout exists (LP-19), try it with this script, which plays Reservations.
+It reads the key from `compose.env` and never prints it. Use the ID of a published offer:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\stock_api.py offer 17
+.\.venv\Scripts\python.exe scripts\stock_api.py reserve 17 --quantity 1
+.\.venv\Scripts\python.exe scripts\stock_api.py release <ref> --listing 17
+.\.venv\Scripts\python.exe scripts\stock_api.py consume <ref> --listing 17
+.\.venv\Scripts\python.exe scripts\stock_api.py reserve 17 --no-key
+```
+
+Allocations are listed, read-only, at http://127.0.0.1:8002/admin/marketplace/allocation/.
+
+## Place an order (LP-19)
+
+1. Sign up at http://127.0.0.1:8000/signup/ and choose **I want to buy food**.
+2. Open a restaurant's page from **Browse food** (click the restaurant's name) and press
+   **Add** on an item.
+3. Open the cart (the **View cart** bar) and press **Reserve**.
+4. The cart page shows **Order placed!** with the pickup code, the "pick up by" time and
+   the cash total. Customers see 1 less of that offer.
+
+If something changed since the cart was shown (sold out, fewer left, taken down, pickup
+ended, new price), nothing is reserved and the cart says what changed on that line. If
+Marketplace does not answer, the cart asks to press **Reserve** again; that continues the
+same order. A customer can have at most 2 orders waiting for pickup. Orders are listed,
+read-only, at http://127.0.0.1:8003/admin/reservations/order/.
+
+## Reserve from an offer page (LP-83)
+
+A signed-in customer can also order one item without the cart: **Browse food** → **View
+offer** → at the bottom of the offer page, choose a **Quantity** and press **Reserve**. It
+uses the same checkout as the cart (LP-19), so the same rules apply. The page then shows
+**Order placed!** with the pickup code, the "pick up by" time and the cash total. Visitors,
+restaurant owners and admins see only the offer details. The cart is not changed.
+
+## Order page and My orders (LP-78)
+
+After **Reserve** (in the cart or on an offer page) the customer lands on the order page,
+the page to show at the counter: the big pickup code, the status, the items, "Pay $X in
+cash at pickup", the restaurant, branch address and phone, the pickup time and "Pick up by
+19:15" with a countdown. **My orders** (in the menu, for customers) lists active orders on
+top and past ones below.
+
+The restaurant, branch, address and phone are saved with the order at checkout (README:
+the agreed address never changes later), so the order page works even when Marketplace is
+down. Orders placed before LP-78 show just the restaurant and branch name.
 
 ## 6. Run one service outside Docker
 

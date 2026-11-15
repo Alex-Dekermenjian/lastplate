@@ -100,6 +100,28 @@ REST_FRAMEWORK = {
 }
 
 
+def service_keys(*env_names):
+    """LP-20: a caller's current key and, during a changeover, its previous one.
+
+    Keys live only in environment variables (compose.env / .env, never Git).
+    An unset key means that caller is refused; a key shorter than 32
+    characters is refused at start-up.
+    """
+    keys = [os.environ.get(name, "").strip() for name in env_names]
+    for name, key in zip(env_names, keys):
+        if key and len(key) < 32:
+            from django.core.exceptions import ImproperlyConfigured
+
+            raise ImproperlyConfigured(f"{name} must be at least 32 characters long.")
+    return [key for key in keys if key]
+
+
+# LP-20: keys for services allowed to call /internal/ (docs/microservices-plan.md §4).
+INTERNAL_SERVICE_KEYS = {
+    "reservations": service_keys("RESERVATIONS_SERVICE_KEY", "RESERVATIONS_SERVICE_KEY_PREVIOUS"),
+}
+
+
 def read_key_file(setting, default_path):
     """Read a PEM key from the path in `setting`, else from `default_path`."""
     path = Path(os.environ.get(setting) or default_path)

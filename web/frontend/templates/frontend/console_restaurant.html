@@ -91,6 +91,66 @@
       </form>
     </section>
   {% endif %}
+
+  {# LP-60: suspend or restore an approved restaurant. #}
+  {% if shop.approval_status == "APPROVED" %}
+    <section class="card review-card">
+      {% if shop.suspended_at %}
+        <h2>Suspended</h2>
+        <div class="notice notice--error">
+          <p><strong>Suspended {{ shop.suspended_at|date:"j M Y, H:i" }}.</strong> Its offers are hidden from customers.</p>
+          <p><strong>Reason shown to the owner:</strong> {{ shop.suspension_reason|linebreaksbr }}</p>
+        </div>
+        <form method="post" action="{% url 'console-restore-restaurant' shop.id %}">
+          {% csrf_token %}
+          <button class="button button--primary button--block" type="submit">Restore restaurant</button>
+        </form>
+      {% else %}
+        <h2>Suspend</h2>
+        <form method="post" action="{% url 'console-suspend-restaurant' shop.id %}" novalidate>
+          {% csrf_token %}
+          <div class="field">
+            <label for="suspend-reason">Reason (the owner will see it)</label>
+            <textarea name="reason" id="suspend-reason" rows="3" maxlength="2000" required></textarea>
+          </div>
+          <button class="button button--secondary button--block" type="submit">Suspend restaurant</button>
+        </form>
+        <p class="help">Its offers disappear from the site until you restore it. Orders already reserved stay valid.</p>
+      {% endif %}
+    </section>
+  {% endif %}
+
+  {# LP-60: the restaurant's offers; remove a single one with a reason. #}
+  {% if offers is not None %}
+    <section class="card card--wide">
+      <h2>Offers</h2>
+      {% if not offers %}
+        <p class="muted">No published offers.</p>
+      {% else %}
+        <ul class="order-list">
+          {% for offer in offers %}
+            <li>
+              <p><strong>{{ offer.title|default:"Untitled offer" }}</strong> · ${{ offer.discounted_price }} · {{ offer.free_quantity }} left of {{ offer.total_quantity }}{% if offer.pickup_end %} · until {{ offer.pickup_end|date:"D j M, H:i" }}{% endif %}</p>
+              {% if offer.removed_at %}
+                <p class="help">Removed {{ offer.removed_at|date:"j M Y, H:i" }}: {{ offer.removal_reason }}</p>
+              {% elif offer.status == "PUBLISHED" %}
+                <form method="post" action="{% url 'console-remove-offer' shop.id offer.id %}" novalidate>
+                  {% csrf_token %}
+                  <div class="field">
+                    <label for="remove-reason-{{ offer.id }}">Why remove this offer? (the owner will see it)</label>
+                    <input type="text" name="reason" id="remove-reason-{{ offer.id }}" maxlength="2000" required>
+                  </div>
+                  <button class="button button--secondary" type="submit">Remove offer</button>
+                </form>
+              {% else %}
+                <p class="help">{{ offer.status|title }}</p>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </section>
+  {% endif %}
 {% endif %}
 {% endblock %}
 

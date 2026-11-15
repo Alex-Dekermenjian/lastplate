@@ -1,0 +1,4 @@
+{# LP-83: the result of pressing Reserve on an offer page, shown once. #}
+{% if notice %}
+  <p class="notice notice--{% if notice.kind == 'warning' %}warning{% elif notice.kind == 'info' %}info{% else %}error{% endif %}" role="alert">{{ notice.text }}</p>
+{% endif %}

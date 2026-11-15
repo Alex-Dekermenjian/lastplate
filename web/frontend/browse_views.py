@@ -194,18 +194,30 @@ def home_food(request):
 def offer_detail(request, listing_id):
     template = "frontend/offer_detail.html"
 
+    # LP-83: a customer can reserve at the bottom of the page. The result of
+    # pressing Reserve is shown even when the offer itself can't be loaded.
+    from . import offer_reserve
+
+    notice = offer_reserve.pop_notice(request, listing_id)
+
     try:
         status, data = services.listing_offer(listing_id)
     except ServiceUnavailable:
         return render(
             request,
             template,
-            {"unavailable": UNAVAILABLE_MESSAGE},
+            {"unavailable": UNAVAILABLE_MESSAGE, "notice": notice},
             status=503,
         )
 
     if status == 404:
-        return render(request, template, {"not_found": True}, status=404)
+        return render(request, template, {
+            "not_found": True,
+            # LP-83: after this customer's own order took the last ones, or
+            # once the window is over: "Sold out" / "Pickup ended".
+            "closed": offer_reserve.closed_reason(request, listing_id),
+            "notice": notice,
+        }, status=404)
 
     if status != 200 or not isinstance(data, dict):
         return render(
@@ -215,7 +227,12 @@ def offer_detail(request, listing_id):
             status=502,
         )
 
-    return render(request, template, {"offer": offer_for_display(data)})
+    offer = offer_for_display(data)
+    return render(request, template, {
+        "offer": offer,
+        "notice": notice,
+        **offer_reserve.reserve_context(request, offer, data),
+    })
 
 
 @require_GET

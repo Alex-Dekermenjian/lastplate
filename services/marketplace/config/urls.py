@@ -15,6 +15,9 @@ urlpatterns = [
     # Marketplace APIs
     path("api/", include("marketplace.urls")),
 
+    # LP-20: stock API for the Reservations service (service key only)
+    path("internal/", include("marketplace.internal_urls")),
+
     # Service health checks
     path("health/live/", health.LiveView.as_view(), name="health-live"),
     path("health/ready/", health.ReadyView.as_view(), name="health-ready"),
