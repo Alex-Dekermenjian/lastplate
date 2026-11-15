@@ -102,6 +102,18 @@ FLOWCHECK-labelled fictional data and deletes nothing. It takes about a minute.
 It should end with `All order flow checks passed.` Without `--url` it checks
 `http://127.0.0.1:8000`.
 
+**Sign-up limit**: Accounts allows 10 sign-ups per hour per connection, and
+every visitor reaches Accounts through the web service, so **all phones on the
+link share those 10**. Each run of the check uses 2. If sign-up says "Too many
+registration attempts", restarting Accounts resets the count (it is kept in
+memory):
+
+```powershell
+docker compose --env-file compose.env restart accounts
+```
+
+Create the demo accounts before the demo rather than live.
+
 At the end the check marks its offer sold out, so nothing FLOWCHECK stays on
 the public offers page. Its fictional accounts and orders stay (orders are
 never deleted, LP-17); they belong to its own restaurant and customer, so the
