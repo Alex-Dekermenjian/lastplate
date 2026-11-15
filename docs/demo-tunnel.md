@@ -59,6 +59,54 @@ Run these from the repository root.
 
    Log in at `<link>/login/` and you land on `/console`.
 
+## Orders on the link (LP-85)
+
+Reservations and its timer job are part of the stack, so reserving, My orders,
+Today's orders, Paid and expiry all work through the link with nothing extra
+to deploy. Their secret keys stay in `compose.env` on the laptop running the
+demo, never in GitHub.
+
+**Before the demo (the "redeploy")**: after each merge, the laptop that runs
+the demo takes the new code:
+
+```powershell
+git switch main
+git pull
+docker compose --env-file compose.env up -d --build --wait
+```
+
+**Show expiry live**: orders are held 60 minutes by default. For the demo, add
+this line to `compose.env` and run the `up` command again. Reservations and the
+timer job restart with a 2-minute hold:
+
+```
+PICKUP_HOLD_MINUTES=2
+```
+
+An order that isn't marked Paid within 2 minutes then shows Expired (within
+about a minute; the timer job runs every 60 seconds), and its food is back on
+sale. Remove the line and run `up` again to return to 60 minutes.
+
+**Check the flow through the link**: with the tunnel open, run this in a
+second terminal. It opens every page through the link like a phone would:
+a fictional restaurant signs up, is approved in `/console` and publishes an
+offer; a fictional customer reserves it; the restaurant marks it Paid; a second
+order expires and its food goes back on sale. It also checks that the link
+doesn't reach the Django admin, `/internal/` or any service API. It adds
+FLOWCHECK-labelled fictional data and deletes nothing. It takes about a minute.
+
+```powershell
+.\.venv\Scripts\python.exe "scripts\order flow check.py" --url https://<words>.trycloudflare.com
+```
+
+It should end with `All order flow checks passed.` Without `--url` it checks
+`http://127.0.0.1:8000`.
+
+At the end the check marks its offer sold out, so nothing FLOWCHECK stays on
+the public offers page. Its fictional accounts and orders stay (orders are
+never deleted, LP-17); they belong to its own restaurant and customer, so the
+demo accounts don't see them.
+
 ## Stop the demo
 
 1. Press **Ctrl+C** in the cloudflared terminal. The link stops working at once.
