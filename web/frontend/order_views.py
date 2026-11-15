@@ -152,7 +152,14 @@ def my_orders(request):
         "active_orders": [o for o in orders if o["active"]],
         "past_orders": [o for o in orders if not o["active"]],
         "strikes": strikes_for_display(data.get("strikes")),
+        "admin_block_until": _admin_block_until(data.get("admin_block")),
     })
+
+
+def _admin_block_until(block):
+    """LP-60: until when the admin blocked ordering, as shown, or ""."""
+    until = lebanon_time(block.get("blocked_until")) if isinstance(block, dict) else None
+    return _clock(until) if until else ""
 
 
 def strikes_for_display(strikes):

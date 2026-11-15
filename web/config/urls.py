@@ -60,6 +60,17 @@ urlpatterns = [
     path("console/customers/", customer_console_views.console_customers, name="console-customers"),
     path("console/customers/<int:customer_user_id>/", customer_console_views.console_customer,
          name="console-customer"),
+    # LP-60: suspend/restore a restaurant, remove an offer, block/unblock a customer.
+    path("console/restaurants/<int:shop_id>/suspend/", customer_console_views.suspend_restaurant,
+         name="console-suspend-restaurant"),
+    path("console/restaurants/<int:shop_id>/restore/", customer_console_views.restore_restaurant,
+         name="console-restore-restaurant"),
+    path("console/restaurants/<int:shop_id>/offers/<int:listing_id>/remove/", customer_console_views.remove_offer,
+         name="console-remove-offer"),
+    path("console/customers/<int:customer_user_id>/block/", customer_console_views.block_customer,
+         name="console-block-customer"),
+    path("console/customers/<int:customer_user_id>/unblock/", customer_console_views.unblock_customer,
+         name="console-unblock-customer"),
 
     path("workspace/", account_views.workspace, name="workspace"),
     path("workspace/orders/", shop_order_views.today_orders, name="today-orders"),

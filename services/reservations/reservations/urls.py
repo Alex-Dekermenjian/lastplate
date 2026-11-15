@@ -19,6 +19,9 @@ urlpatterns = [
     path("admin/customers", strike_views.customers, name="admin-customers"),
     path("admin/customers/<int:customer_user_id>", strike_views.customer, name="admin-customer"),
     path("admin/strikes/<uuid:ref>/remove", strike_views.remove, name="admin-remove-strike"),
+    # LP-60: the admin blocks or unblocks a customer from ordering.
+    path("admin/customers/<int:customer_user_id>/block", strike_views.block, name="admin-block-customer"),
+    path("admin/customers/<int:customer_user_id>/unblock", strike_views.unblock, name="admin-unblock-customer"),
     path("reservations", views.reservations, name="reservations"),
     # LP-78: one of the customer's own orders.
     path("reservations/<uuid:ref>", views.reservation_detail, name="reservation-detail"),

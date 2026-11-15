@@ -291,3 +291,34 @@ class StrikeRemoval(models.Model):
 
     def delete(self, *args, **kwargs):
         raise NotDeletable("Removed strikes are never deleted.")
+
+
+class CustomerBlock(models.Model):
+    """LP-60: the admin blocked a customer from ordering until a date.
+
+    Separate from LP-80's strikes (those block by themselves). Never deleted:
+    unblocking (or a newer block) only sets lifted_at, so the history stays.
+    """
+
+    customer_user_id = models.PositiveBigIntegerField(db_index=True)
+    blocked_until = models.DateTimeField()
+    reason = models.TextField()
+    # Accounts admins; plain IDs, never ForeignKeys.
+    blocked_by_user_id = models.PositiveBigIntegerField()
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+    lifted_at = models.DateTimeField(null=True, blank=True)
+    lifted_by_user_id = models.PositiveBigIntegerField(null=True, blank=True)
+
+    objects = NoDeleteQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.CheckConstraint(condition=~Q(reason=""), name="customerblock_reason_required"),
+        ]
+
+    def __str__(self):
+        return f"Customer {self.customer_user_id} blocked until {self.blocked_until:%Y-%m-%d}"
+
+    def delete(self, *args, **kwargs):
+        raise NotDeletable("Customer blocks are never deleted.")

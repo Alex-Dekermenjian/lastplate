@@ -406,6 +406,40 @@ def admin_remove_strike(access, reservation_ref, reason):
                  {"reason": reason}, token=access)
 
 
+# LP-60: the admin suspends/restores a restaurant, removes an offer, and
+# blocks/unblocks a customer. Marketplace and Reservations check the Admin token.
+@sensitive_variables("access")
+def admin_suspend_shop(access, shop_id, reason):
+    return _call("marketplace", "POST", f"/api/admin/shops/{int(shop_id)}/suspend", {"reason": reason}, token=access)
+
+
+@sensitive_variables("access")
+def admin_restore_shop(access, shop_id):
+    return _call("marketplace", "POST", f"/api/admin/shops/{int(shop_id)}/restore", {}, token=access)
+
+
+@sensitive_variables("access")
+def admin_shop_listings(access, shop_id):
+    return _call("marketplace", "GET", f"/api/admin/shops/{int(shop_id)}/listings", token=access)
+
+
+@sensitive_variables("access")
+def admin_remove_listing(access, listing_id, reason):
+    return _call("marketplace", "POST", f"/api/admin/listings/{int(listing_id)}/remove", {"reason": reason},
+                 token=access)
+
+
+@sensitive_variables("access")
+def admin_block_customer(access, customer_user_id, until, reason):
+    return _call("reservations", "POST", f"/api/admin/customers/{int(customer_user_id)}/block",
+                 {"until": until, "reason": reason}, token=access)
+
+
+@sensitive_variables("access")
+def admin_unblock_customer(access, customer_user_id):
+    return _call("reservations", "POST", f"/api/admin/customers/{int(customer_user_id)}/unblock", {}, token=access)
+
+
 # LP-25: before the offers list is shown, Reservations expires late orders so
 # their food is back on sale even if its background timer is asleep. Never
 # makes a page fail or wait long: any problem is ignored (the timer retries).

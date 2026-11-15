@@ -217,6 +217,9 @@ class ShopSerializer(serializers.ModelSerializer):
             "review_requests",
             "created_at",
             "updated_at",
+            # LP-60: suspended by the LastPlate admin, and why.
+            "suspended_at",
+            "suspension_reason",
         ]
 
         read_only_fields = fields
@@ -439,6 +442,9 @@ class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
             "branch_details",
             "created_at",
             "updated_at",
+            # LP-60: removed by the LastPlate admin, and why.
+            "removed_at",
+            "removal_reason",
         ]
 
         read_only_fields = [
@@ -446,6 +452,8 @@ class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
             "status",
             "created_at",
             "updated_at",
+            "removed_at",
+            "removal_reason",
         ]
 
     # LP-14: Reject, rather than silently drop, unknown and read-only fields

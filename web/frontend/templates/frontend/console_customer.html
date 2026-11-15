@@ -22,8 +22,34 @@
       <dt>Account</dt><dd>#{{ customer.customer_user_id }}</dd>
       <dt>Strikes (last 30 days)</dt><dd>{{ customer.count }}</dd>
       <dt>Ordering</dt>
-      <dd>{% if customer.blocked_until %}Blocked until {{ customer.blocked_until|date:"D j M Y, H:i" }}{% else %}Allowed{% endif %}</dd>
+      <dd>{% if customer.ordering_blocked_until %}Blocked until {{ customer.ordering_blocked_until|date:"D j M Y, H:i" }}{% if customer.blocked_because == "admin" %} (by admin){% else %} (3 strikes){% endif %}{% else %}Allowed{% endif %}</dd>
     </dl>
+  </section>
+
+  {# LP-60: block or unblock ordering. Browsing always works. #}
+  <section class="card review-card">
+    {% if customer.admin_block %}
+      <h2>Blocked by admin</h2>
+      <p>Until {{ customer.admin_block.blocked_until|date:"D j M Y" }}. Reason: {{ customer.admin_block.reason }}</p>
+      <form method="post" action="{% url 'console-unblock-customer' customer.customer_user_id %}">
+        {% csrf_token %}
+        <button class="button button--primary button--block" type="submit">Unblock</button>
+      </form>
+    {% else %}
+      <h2>Block from ordering</h2>
+      <form method="post" action="{% url 'console-block-customer' customer.customer_user_id %}" novalidate>
+        {% csrf_token %}
+        <div class="field">
+          <label for="block-until">Can order again on</label>
+          <input type="date" name="until" id="block-until" required>
+        </div>
+        <div class="field">
+          <label for="block-reason">Reason (kept for the team)</label>
+          <input type="text" name="reason" id="block-reason" maxlength="1000" required>
+        </div>
+        <button class="button button--secondary button--block" type="submit">Block customer</button>
+      </form>
+    {% endif %}
   </section>
 
   <section class="card card--wide">

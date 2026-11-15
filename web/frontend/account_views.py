@@ -74,6 +74,9 @@ def listing_summary(listing, shop):
         elif free is not None and free <= 0:
             hidden_because = "it has sold out. Add stock to show it again."
 
+    if published and not hidden_because and shop.get("suspended_at"):
+        hidden_because = "LastPlate suspended your restaurant."  # LP-60
+
     # LP-68: which branch the offer is at, when the restaurant has several.
     branch = listing.get("branch_details") if isinstance(listing.get("branch_details"), dict) else {}
     several_branches = len(shop.get("branches") or []) > 1

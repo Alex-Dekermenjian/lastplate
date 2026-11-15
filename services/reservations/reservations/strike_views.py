@@ -3,6 +3,9 @@
 GET  /api/admin/customers                   customers with strikes or a running block
 GET  /api/admin/customers/{customer_user_id} their strikes and expired-order history
 POST /api/admin/strikes/{ref}/remove         {"reason": "..."}: remove one strike
+LP-60:
+POST /api/admin/customers/{id}/block         {"until": "YYYY-MM-DD", "reason": "..."}
+POST /api/admin/customers/{id}/unblock
 
 Customers and restaurants get 403; no token gets 401.
 """
@@ -14,7 +17,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .authentication import IsAdmin
-from .models import Order, Status
+from .blocks import active_block, block_customer, block_data, ordering_block, unblock_customer
+from .models import CustomerBlock, Order, Status
 from .strikes import STRIKE_WINDOW, StrikeRefused, customers_with_strikes, remove_strike, strike_status
 from .timers import expire_due_orders_quietly
 
@@ -24,8 +28,17 @@ MAX_HISTORY = 100
 
 
 def _customer(customer_user_id, first_name):
+    until, why = ordering_block(customer_user_id)
     return {"customer_user_id": customer_user_id, "first_name": first_name,
-            **strike_status(customer_user_id).as_dict()}
+            **strike_status(customer_user_id).as_dict(),
+            # LP-60: the admin's block, and when ordering is possible again (either block).
+            "admin_block": block_data(active_block(customer_user_id)),
+            "ordering_blocked_until": until.isoformat() if until else None, "blocked_because": why}
+
+
+def _first_name(customer_user_id):
+    latest = Order.objects.filter(customer_user_id=customer_user_id).order_by("-created_at").first()
+    return (latest.customer_first_name if latest else "") or "Customer"
 
 
 @never_cache
@@ -33,7 +46,11 @@ def _customer(customer_user_id, first_name):
 @permission_classes(ADMIN_ONLY)
 def customers(request):
     expire_due_orders_quietly()
-    return Response({"customers": [_customer(*row) for row in customers_with_strikes()]})
+    rows = dict(customers_with_strikes())
+    # LP-60: and customers the admin blocked, while the block runs.
+    for block in CustomerBlock.objects.filter(lifted_at__isnull=True, blocked_until__gt=timezone.now()):
+        rows.setdefault(block.customer_user_id, _first_name(block.customer_user_id))
+    return Response({"customers": [_customer(*row) for row in rows.items()]})
 
 
 def _expired_order(order, window_start):
@@ -59,17 +76,36 @@ def _expired_order(order, window_start):
 @permission_classes(ADMIN_ONLY)
 def customer(request, customer_user_id):
     expire_due_orders_quietly()
-    status = strike_status(customer_user_id)
     orders = (Order.objects.filter(customer_user_id=customer_user_id, status=Status.EXPIRED)
               .select_related("strike_removal").prefetch_related("lines").order_by("-pick_up_by", "-id"))
-    latest = Order.objects.filter(customer_user_id=customer_user_id).order_by("-created_at").first()
     window_start = timezone.now() - STRIKE_WINDOW
     return Response({
-        "customer_user_id": customer_user_id,
-        "first_name": (latest.customer_first_name if latest else "") or "Customer",
-        **status.as_dict(),
+        **_customer(customer_user_id, _first_name(customer_user_id)),
+        "has_orders": Order.objects.filter(customer_user_id=customer_user_id).exists(),
         "expired_orders": [_expired_order(order, window_start) for order in orders[:MAX_HISTORY]],
     })
+
+
+@api_view(["POST"])
+@permission_classes(ADMIN_ONLY)
+def block(request, customer_user_id):
+    """LP-60: block a customer from ordering until a day, with a reason."""
+    data = request.data if isinstance(request.data, dict) else {}
+    try:
+        block_customer(customer_user_id, data.get("until"), data.get("reason"), request.user.id)
+    except StrikeRefused as refused:
+        return Response(refused.body, status=refused.http_status)
+    return Response(_customer(customer_user_id, _first_name(customer_user_id)))
+
+
+@api_view(["POST"])
+@permission_classes(ADMIN_ONLY)
+def unblock(request, customer_user_id):
+    try:
+        unblock_customer(customer_user_id, request.user.id)
+    except StrikeRefused as refused:
+        return Response(refused.body, status=refused.http_status)
+    return Response(_customer(customer_user_id, _first_name(customer_user_id)))
 
 
 @api_view(["POST"])
