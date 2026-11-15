@@ -7,7 +7,10 @@
 <section class="card card--wide">
   <h1>My orders</h1>
 
-  {% if strikes %}
+  {% if admin_block_until %}
+    {# LP-60 #}
+    <p class="notice notice--error" role="alert"><strong>LastPlate has blocked ordering on your account until {{ admin_block_until }}.</strong> You can still browse food.</p>
+  {% elif strikes %}
     {# LP-80: expired orders are strikes. #}
     {% if strikes.blocked %}
       <p class="notice notice--error" role="alert"><strong>You can't place orders until {{ strikes.until }}.</strong>

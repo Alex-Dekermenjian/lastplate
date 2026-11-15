@@ -18,8 +18,10 @@ from .stock import free_quantity, with_committed
 
 
 def _approved_shops():
+    # LP-60: a suspended restaurant and all its offers leave the site.
     return Shop.objects.filter(
-        approval_status=Shop.ApprovalStatus.APPROVED
+        approval_status=Shop.ApprovalStatus.APPROVED,
+        suspended_at__isnull=True,
     )
 
 

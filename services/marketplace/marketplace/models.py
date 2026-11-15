@@ -128,6 +128,13 @@ class Shop(models.Model):
     review_request_note = models.TextField(blank=True, default="")
     review_requested_at = models.DateTimeField(null=True, blank=True)
 
+    # LP-60: the LastPlate admin suspended this restaurant. Its offers leave
+    # the site and nothing new can be reserved; the owner sees the reason.
+    # Existing Reserved orders stay valid. Restore clears all three.
+    suspended_at = models.DateTimeField(null=True, blank=True)
+    suspension_reason = models.TextField(blank=True, default="", db_default="")
+    suspended_by_user_id = models.PositiveBigIntegerField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -319,6 +326,12 @@ class Listing(models.Model):
         blank=True,
     )
 
+    # LP-60: the LastPlate admin removed this offer (status WITHDRAWN) and
+    # why; the owner sees the reason. Existing reservations stay valid.
+    removed_at = models.DateTimeField(null=True, blank=True)
+    removal_reason = models.TextField(blank=True, default="", db_default="")
+    removed_by_user_id = models.PositiveBigIntegerField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -422,6 +435,7 @@ class Allocation(models.Model):
     class RejectReason(models.TextChoices):
         NOT_PUBLISHED = "not_published", "The offer is not published"
         SHOP_NOT_APPROVED = "shop_not_approved", "The restaurant is not approved"
+        SHOP_SUSPENDED = "shop_suspended", "The restaurant is suspended"
         PICKUP_ENDED = "pickup_ended", "The pickup window has ended"
         TERMS_CHANGED = "terms_changed", "The offer changed since the customer saw it"
         NOT_ENOUGH_STOCK = "not_enough_stock", "Not enough left"
