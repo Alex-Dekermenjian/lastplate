@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Search food — LastPlate{% endblock %}
+
+{% block content %}
+{# LP-18: the Search tab. Same search bar and food cards as the home page (LP-69). #}
+<section class="browse">
+  <h1>Search food</h1>
+  <p class="lead">Choose where you are and what you feel like eating.</p>
+
+  {% if unavailable %}
+    <p class="notice notice--warning" role="alert">{{ unavailable }}</p>
+  {% else %}
+    {% include "frontend/_food_search.html" %}
+    {% if not offers and not searching %}
+      <p class="notice notice--info">There's no food available right now. Check back later today.</p>
+    {% elif offers %}
+      {% if not searching %}<p class="offer-count">{{ offers|length }} offer{{ offers|length|pluralize }} available</p>{% endif %}
+      {% include "frontend/_offer_grid.html" %}
+    {% endif %}
+  {% endif %}
+</section>
+{% endblock %}

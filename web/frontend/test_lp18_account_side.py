@@ -4,6 +4,8 @@ import base64
 import json
 import time
 from types import SimpleNamespace
+from unittest import mock
+from urllib.error import URLError
 from urllib.parse import urlencode
 
 from django.test import Client, SimpleTestCase
@@ -12,6 +14,7 @@ from django.urls import reverse
 from . import tokens
 from .services import ServiceUnavailable
 from .test_accounts import PASSWORD, TOKENS, patch_service
+from .test_browse_offers import UNAVAILABLE, offer
 from .test_lp62_cart import CartTestCase
 from .test_lp56_login_signup import CUSTOMER, OPERATOR
 
@@ -34,6 +37,11 @@ def refresh_token(seconds_from_now):
 
 
 class CustomerBottomBarTests(CartTestCase):
+    def setUp(self):
+        super().setUp()
+        # The Search page lists food, so none of these tests may need a real Marketplace.
+        self.enterContext(patch_service("browse_listings", return_value=(200, [])))
+
     def labels(self, response):
         html = response.content.decode()
         start = html.index('class="bottom-bar-customer"')
@@ -61,7 +69,7 @@ class CustomerBottomBarTests(CartTestCase):
         response = self.client.get(reverse("workspace"))
         self.assertNotContains(response, "bottom-bar-customer")
 
-    def test_placeholder_pages_are_customers_only(self):
+    def test_search_and_orders_are_customers_only(self):
         for name in ("search", "my-orders"):
             with self.subTest(page=name, who="signed out"):
                 response = self.client.get(reverse(name))
@@ -321,3 +329,118 @@ class EmailRuleOnTheProfileTests(CartTestCase):
         self.assertContains(response, "An account with this email already exists.")
         self.assertEqual(self.client.session["account"]["display_name"], "Rami")
         self.assertEqual(self.client.session["account"]["email"], CUSTOMER["email"])
+
+
+HAMRA_CROISSANTS = offer(id=1, title="Butter Croissants", category="Bakery",
+                         shop={"id": 1, "name": "Cedar Bakery", "area": "Hamra"})
+ACHRAFIEH_PIZZA = offer(id=2, title="Pizza Slices", category="Pizza",
+                        shop={"id": 2, "name": "Slice Corner", "area": "Achrafieh"})
+
+
+class SearchPageTests(CartTestCase):
+    """LP-18: the Search tab has the Where box and Type of food, like the home page."""
+
+    url = reverse("search")
+
+    def setUp(self):
+        super().setUp()
+        self.sign_in_as(CUSTOMER)
+
+    def search(self, **params):
+        with patch_service("browse_listings", return_value=(200, [HAMRA_CROISSANTS, ACHRAFIEH_PIZZA])):
+            return self.client.get(self.url, params)
+
+    def titles(self, response):
+        return [item["title"] for item in response.context["offers"]]
+
+    def test_it_has_the_where_box_and_the_type_of_food(self):
+        response = self.search()
+
+        self.assertContains(response, 'role="search"')
+        self.assertContains(response, "Where")
+        self.assertContains(response, "Search a place, e.g. Hamra")
+        self.assertContains(response, "Type of food")
+        self.assertContains(response, "2 offers available")
+        self.assertEqual(self.titles(response), ["Butter Croissants", "Pizza Slices"])
+
+    def test_searching_stays_on_the_search_page(self):
+        response = self.search(place="Achrafieh")
+
+        self.assertContains(response, 'action=""')  # the form sends the search back to this page
+        self.assertEqual(self.titles(response), ["Pizza Slices"])
+        self.assertContains(response, "in Achrafieh")
+        self.assertEqual(response.context["search_form"]["place"].value(), "Achrafieh")
+
+    def test_a_place_with_no_food_says_so(self):
+        response = self.search(place="Badaro")
+
+        self.assertEqual(self.titles(response), [])
+        self.assertContains(response, "No food matches your search right now.")
+
+    def test_the_search_tab_is_the_highlighted_one(self):
+        html = self.search().content.decode()
+        bar = html[html.index('class="bottom-bar-customer"'):]
+        bar = bar[:bar.index("</nav>")]
+
+        self.assertEqual(bar.count('aria-current="page"'), 1)
+        self.assertIn('aria-current="page">Search</a>', bar)
+
+    def test_the_page_still_opens_when_marketplace_is_down(self):
+        with patch_service("browse_listings", side_effect=ServiceUnavailable):
+            response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, UNAVAILABLE)
+        self.assertContains(response, "bottom-bar-customer")
+
+
+class CustomerHomeTests(CartTestCase):
+    """The Where and Type of food boxes live on the Search tab. A signed-in
+    customer's home pages don't repeat them; visitors and restaurants, who have
+    no Search tab, still get them."""
+
+    OFFERS = [HAMRA_CROISSANTS, ACHRAFIEH_PIZZA]
+
+    def home(self):
+        with mock.patch("frontend.views.urlopen", side_effect=URLError("down")), \
+                patch_service("browse_listings", return_value=(200, self.OFFERS)):
+            return self.client.get(reverse("home"))
+
+    def browse(self):
+        with patch_service("browse_listings", return_value=(200, self.OFFERS)):
+            return self.client.get(reverse("browse-offers"))
+
+    def test_customers_do_not_get_the_search_boxes_on_their_home_pages(self):
+        self.sign_in_as(CUSTOMER)
+
+        for name, response in (("home", self.home()), ("browse-offers", self.browse())):
+            with self.subTest(page=name):
+                self.assertNotContains(response, 'role="search"')
+                self.assertNotContains(response, "Search a place")
+                self.assertNotContains(response, "Type of food")
+                self.assertContains(response, "Butter Croissants")
+                self.assertContains(response, "2 offers available")
+                self.assertContains(response, "bottom-bar-customer")
+
+    def test_the_search_tab_keeps_the_boxes(self):
+        self.sign_in_as(CUSTOMER)
+
+        with patch_service("browse_listings", return_value=(200, self.OFFERS)):
+            response = self.client.get(reverse("search"))
+
+        self.assertContains(response, 'role="search"')
+        self.assertContains(response, "Search a place, e.g. Hamra")
+        self.assertContains(response, "Type of food")
+
+    def test_visitors_still_get_the_search_boxes(self):
+        for name, response in (("home", self.home()), ("browse-offers", self.browse())):
+            with self.subTest(page=name):
+                self.assertContains(response, 'role="search"')
+                self.assertContains(response, "Search a place, e.g. Hamra")
+
+    def test_restaurants_still_get_the_search_boxes(self):
+        self.sign_in_as(OPERATOR)
+
+        response = self.browse()
+
+        self.assertContains(response, 'role="search"')

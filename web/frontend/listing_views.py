@@ -10,6 +10,9 @@ from .account_views import authenticated_call, operator_required
 from .apply_views import approved_shop_required
 from .services import ServiceUnavailable
 from .listing_photos import photo_url
+from .food_types import canonical, type_choices
+
+CHOOSE_A_FOOD_TYPE = "Choose a type of food from the list."
 
 
 LISTING_FIELDS = (
@@ -212,6 +215,7 @@ def create_listing(request):
                 "form_values": {},
                 "branches": branch_rows(branches),
                 "several_branches": several,
+                "food_types": type_choices(),
             },
         )
 
@@ -239,6 +243,7 @@ def create_listing(request):
                 "form_values": form_values,
                 "branches": branch_rows(branches, request.POST),
                 "several_branches": several,
+                "food_types": type_choices(),
                 **context,
             },
             status=status,
@@ -246,6 +251,13 @@ def create_listing(request):
 
     if several and not chosen:
         return form_page(400, error=CHOOSE_A_BRANCH)
+
+    # Only a type of food from the list, in the list's spelling.
+    if listing_data.get("category"):
+        food_type = canonical(listing_data["category"])
+        if food_type is None:
+            return form_page(400, error=CHOOSE_A_FOOD_TYPE)
+        listing_data["category"] = form_values["category"] = food_type
 
     photo = request.FILES.get("photo")
 
@@ -410,6 +422,7 @@ def edit_listing(request, listing_id):
         # LP-68: a draft can move to another branch.
         "branches": branch_rows(branches, selected=listing.get("branch")),
         "several_branches": len(branches) > 1,
+        "food_types": type_choices(listing.get("category")),
     }
 
     if request.method == "GET":
@@ -425,6 +438,16 @@ def edit_listing(request, listing_id):
         **listing,
         **listing_data,
     }
+
+    # Only a type of food from the list; a draft's older typed category may
+    # stay as it is until the owner picks one.
+    category = listing_data.get("category")
+    if category and category != listing.get("category"):
+        food_type = canonical(category)
+        if food_type is None:
+            context["error"] = CHOOSE_A_FOOD_TYPE
+            return render(request, template, context, status=400)
+        listing_data["category"] = context["form_values"]["category"] = food_type
 
     photo = request.FILES.get("photo")
 
