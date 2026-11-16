@@ -41,6 +41,8 @@ class CustomerBottomBarTests(CartTestCase):
         super().setUp()
         # The Search page lists food, so none of these tests may need a real Marketplace.
         self.enterContext(patch_service("browse_listings", return_value=(200, [])))
+        # My orders (LP-78) reads the customer's orders from Reservations.
+        self.enterContext(patch_service("my_orders", return_value=(200, {"orders": []})))
 
     def labels(self, response):
         html = response.content.decode()
@@ -261,6 +263,35 @@ class SessionExpiryTests(CartTestCase):
         self.sign_in_as(CUSTOMER)
         self.assertRedirects(self.client.get(url), reverse("cart"), fetch_redirect_response=False)
         self.assertEqual(self.lines(), {})
+
+    def test_a_button_comes_back_to_the_page_it_was_on(self):
+        """Reserve is POST-only, so after logging in the browser must not be sent back to its address."""
+        self.set_refresh_token(refresh_token(-1))
+
+        with patch_service("create_reservation") as reserve:
+            response = self.client.post(reverse("cart-checkout"), HTTP_REFERER="http://testserver/cart/")
+
+        self.assert_session_ended(response, reverse("cart"))
+        reserve.assert_not_called()  # nothing was reserved and no stock moved
+
+    def test_the_reserve_button_on_an_offer_page_comes_back_to_that_page(self):
+        self.set_refresh_token(refresh_token(-1))
+        offer_page = f"{reverse('offer-detail', args=[42])}?{urlencode({'from': 'search'})}"
+
+        with patch_service("create_reservation") as reserve:
+            response = self.client.post(reverse("offer-reserve", args=[42]), HTTP_REFERER=f"http://testserver{offer_page}")
+
+        self.assert_session_ended(response, offer_page)
+        reserve.assert_not_called()
+
+    def test_a_referer_from_another_site_is_ignored(self):
+        self.set_refresh_token(refresh_token(-1))
+        url = reverse("cart-update", args=[42])
+
+        with patch_service("listing_offer"):
+            response = self.client.post(url, HTTP_REFERER="http://evil.example/steal")
+
+        self.assert_session_ended(response, url)
 
     def test_a_refresh_token_rejected_by_accounts_also_returns_to_the_same_page(self):
         with patch_service("update_account", return_value=(401, {})), \

@@ -3,7 +3,7 @@
 <nav class="bottom-bar-customer" aria-label="Customer menu">
   <a href="{% url 'browse-offers' %}"{% if page == "browse-offers" or page == "offer-detail" or page == "restaurant-detail" or page == "home" %} aria-current="page"{% endif %}>Home</a>
   <a href="{% url 'search' %}"{% if page == "search" %} aria-current="page"{% endif %}>Search</a>
-  <a href="{% url 'my-orders' %}"{% if page == "my-orders" %} aria-current="page"{% endif %}>My orders</a>
+  <a href="{% url 'my-orders' %}"{% if page == "my-orders" or page == "order-detail" %} aria-current="page"{% endif %}>My orders</a>
   <a href="{% url 'my-account' %}"{% if page == "my-account" %} aria-current="page"{% endif %}>Profile</a>
 </nav>
 {% endwith %}

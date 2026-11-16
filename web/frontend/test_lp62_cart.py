@@ -117,7 +117,7 @@ class CartPageTests(CartTestCase):
         response = self.view()
 
         for text in ("Croissant Box", "Bread Bag", "$4.50", "$6.00", "Total, paid in cash at pickup",
-                     "$10.50", "Ordering opens soon."):
+                     "$10.50", "Reserve"):
             self.assertContains(response, text)
         self.assertEqual(response.context["total"], Decimal("10.50"))
 

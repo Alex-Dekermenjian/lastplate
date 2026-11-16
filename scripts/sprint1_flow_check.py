@@ -198,8 +198,8 @@ def run():
     with_photo = own(token, photo_title)
     path = with_photo.get("photo_display") or ""
     check(path.startswith("/media/"), "photo stored", path)
-    status, _, _ = owner.get(MARKET + path)
-    check(status == 200, "uploaded photo can be downloaded by a browser", status)
+    status, _, _ = owner.get(WEB + path)
+    check(status == 200, "uploaded photo can be downloaded through the web site", status)
     page = owner.post_photo(f"{WEB}/workspace/listings/{with_photo['id']}/edit/", offer(photo_title), "fake.png", "image/png", b"not an image")[2]
     check("not a valid image" in page and own(token, photo_title)["photo_display"] == path, "fake image refused; photo kept")
     other = Browser()
@@ -220,7 +220,7 @@ def run():
     page = Browser().get(f"{WEB}/offers/{lid}/")[2]
     for want in (photo_title, "$4.00", "$10.00", "10 left", "16:00", "18:00", "12 Sample Street", "Gluten (fictional)", "Hamra", "+961 1 234 567"):
         check(want in page, f"public details show {want}")
-    check(f"{MARKET}{path}" in page, "public page links the photo at a browser-reachable address")
+    check(f'src="{path}"' in page and "127.0.0.1:8002" not in page, "public page links the photo on the web site itself")
     check("marketplace:8000" not in page, "no Docker-internal hostname on the page")
     check(photo_title in Browser().get(f"{WEB}/offers/")[2], "offer on the public list")
     check(not is_public(listing["id"]), "drafts stay private")

@@ -65,7 +65,7 @@ lastplate/
 | --- | --- | --- |
 | Accounts | User, password hash, role, login, token issuing | none |
 | Marketplace | Shop (profile, approval), Listing, StockAdjustment, Allocation | `operator_user_id`, `reservation_ref` |
-| Reservations | Reservation, agreed-term snapshot, ReservationEvent | `customer_user_id`, `listing_id`, `shop_id` |
+| Reservations | Order, OrderLine (agreed-term snapshot), OrderEvent (LP-17; called Reservation/ReservationEvent below) | `customer_user_id`, `listing_id`, `shop_id`, `branch_id` |
 
 Changes from `docs/database-design.md`:
 
@@ -187,8 +187,12 @@ authentication, not by the network. Planned rules:
 - A missing, unknown or wrong key returns 401/403. Reservations must treat that
   as a configuration fault (§6), never as a stock rejection.
 
-Not implemented yet: the first internal endpoint arrives with Sprint 2
-allocations. Health endpoints are public and expose no data except, when
+**Implemented (LP-20)** for Marketplace's `/internal/allocations` endpoints:
+`marketplace/service_auth.py`. Only `reservations` is allowed. Its key is
+`RESERVATIONS_SERVICE_KEY` (and `RESERVATIONS_SERVICE_KEY_PREVIOUS` during a
+changeover), filled from `compose.env` by `scripts/init_dev_env.py`. Missing
+headers give 401; an unknown caller, a wrong key or a caller the endpoint does
+not allow give 403. Health endpoints are public and expose no data except, when
 `HEALTH_EXPOSE_DETAILS` is on (development and CI only), the connected
 database name.
 
@@ -219,7 +223,7 @@ Full request/response examples go in `docs/api/<service>.md` before coding.
 | `GET /api/admin/shops?status=PENDING` | staff | Review queue |
 | `POST /api/admin/shops/{id}/approve`, `/reject` | staff | Decision; reject needs a reason |
 | `GET /internal/shops/by-operator/{user_id}` | Reservations | Which shop an operator runs |
-| `POST /internal/allocations` | Reservations | Allocate stock (Sprint 2, §6) |
+| `POST /internal/allocations` | Reservations | Allocate stock (§6; implemented in LP-20, as are the four below) |
 | `GET /internal/allocations/{ref}` | Reservations | Read allocation result |
 | `POST /internal/allocations/{ref}/release` | Reservations | Customer cancellation or expiry |
 | `POST /internal/allocations/{ref}/consume` | Reservations | Collection |
@@ -229,8 +233,8 @@ Full request/response examples go in `docs/api/<service>.md` before coding.
 
 | Method and path | Caller | Purpose |
 | --- | --- | --- |
-| `POST /api/reservations` | customer | `{listing_id, quantity, request_key, expected_terms_revision}` |
-| `GET /api/reservations`, `GET /api/reservations/{ref}` | customer | Own reservations and status |
+| `POST /api/reservations` | customer | Implemented in LP-19 for a one-branch cart: `{request_key, lines: [{listing_id, quantity, expected_unit_price}]}`; one allocation per line, all or nothing |
+| `GET /api/reservations`, `GET /api/reservations/{ref}` | customer | Own reservations and status (implemented in LP-78; someone else's order is 404; PROCESSING and NOT_RESERVED are never shown) |
 | `POST /api/reservations/{ref}/cancel` | customer | Before pickup start |
 | `GET /api/shop/reservations` | operator | Reservations for own shop |
 | `POST /api/shop/reservations/{ref}/collect` | operator | During pickup window |
@@ -351,8 +355,15 @@ allocation and overselling.
 
 ### Collection and shop cancellation
 
-- Collection (`pickup_start <= now < pickup_end`): set COLLECTED and
-  CONSUME_PENDING, then call consume. HELD → CONSUMED.
+- Collection (LP-24, `pickup_start <= now < pick_up_by`): set COLLECTED,
+  collected_at and CONSUME_PENDING under the order lock. Do not call consume
+  immediately. The restaurant may undo Paid for ten minutes, restoring Reserved
+  with an audit event. LP-25 must durably claim consumption after that window,
+  under the same lock, before calling Marketplace. A claim permanently blocks
+  undo, including after HTTP failures. The timing, version/idempotency rules,
+  per-line allocation references and concurrency contract are specified in
+  [LP-24 collection contract](api/lp24-collection.md). HELD → CONSUMED happens
+  only through that later worker; no worker is implemented by LP-24.
   - **Consumed stock stays unavailable.** CONSUMED still counts in the free
     stock formula, and release is refused on CONSUMED.
   - Until the consume call succeeds, the allocation is still HELD, which also
@@ -388,7 +399,8 @@ These cases were unresolved in the first draft.
    only CONFIRMED rows; case 1 covers late resolution. Shops can collect or
    cancel only CONFIRMED reservations.
 6. **Consume and release retries arrive in either order.** Reservations
-   allows only one terminal transition per reservation. Marketplace moves only
+   serializes status transitions; LP-24's guarded undo is allowed only before
+   consumption is claimed. Marketplace moves only
    from HELD, so a stray release after CONSUMED returns 409 and is flagged
    NEEDS_ATTENTION. Units are never returned.
 7. **Release must match the allocation.** Release, consume and shop-cancel

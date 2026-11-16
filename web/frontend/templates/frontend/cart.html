@@ -27,6 +27,9 @@
             {% else %}
               <span class="cart-line__gone">No longer available</span>
             {% endif %}
+            {% if line.problem %}
+              <span class="cart-line__gone" role="alert">{{ line.problem }}</span>
+            {% endif %}
           </div>
 
           {% if line.available %}
@@ -61,9 +64,23 @@
       <strong>${{ total }}</strong>
     </p>
 
-    {# LP-19 turns this into the real checkout. #}
-    <button class="button button--primary button--block" type="button" disabled>Checkout</button>
-    <p class="help" style="text-align: center;">Ordering opens soon.</p>
+    {# LP-19: the real checkout. The key stays the same while the cart does. #}
+    {% if has_gone %}
+      <button class="button button--primary button--block" type="button" disabled>Reserve</button>
+      <p class="help" style="text-align: center;">Remove what is no longer available, then reserve.</p>
+    {% else %}
+      <form method="post" action="{% url 'cart-checkout' %}">
+        {% csrf_token %}
+        <input type="hidden" name="request_key" value="{{ request_key }}">
+        <div class="field">
+          <label for="customer-phone">Contact phone (optional)</label>
+          <input id="customer-phone" name="customer_phone" type="tel" maxlength="32" autocomplete="tel">
+          <p class="help">The restaurant can see this only while your order is Reserved.</p>
+        </div>
+        <button class="button button--primary button--block" type="submit">Reserve</button>
+      </form>
+      <p class="help" style="text-align: center;">We hold the food for you; you pay in cash at pickup.</p>
+    {% endif %}
   {% endif %}
 </section>
 {% endblock %}

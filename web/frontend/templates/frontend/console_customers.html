@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Customers — Console — LastPlate{% endblock %}
+{% block header_class %}header-restaurant{% endblock %}
+
+{% block content %}
+<section class="card card--wide">
+  <p class="eyebrow">Console</p>
+  <h1>Customers with strikes</h1>
+  <p class="help">Each order that expired without pickup is a strike for 30 days. 2 strikes: the customer is warned. 3 within 30 days: no ordering for 7 days.</p>
+
+  {# LP-60: open any customer by account number, to block them. #}
+  <form method="get" class="inline-form">
+    <div class="field">
+      <label for="find-account">Find a customer by account number</label>
+      <input type="text" name="account" id="find-account" inputmode="numeric" placeholder="e.g. 501">
+    </div>
+    <button class="button button--secondary" type="submit">Open</button>
+  </form>
+
+  {% if unavailable %}
+    <p class="notice notice--warning" role="alert">We can't load customers right now. Please refresh in a few minutes.</p>
+  {% elif not customers %}
+    <p class="muted">No customer has a strike right now.</p>
+  {% else %}
+    <ul class="order-list">
+      {% for customer in customers %}
+        <li>
+          <a href="{% url 'console-customer' customer.customer_user_id %}">
+            <strong>{{ customer.first_name }}</strong> · account #{{ customer.customer_user_id }}
+          </a>
+          <span class="status{% if customer.ordering_blocked_until %} status--REJECTED{% elif customer.warning %} status--PENDING{% endif %}">
+            {{ customer.count }} strike{{ customer.count|pluralize }}{% if customer.ordering_blocked_until %} · blocked until {{ customer.ordering_blocked_until|date:"D j M, H:i" }}{% if customer.blocked_because == "admin" %} (by admin){% endif %}{% endif %}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block bottom_bar %}{% include "frontend/_console_bar.html" %}{% endblock %}

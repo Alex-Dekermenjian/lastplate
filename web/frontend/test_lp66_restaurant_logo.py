@@ -12,7 +12,7 @@ from .test_lp62_cart import CEDAR, CartTestCase
 
 PUBLIC = "http://127.0.0.1:8002"
 LOGO_PATH = "/media/shop_logos/logo.png"
-LOGO_URL = PUBLIC + LOGO_PATH
+LOGO_URL = LOGO_PATH  # LP-46: photo links are relative to this site
 
 
 @override_settings(DEBUG=True, MARKETPLACE_PUBLIC_URL=PUBLIC)

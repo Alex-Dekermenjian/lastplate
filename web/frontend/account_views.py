@@ -5,7 +5,7 @@ and which pages it may open.
 """
 
 from functools import wraps
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from django.conf import settings
 from django.contrib import messages
@@ -74,6 +74,9 @@ def listing_summary(listing, shop):
             hidden_because = "its pickup time has ended."
         elif free is not None and free <= 0:
             hidden_because = "it has sold out. Add stock to show it again."
+
+    if published and not hidden_because and shop.get("suspended_at"):
+        hidden_because = "LastPlate suspended your restaurant."  # LP-60
 
     # LP-68: which branch the offer is at, when the restaurant has several.
     branch = listing.get("branch_details") if isinstance(listing.get("branch_details"), dict) else {}
@@ -152,9 +155,28 @@ def landing_url(account):
     return reverse("home")
 
 
+def return_path(request):
+    """Where a customer lands after logging in again.
+
+    A page opened with GET comes back to itself. A button (POST) cannot be
+    repeated by the browser after logging in, and some buttons are POST-only
+    (Reserve, for example), so it comes back to the page the button was on,
+    when the browser says which page that was and it is this site.
+    """
+    if request.method != "GET":
+        referer = request.META.get("HTTP_REFERER", "")
+        if referer and url_has_allowed_host_and_scheme(
+            referer, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+        ):
+            parts = urlsplit(referer)
+            if parts.path.startswith("/"):
+                return parts.path + (f"?{parts.query}" if parts.query else "")
+    return request.get_full_path()
+
+
 def login_with_next(request):
-    """Send the person to /login and bring them back to this same page afterwards."""
-    return redirect(f"{reverse('login')}?{urlencode({'next': request.get_full_path()})}")
+    """Send the person to /login and bring them back to where they were."""
+    return redirect(f"{reverse('login')}?{urlencode({'next': return_path(request)})}")
 
 
 def session_ended(request, account):
