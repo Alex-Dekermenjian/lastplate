@@ -51,6 +51,8 @@ urlpatterns = [
     # LP-78: the customer's order page (shown at the counter) and My orders.
     path("orders/", order_views.my_orders, name="my-orders"),
     path("orders/<uuid:reservation_ref>/", order_views.order_detail, name="order-detail"),
+    # LP-27: the customer cancels before the pick-up-by time.
+    path("orders/<uuid:reservation_ref>/cancel/", order_views.order_cancel, name="order-cancel"),
 
     # LP-56: one login page and one sign-up page for every kind of account.
     path("login/", account_views.login, name="login"),
