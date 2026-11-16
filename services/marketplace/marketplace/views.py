@@ -488,6 +488,12 @@ def publish_listing(request, pk):
             {"detail": "Your shop must be approved before publishing."},
             status=status.HTTP_403_FORBIDDEN,
         )
+    if shop.suspended_at is not None:
+        # LP-60: nothing new goes on sale while LastPlate has suspended the shop.
+        return Response(
+            {"detail": "LastPlate suspended your restaurant, so you can't publish offers right now."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
     # LP-8: Check actual profile completeness.
     profile_complete = shop.profile_complete

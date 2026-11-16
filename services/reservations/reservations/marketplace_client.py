@@ -95,6 +95,36 @@ def _held(body, ref):
     return isinstance(body, dict) and body.get("reservation_ref") == str(ref)
 
 
+# LP-25: what the timer job's release and consume calls can end in.
+DONE = "DONE"
+# The allocation states that mean the call has taken effect.
+_FINISHED_BY = {"release": ("RELEASED", "REJECTED"), "consume": ("CONSUMED",)}
+
+
+def stock_call(action, ref, listing_id):
+    """LP-25: release or consume one item's allocation.
+
+    DONE: Marketplace confirmed it (a repeat answers the same, it is
+    idempotent). UNKNOWN: no answer, try again on the next run. FAULT: an
+    answer that must never happen (409 not_held, 404, a bad key): staff look.
+    """
+    if action not in _FINISHED_BY:
+        raise ValueError(f"Unknown stock action {action!r}")
+    if not settings.MARKETPLACE_SERVICE_KEY:
+        logger.error("MARKETPLACE_SERVICE_KEY is not set; Marketplace will refuse every stock call.")
+        return FAULT
+    try:
+        status, body = _request("POST", f"/internal/allocations/{ref}/{action}",
+                                {"listing_id": int(listing_id)}, internal=True)
+    except MarketplaceUnavailable:
+        return UNKNOWN
+    if status == 200 and _held(body, ref) and body.get("status") in _FINISHED_BY[action]:
+        return DONE
+    logger.error("Unexpected %s answer %s (%s) for %s", action, status,
+                 body.get("code", "?") if isinstance(body, dict) else "?", ref)
+    return FAULT
+
+
 def allocate(ref, listing_id, quantity, expected_terms_revision):
     if not settings.MARKETPLACE_SERVICE_KEY:
         logger.error("MARKETPLACE_SERVICE_KEY is not set; Marketplace will refuse every stock call.")

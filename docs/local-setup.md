@@ -219,6 +219,29 @@ window's start, if ordered earlier) plus `PICKUP_HOLD_MINUTES` (default 60), nev
 than the window's end. For a 2-minute demo hold, add `PICKUP_HOLD_MINUTES: "2"` to the
 `reservations` environment in a local Compose override file.
 
+### Fake orders for building screens (LP-77)
+
+One command adds ten fake orders in every status (3 Reserved, 3 Paid, 2 Cancelled, 2
+Expired), with items, history and pick-up-by times around now (development only):
+
+```powershell
+docker compose --env-file compose.env exec reservations python manage.py seed_demo_orders
+docker compose --env-file compose.env exec reservations python manage.py seed_demo_orders --customer-id 12 --customer-name Rami
+```
+
+- They use a real restaurant branch and its offers when Marketplace lists any, so the
+  restaurant's Today's orders and the admin see them; otherwise fictional ones. With
+  fictional offers the 3 Reserved orders are skipped (when they expired, Marketplace
+  wouldn't know their offers and they would show on the admin's "Needs attention" list).
+  Publish an offer and run the command again to add them.
+- `--customer-id` is an Accounts user ID; use your test customer's ID to see the orders in
+  their My orders. The default is a fictional customer (999001).
+- **They never change Marketplace stock**: nothing is held, sold or put back, so "left"
+  numbers stay the same. Don't collect them at the counter, since there is no stock to
+  consume.
+- Running it again adds nothing for the same customer. Like every order, they can't be
+  deleted.
+
 ## Try the stock API (LP-20)
 
 Marketplace is the only service that changes stock. Reservations will call its internal

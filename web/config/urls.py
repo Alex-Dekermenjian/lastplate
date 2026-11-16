@@ -8,9 +8,23 @@ https://docs.djangoproject.com/en/5.2/topics/http/urls/
 from django.urls import path
 from django.views.generic import RedirectView
 
-from frontend import account_views, branch_views, browse_views, cart, console_views, health, listing_views, offer_actions, offer_reserve, order_views, views
-from frontend import shop_order_views
-from frontend import pickup_views
+from frontend import (
+    account_views,
+    branch_views,
+    browse_views,
+    cart,
+    console_views,
+    customer_console_views,
+    health,
+    listing_photos,
+    listing_views,
+    offer_actions,
+    offer_reserve,
+    order_views,
+    pickup_views,
+    shop_order_views,
+    views,
+)
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -57,6 +71,21 @@ urlpatterns = [
         console_views.console_restaurant,
         name="console-restaurant",
     ),
+    # LP-80: customers with expired-order strikes; the admin can remove one.
+    path("console/customers/", customer_console_views.console_customers, name="console-customers"),
+    path("console/customers/<int:customer_user_id>/", customer_console_views.console_customer,
+         name="console-customer"),
+    # LP-60: suspend/restore a restaurant, remove an offer, block/unblock a customer.
+    path("console/restaurants/<int:shop_id>/suspend/", customer_console_views.suspend_restaurant,
+         name="console-suspend-restaurant"),
+    path("console/restaurants/<int:shop_id>/restore/", customer_console_views.restore_restaurant,
+         name="console-restore-restaurant"),
+    path("console/restaurants/<int:shop_id>/offers/<int:listing_id>/remove/", customer_console_views.remove_offer,
+         name="console-remove-offer"),
+    path("console/customers/<int:customer_user_id>/block/", customer_console_views.block_customer,
+         name="console-block-customer"),
+    path("console/customers/<int:customer_user_id>/unblock/", customer_console_views.unblock_customer,
+         name="console-unblock-customer"),
 
     path("workspace/", account_views.workspace, name="workspace"),
     path("workspace/orders/", shop_order_views.today_orders, name="today-orders"),
@@ -113,6 +142,9 @@ urlpatterns = [
         listing_views.adjust_stock,
         name="adjust-stock",
     ),
+
+    # LP-46: offer and shop photos, fetched from Marketplace so they load on any host.
+    path("media/<path:path>", listing_photos.media_proxy, name="media"),
 
     path("health/live/", health.live, name="health-live"),
     path("health/ready/", health.ready, name="health-ready"),

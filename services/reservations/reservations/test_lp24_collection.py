@@ -98,7 +98,8 @@ class CollectionApiTests(TestCase):
         self.client.credentials()
         self.assertEqual(self.lookup().status_code, 401)
 
-    def test_expiry_boundary_returns_deadline_without_changing_state(self):
+    @patch("reservations.collection_views.expire_due_orders_quietly")  # LP-25 timer off: Paid/lookup alone
+    def test_expiry_boundary_returns_deadline_without_changing_state(self, _no_expiry):
         for offset in (0, 1):
             with patch("reservations.collection.timezone.now", return_value=self.order.pick_up_by + timedelta(seconds=offset)):
                 self.assertEqual(self.action().status_code, 409)

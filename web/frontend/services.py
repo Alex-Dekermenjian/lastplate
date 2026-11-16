@@ -389,8 +389,73 @@ def admin_review_shop(access, shop_id, decision):
     return _call("marketplace", "POST", f"/api/admin/shops/{int(shop_id)}/review", decision, token=access)
 
 
+# LP-80: customers' expired-order strikes (Reservations, Admin token only).
+@sensitive_variables("access")
+def admin_customers(access):
+    return _call("reservations", "GET", "/api/admin/customers", token=access)
+
+
+@sensitive_variables("access")
+def admin_customer(access, customer_user_id):
+    return _call("reservations", "GET", f"/api/admin/customers/{int(customer_user_id)}", token=access)
+
+
+@sensitive_variables("access")
+def admin_remove_strike(access, reservation_ref, reason):
+    return _call("reservations", "POST", f"/api/admin/strikes/{reservation_ref}/remove",
+                 {"reason": reason}, token=access)
+
+
+# LP-60: the admin suspends/restores a restaurant, removes an offer, and
+# blocks/unblocks a customer. Marketplace and Reservations check the Admin token.
+@sensitive_variables("access")
+def admin_suspend_shop(access, shop_id, reason):
+    return _call("marketplace", "POST", f"/api/admin/shops/{int(shop_id)}/suspend", {"reason": reason}, token=access)
+
+
+@sensitive_variables("access")
+def admin_restore_shop(access, shop_id):
+    return _call("marketplace", "POST", f"/api/admin/shops/{int(shop_id)}/restore", {}, token=access)
+
+
+@sensitive_variables("access")
+def admin_shop_listings(access, shop_id):
+    return _call("marketplace", "GET", f"/api/admin/shops/{int(shop_id)}/listings", token=access)
+
+
+@sensitive_variables("access")
+def admin_remove_listing(access, listing_id, reason):
+    return _call("marketplace", "POST", f"/api/admin/listings/{int(listing_id)}/remove", {"reason": reason},
+                 token=access)
+
+
+@sensitive_variables("access")
+def admin_block_customer(access, customer_user_id, until, reason):
+    return _call("reservations", "POST", f"/api/admin/customers/{int(customer_user_id)}/block",
+                 {"until": until, "reason": reason}, token=access)
+
+
+@sensitive_variables("access")
+def admin_unblock_customer(access, customer_user_id):
+    return _call("reservations", "POST", f"/api/admin/customers/{int(customer_user_id)}/unblock", {}, token=access)
+
+
+# LP-25: before the offers list is shown, Reservations expires late orders so
+# their food is back on sale even if its background timer is asleep. Never
+# makes a page fail or wait long: any problem is ignored (the timer retries).
+EXPIRE_TIMEOUT_SECONDS = 2
+
+
+def expire_late_orders():
+    try:
+        _call("reservations", "POST", "/api/timers/expire", {}, timeout=EXPIRE_TIMEOUT_SECONDS)
+    except Exception:  # noqa: BLE001 - best effort only
+        pass
+
+
 # LP-13: Public marketplace. No token is sent: these pages need no sign-in.
 def browse_listings():
+    expire_late_orders()
     return _call(
         "marketplace",
         "GET",
@@ -399,6 +464,7 @@ def browse_listings():
 
 
 def listing_offer(listing_id):
+    expire_late_orders()
     return _call(
         "marketplace",
         "GET",
@@ -408,6 +474,7 @@ def listing_offer(listing_id):
 
 # LP-39: A restaurant's public page. No token: anyone may open it.
 def restaurant_page(shop_id):
+    expire_late_orders()
     return _call(
         "marketplace",
         "GET",

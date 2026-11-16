@@ -30,6 +30,9 @@ from .authentication import IsCustomer
 from .cancellation import CancelRefused, cancel_by_customer
 from .checkout import CheckoutRefused, TryAgain, place_order
 from .models import Order, Status
+from .blocks import active_block
+from .strikes import strike_status
+from .timers import expire_due_orders_quietly
 
 # LP-78: how many orders "My orders" shows.
 MAX_LISTED = 50
@@ -79,9 +82,16 @@ def customer_orders(request):
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated, IsCustomer])
 def reservations(request):
+    # LP-25: late orders expire before they are read or counted.
+    expire_due_orders_quietly()
     if request.method == "GET":
         orders = customer_orders(request).prefetch_related("lines").order_by("-created_at", "-id")[:MAX_LISTED]
-        return Response({"orders": [order_data(order) for order in orders]})
+        # LP-80: the customer's strikes, for the warning banner. LP-60: and
+        # whether the admin blocked ordering (until when; the reason stays internal).
+        admin = active_block(request.user.id)
+        return Response({"orders": [order_data(order) for order in orders],
+                         "strikes": strike_status(request.user.id).as_dict(),
+                         "admin_block": {"blocked_until": admin.blocked_until.isoformat()} if admin else None})
 
     data = request.data if isinstance(request.data, dict) else {}
     try:
@@ -111,6 +121,7 @@ def reservations(request):
 def reservation_detail(request, ref):
     """LP-78: one order. Someone else's order is 404, never 403, so a
     reference reveals nothing about orders that are not yours."""
+    expire_due_orders_quietly()  # LP-25
     order = customer_orders(request).prefetch_related("lines").filter(reservation_ref=ref).first()
     if order is None:
         return Response({"code": "not_found", "detail": "No such order."}, status=status.HTTP_404_NOT_FOUND)

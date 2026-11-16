@@ -56,6 +56,8 @@ Delivery, online refunds, combined shopping carts, partial pickup, delegated-pic
 
 Installed package versions are pinned in [requirements.txt](requirements.txt). Local installation and configuration are documented in [docs/local-setup.md](docs/local-setup.md), with placeholders in [.env.example](.env.example). Shared template/static directories, static collection, development-only media serving and environment-based debug/host settings are configured. The deployment target and persistence decisions are recorded in [docs/hosting-plan.md](docs/hosting-plan.md). Production integration and deployment are tracked by LP-11/LP-15.
 
+**Fake orders for development (LP-77):** `python manage.py seed_demo_orders` in the Reservations service adds ten fake orders in every status (Reserved, Paid, Cancelled, Expired), so screens can be built with realistic data. It runs only with `DJANGO_DEBUG=True`, adds nothing when run again, and **never changes Marketplace stock**. See [docs/local-setup.md](docs/local-setup.md#fake-orders-for-building-screens-lp-77).
+
 ## Contribution workflow
 
 1. Choose a Jira card, read its completion checks and move it to In Progress when work begins.

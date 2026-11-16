@@ -26,6 +26,11 @@ class OwnerOrdersTests(TestCase):
         clock = patch("reservations.shop_views.timezone.now", return_value=NOW)
         clock.start()
         self.addCleanup(clock.stop)
+        # LP-25 expires overdue orders on every read (tested in test_lp25_timers);
+        # these tests are about the list itself, so the timer is switched off.
+        no_expiry = patch("reservations.shop_views.expire_due_orders_quietly")
+        no_expiry.start()
+        self.addCleanup(no_expiry.stop)
 
     def order(self, minutes=30, **fields):
         order = make_order()
