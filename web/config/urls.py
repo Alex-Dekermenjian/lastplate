@@ -1,4 +1,3 @@
-
 """
 URL configuration for the web frontend.
 
@@ -12,6 +11,7 @@ from frontend import customer_console_views
 from frontend import account_views, branch_views, browse_views, cart, console_views, customer_views, health, listing_views, offer_actions, offer_reserve, order_views, views
 from frontend import shop_order_views
 from frontend import pickup_views
+from frontend import listing_photos
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -127,6 +127,9 @@ urlpatterns = [
         listing_views.adjust_stock,
         name="adjust-stock",
     ),
+
+    # LP-46: listing and shop photos, fetched from Marketplace through this site.
+    path("media/<path:path>", listing_photos.media_proxy, name="media"),
 
     path("health/live/", health.live, name="health-live"),
     path("health/ready/", health.ready, name="health-ready"),
