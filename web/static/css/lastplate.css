@@ -625,3 +625,13 @@ p { margin: 0 0 12px; }
 .cancel-reasons { border: 0; padding: 0; margin: 8px 0; }
 .cancel-reasons legend { font-weight: 700; padding: 0; margin-bottom: 4px; }
 .cancel-reasons .check { margin: 0; }
+
+/* LP-33: responsive reporting cards and a horizontally scrollable history. */
+.sales-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 12px; margin: 16px 0 20px; }
+.sales-summary .card { min-width: 0; overflow-wrap: anywhere; }
+.sales-history input[type="date"] { min-width: 0; max-width: 100%; }
+.sales-table { max-width: 100%; overflow-x: auto; margin-bottom: 16px; }
+.sales-table table { width: 100%; border-collapse: collapse; }
+.sales-table th, .sales-table td { padding: 12px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+.sales-table th { background: var(--tint); }
+.sales-table caption { text-align: left; font-weight: 700; margin-bottom: 8px; }

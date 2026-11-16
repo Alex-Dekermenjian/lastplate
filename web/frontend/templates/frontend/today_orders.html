@@ -4,6 +4,15 @@
 {% block content %}
 <section class="card card--wide">
   <h1>Today's orders</h1>
+  <p><a href="{% url 'sales-history' %}">Sales history</a></p>
+  {% if summary %}
+  <div class="sales-summary" aria-label="Today's sales">
+    <div class="card"><h2 class="stat__label">Paid orders</h2><strong class="stat__value">{{ summary.paid_orders }}</strong></div>
+    <div class="card"><h2 class="stat__label">Cash collected</h2><strong class="stat__value">USD {{ summary.cash_collected }}</strong></div>
+    <div class="card"><h2 class="stat__label">Cash still expected</h2><strong class="stat__value">USD {{ summary.cash_expected }}</strong></div>
+    <div class="card"><h2 class="stat__label">Expired orders</h2><strong class="stat__value">{{ summary.expired_orders }}</strong></div>
+  </div>
+  {% endif %}
   <p><a href="{% url 'pickup-code' %}">Enter pickup code</a></p>
   <nav aria-label="Order status">
     <a href="{% url 'today-orders' %}"{% if not paid_tab %} aria-current="page"{% endif %}>Reserved</a> ·

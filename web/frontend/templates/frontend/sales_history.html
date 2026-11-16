@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Sales history — LastPlate{% endblock %}
+{% block content %}
+<section class="card card--wide sales-history">
+  <h1>Sales history</h1>
+  <p><a href="{% url 'today-orders' %}">Today's orders</a></p>
+  <p class="muted">By pickup deadline · Lebanon time · All amounts in USD</p>
+  <form method="get" class="orders-filters">
+    <div class="field"><label for="sales-from">From</label><input id="sales-from" name="from" type="date" value="{{ filters.from }}" required></div>
+    <div class="field"><label for="sales-to">To</label><input id="sales-to" name="to" type="date" value="{{ filters.to }}" required></div>
+    <div class="field"><label for="sales-branch">Branch</label><select id="sales-branch" name="branch">
+      <option value="">All branches</option>
+      {% for branch in branches %}<option value="{{ branch.id }}"{% if filters.branch|stringformat:"s" == branch.id|stringformat:"s" %} selected{% endif %}>{{ branch.name }}</option>{% endfor %}
+    </select></div>
+    <button type="submit" class="button button--primary">Apply filters</button>
+  </form>
+  {% if unavailable %}
+    <p class="notice notice--warning" role="alert">{{ error|default:"Can't load sales right now. Please try again." }}</p>
+  {% else %}
+    <div class="sales-summary" aria-label="Sales summary">
+      <div class="card"><h2 class="stat__label">Total orders</h2><strong class="stat__value">{{ summary.orders }}</strong></div>
+      <div class="card"><h2 class="stat__label">Cash collected</h2><strong class="stat__value">USD {{ summary.cash_collected }}</strong></div>
+      <div class="card"><h2 class="stat__label">Items saved</h2><strong class="stat__value">{{ summary.items_saved }}</strong></div>
+      <div class="card"><h2 class="stat__label">Expired orders</h2><strong class="stat__value">{{ summary.expired_orders }}</strong></div>
+    </div>
+    <p class="help">Items saved counts quantities on current Paid orders.</p>
+    <p><a class="button button--secondary" href="{{ export_url }}">Export CSV</a></p>
+    <div class="sales-table" role="region" aria-labelledby="sales-history-caption" tabindex="0"><table>
+      <caption id="sales-history-caption">Filtered order history</caption>
+      <thead><tr><th scope="col">Order</th><th scope="col">Branch</th><th scope="col">Pickup deadline</th><th scope="col">Paid at</th><th scope="col">Status</th><th scope="col">Items</th><th scope="col">Order total (USD)</th><th scope="col">Collected (USD)</th><th scope="col">Expected (USD)</th></tr></thead>
+      <tbody>{% for order in orders %}<tr>
+        <td>{{ order.reservation_ref }}</td><td>{{ order.branch_name }}</td><td>{{ order.pick_up_by }}</td><td>{{ order.collected_at|default:"—" }}</td><td>{{ order.status_label }}</td><td>{{ order.quantity }}</td><td>{{ order.order_total }}</td><td>{{ order.cash_collected }}</td><td>{{ order.cash_expected }}</td>
+      </tr>{% empty %}<tr><td colspan="9">No orders match these filters.</td></tr>{% endfor %}</tbody>
+    </table></div>
+    <p class="muted">Page {{ pagination.page }}</p>
+    <nav class="workspace-actions" aria-label="History pages">{% if previous_url %}<a class="button button--secondary" href="{{ previous_url }}">Previous</a>{% endif %}{% if next_url %}<a class="button button--secondary" href="{{ next_url }}">Next</a>{% endif %}</nav>
+  {% endif %}
+</section>
+{% endblock %}

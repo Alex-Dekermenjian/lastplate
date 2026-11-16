@@ -23,6 +23,7 @@ from frontend import (
     order_views,
     pickup_views,
     shop_order_views,
+    sales_views,
     views,
 )
 
@@ -89,6 +90,8 @@ urlpatterns = [
 
     path("workspace/", account_views.workspace, name="workspace"),
     path("workspace/orders/", shop_order_views.today_orders, name="today-orders"),
+    path("workspace/sales/", sales_views.history, name="sales-history"),
+    path("workspace/sales/export/", sales_views.history, {"export": True}, name="sales-export"),
     path("workspace/orders/count/", shop_order_views.orders_badge, name="orders-badge"),
     path("workspace/orders/pickup/", pickup_views.pickup, name="pickup-code"),
     path("workspace/orders/<uuid:reservation_ref>/paid/", pickup_views.payment, name="pickup-paid"),
