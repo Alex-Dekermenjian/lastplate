@@ -8,8 +8,11 @@ from . import collection_views
 from . import shop_cancel_views
 from . import strike_views
 from . import timer_views
+from .sales_views import sales
 
 urlpatterns = [
+    path("shop/sales", sales, name="shop-sales"),
+    path("shop/sales/export", sales, {"export": True}, name="shop-sales-export"),
     path("shop/reservations/lookup", collection_views.lookup, name="pickup-lookup"),
     path("shop/reservations/<uuid:ref>/collect", collection_views.collect, name="collect-order"),
     path("shop/reservations/<uuid:ref>/undo", collection_views.collect, {"undo": True}, name="undo-order"),

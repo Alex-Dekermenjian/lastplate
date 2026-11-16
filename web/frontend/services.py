@@ -29,9 +29,9 @@ def _read_json(response):
 
 
 @sensitive_variables("payload", "token", "body", "headers")
-def _call(service, method, path, payload=None, token=None, timeout=None):
+def _call(service, method, path, payload=None, token=None, timeout=None, csv=False):
     body = json.dumps(payload).encode() if payload is not None else None
-    headers = {"Accept": "application/json"}
+    headers = {"Accept": "text/csv" if csv else "application/json"}
 
     if body is not None:
         headers["Content-Type"] = "application/json"
@@ -51,6 +51,10 @@ def _call(service, method, path, payload=None, token=None, timeout=None):
             request,
             timeout=timeout or settings.SERVICE_API_TIMEOUT_SECONDS,
         ) as response:
+            if csv:
+                if response.headers.get_content_type() != "text/csv":
+                    raise ServiceUnavailable(service)
+                return response.status, response.read()
             return response.status, _read_json(response)
     except HTTPError as error:
         if error.code >= 500:
@@ -523,6 +527,16 @@ def my_orders(access):
 @sensitive_variables("access")
 def shop_orders(access, filters=None):
     return _call("reservations", "GET", "/api/shop/reservations?" + urlencode(filters or {}), token=access)
+
+
+@sensitive_variables("access")
+def shop_sales(access, filters=None):
+    return _call("reservations", "GET", "/api/shop/sales?" + urlencode(filters or {}), token=access)
+
+
+@sensitive_variables("access")
+def export_sales(access, filters=None):
+    return _call("reservations", "GET", "/api/shop/sales/export?" + urlencode(filters or {}), token=access, csv=True)
 
 
 @sensitive_variables("access", "payload")
