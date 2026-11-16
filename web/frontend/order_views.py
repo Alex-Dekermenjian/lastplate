@@ -95,6 +95,9 @@ def order_for_display(order, place=None):
         "time_passed": active and left is None,
         "countdown": countdown_text(left) if active else "",
         "date": _day(created) if created else "",
+        # LP-79: the restaurant's reason, shown to the customer.
+        "shop_cancel_reason": (order.get("cancel_reason") or "")
+        if order.get("status") == "CANCELLED" and order.get("cancelled_by") == "Restaurant" else "",
         "shop_id": order.get("shop_id"),
         "place": place or {},
     }

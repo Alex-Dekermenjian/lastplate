@@ -546,3 +546,17 @@ def get_order(access, reservation_ref):
 @sensitive_variables("access")
 def cancel_order(access, reservation_ref):
     return _call("reservations", "POST", f"/api/reservations/{reservation_ref}/cancel", {}, token=access)
+
+
+# LP-79: the restaurant cancels one order, or all of a branch's for today,
+# with a reason. Reservations checks the shop owns them and tells Marketplace.
+@sensitive_variables("access")
+def shop_cancel_order(access, reservation_ref, reason):
+    return _call("reservations", "POST", f"/api/shop/reservations/{reservation_ref}/cancel",
+                 {"reason": reason}, token=access)
+
+
+@sensitive_variables("access")
+def shop_cancel_all(access, branch_id, reason):
+    return _call("reservations", "POST", "/api/shop/reservations/cancel-all",
+                 {"branch_id": branch_id, "reason": reason}, token=access)

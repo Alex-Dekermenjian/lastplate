@@ -30,6 +30,26 @@
     <p role="alert">Can't load orders right now. Please check your filters or try again.</p>
     <a href="{% url 'today-orders' %}">Try again</a>
   {% else %}
+    {% if not paid_tab and branches %}
+      {# LP-79: one reason for every Reserved order of a branch still due today. #}
+      <details class="confirm owner-cancel-all">
+        <summary class="button button--danger-outline">Cancel all for today</summary>
+        <form method="post" action="{% url 'shop-cancel-all' %}">
+          {% csrf_token %}
+          <input type="hidden" name="return_branch" value="{{ selected_branch }}">
+          <div class="field">
+            <label for="cancel-all-branch">Branch</label>
+            <select id="cancel-all-branch" name="branch_id" required>
+              {% if branches|length > 1 %}<option value="">Choose a branch</option>{% endif %}
+              {% for branch in branches %}<option value="{{ branch.id }}"{% if selected_branch == branch.id|stringformat:"s" %} selected{% endif %}>{{ branch.name }}</option>{% endfor %}
+            </select>
+          </div>
+          {% include "frontend/_cancel_reason.html" with prefix="cancel-all" %}
+          <p>Cancel every Reserved order of this branch that is still due today? The food is removed from stock, not put back on sale. Customers see your reason. This can't be undone.</p>
+          <button class="button button--danger" type="submit">Yes, cancel all for today</button>
+        </form>
+      </details>
+    {% endif %}
     {% for order in orders %}
     <article class="owner-order">
       <h2><span class="order-code__value">{{ order.pickup_code }}</span> · {{ order.customer_first_name }}</h2>
@@ -40,6 +60,19 @@
         <p>Pick up by <strong>{{ order.pick_up_by_time }}</strong> · <span class="countdown"{% if not order.time_passed %} data-deadline="{{ order.deadline_iso }}"{% endif %}>{{ order.countdown }}</span></p>
         {% if order.customer_phone %}<p>Customer phone: {{ order.customer_phone }}</p>{% endif %}
         <a href="{% url 'pickup-code' %}?branch_id={{ order.branch_id }}">Enter pickup code</a>
+        {% if not order.time_passed %}
+          {# LP-79: Reservations re-checks the shop, the status and the time. #}
+          <details class="confirm owner-order__cancel">
+            <summary class="button button--danger-outline">Cancel</summary>
+            <form method="post" action="{% url 'shop-cancel-order' order.ref %}">
+              {% csrf_token %}
+              <input type="hidden" name="return_branch" value="{{ selected_branch }}">
+              {% include "frontend/_cancel_reason.html" with prefix=order.ref %}
+              <p>Cancel order {{ order.pickup_code }} for {{ order.customer_first_name }}? The food is removed from stock, not put back on sale. The customer sees your reason. This can't be undone.</p>
+              <button class="button button--danger" type="submit">Yes, cancel order</button>
+            </form>
+          </details>
+        {% endif %}
       {% elif order.can_undo %}
         <form method="post" action="{% url 'pickup-undo' order.ref %}">
           {% csrf_token %}
