@@ -29,9 +29,9 @@ def _read_json(response):
 
 
 @sensitive_variables("payload", "token", "body", "headers")
-def _call(service, method, path, payload=None, token=None, timeout=None):
+def _call(service, method, path, payload=None, token=None, timeout=None, csv=False):
     body = json.dumps(payload).encode() if payload is not None else None
-    headers = {"Accept": "application/json"}
+    headers = {"Accept": "text/csv" if csv else "application/json"}
 
     if body is not None:
         headers["Content-Type"] = "application/json"
@@ -51,6 +51,10 @@ def _call(service, method, path, payload=None, token=None, timeout=None):
             request,
             timeout=timeout or settings.SERVICE_API_TIMEOUT_SECONDS,
         ) as response:
+            if csv:
+                if response.headers.get_content_type() != "text/csv":
+                    raise ServiceUnavailable(service)
+                return response.status, response.read()
             return response.status, _read_json(response)
     except HTTPError as error:
         if error.code >= 500:
@@ -537,6 +541,16 @@ def shop_orders(access, filters=None):
     return _call("reservations", "GET", "/api/shop/reservations?" + urlencode(filters or {}), token=access)
 
 
+@sensitive_variables("access")
+def shop_sales(access, filters=None):
+    return _call("reservations", "GET", "/api/shop/sales?" + urlencode(filters or {}), token=access)
+
+
+@sensitive_variables("access")
+def export_sales(access, filters=None):
+    return _call("reservations", "GET", "/api/shop/sales/export?" + urlencode(filters or {}), token=access, csv=True)
+
+
 @sensitive_variables("access", "payload")
 def pickup_lookup(access, payload):
     return _call("reservations", "POST", "/api/shop/reservations/lookup", payload, token=access)
@@ -551,3 +565,24 @@ def pickup_payment(access, ref, payload, undo=False):
 @sensitive_variables("access")
 def get_order(access, reservation_ref):
     return _call("reservations", "GET", f"/api/reservations/{reservation_ref}", token=access)
+
+
+# LP-27: the customer cancels their own order; Reservations decides and
+# returns the food to Marketplace.
+@sensitive_variables("access")
+def cancel_order(access, reservation_ref):
+    return _call("reservations", "POST", f"/api/reservations/{reservation_ref}/cancel", {}, token=access)
+
+
+# LP-79: the restaurant cancels one order, or all of a branch's for today,
+# with a reason. Reservations checks the shop owns them and tells Marketplace.
+@sensitive_variables("access")
+def shop_cancel_order(access, reservation_ref, reason):
+    return _call("reservations", "POST", f"/api/shop/reservations/{reservation_ref}/cancel",
+                 {"reason": reason}, token=access)
+
+
+@sensitive_variables("access")
+def shop_cancel_all(access, branch_id, reason):
+    return _call("reservations", "POST", "/api/shop/reservations/cancel-all",
+                 {"branch_id": branch_id, "reason": reason}, token=access)

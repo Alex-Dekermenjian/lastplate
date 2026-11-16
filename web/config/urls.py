@@ -7,11 +7,25 @@ https://docs.djangoproject.com/en/5.2/topics/http/urls/
 from django.urls import path
 from django.views.generic import RedirectView
 
-from frontend import customer_console_views
-from frontend import account_views, branch_views, browse_views, cart, console_views, customer_views, health, listing_views, offer_actions, offer_reserve, order_views, views
-from frontend import shop_order_views
-from frontend import pickup_views
-from frontend import listing_photos
+from frontend import (
+    account_views,
+    branch_views,
+    browse_views,
+    cart,
+    console_views,
+    customer_console_views,
+    customer_views,
+    health,
+    listing_photos,
+    listing_views,
+    offer_actions,
+    offer_reserve,
+    order_views,
+    pickup_views,
+    sales_views,
+    shop_order_views,
+    views,
+)
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -38,6 +52,8 @@ urlpatterns = [
     # LP-78: the customer's order page (shown at the counter) and My orders.
     path("orders/", order_views.my_orders, name="my-orders"),
     path("orders/<uuid:reservation_ref>/", order_views.order_detail, name="order-detail"),
+    # LP-27: the customer cancels before the pick-up-by time.
+    path("orders/<uuid:reservation_ref>/cancel/", order_views.order_cancel, name="order-cancel"),
 
     # LP-18: the Search tab of the customer's bottom bar (My orders is LP-78, above).
     path("search/", customer_views.search, name="search"),
@@ -77,10 +93,15 @@ urlpatterns = [
 
     path("workspace/", account_views.workspace, name="workspace"),
     path("workspace/orders/", shop_order_views.today_orders, name="today-orders"),
+    path("workspace/sales/", sales_views.history, name="sales-history"),
+    path("workspace/sales/export/", sales_views.history, {"export": True}, name="sales-export"),
     path("workspace/orders/count/", shop_order_views.orders_badge, name="orders-badge"),
     path("workspace/orders/pickup/", pickup_views.pickup, name="pickup-code"),
     path("workspace/orders/<uuid:reservation_ref>/paid/", pickup_views.payment, name="pickup-paid"),
     path("workspace/orders/<uuid:reservation_ref>/undo/", pickup_views.payment, {"undo": True}, name="pickup-undo"),
+    # LP-79: the restaurant cancels an order, or all of a branch's for today, with a reason.
+    path("workspace/orders/<uuid:reservation_ref>/cancel/", shop_order_views.cancel_order, name="shop-cancel-order"),
+    path("workspace/orders/cancel-all/", shop_order_views.cancel_all_today, name="shop-cancel-all"),
     path("workspace/finish-setup/", account_views.finish_setup, name="finish-setup"),
     path("workspace/profile/", account_views.shop_profile, name="shop-profile"),
     # LP-68: the restaurant's branches (up to 3).

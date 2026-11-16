@@ -22,7 +22,7 @@ class OwnerOrderPagesTests(WebAuthTestCase):
         for text in ("Today's orders", "TM9AY3", "Maya", "2 × Glazed donuts", "$4.50", "min left",
                      "Hamra", 'name="q"', 'name="branch_id"', "js/countdown.js", "js/orders-badge.js"):
             self.assertContains(response, text)
-        self.api.assert_called_once_with("access-token-1", {"q": "Maya", "branch_id": "7"})
+        self.api.assert_called_once_with("access-token-1", {"q": "Maya", "branch_id": "7", "include_summary": "1"})
         self.assert_no_secrets(response)
         self.assertNotContains(response, "Mark paid")
         self.assertIn("no-store", response["Cache-Control"])
