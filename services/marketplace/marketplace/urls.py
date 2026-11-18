@@ -9,6 +9,11 @@ urlpatterns = [
     path("admin/shops", admin_api.shop_list, name="admin-shops"),
     path("admin/shops/<int:pk>", admin_api.shop_detail, name="admin-shop-detail"),
     path("admin/shops/<int:pk>/review", admin_api.shop_review, name="admin-shop-review"),
+    # LP-60: suspend / restore a restaurant; see and remove its offers.
+    path("admin/shops/<int:pk>/suspend", admin_api.shop_suspend, name="admin-shop-suspend"),
+    path("admin/shops/<int:pk>/restore", admin_api.shop_restore, name="admin-shop-restore"),
+    path("admin/shops/<int:pk>/listings", admin_api.shop_listings, name="admin-shop-listings"),
+    path("admin/listings/<int:pk>/remove", admin_api.listing_remove, name="admin-listing-remove"),
 
     # LP-7 and LP-8: Shop endpoints
     path(

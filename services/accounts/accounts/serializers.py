@@ -69,6 +69,26 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class ProfileUpdateSerializer(serializers.Serializer):
+    """LP-18: a signed-in user may change their own display name and nothing
+    else. Email, role and staff flags are rejected, never silently ignored."""
+
+    display_name = serializers.CharField(max_length=150)
+
+    def to_internal_value(self, data):
+        unexpected = sorted(set(data) - set(self.fields))
+        if unexpected:
+            raise serializers.ValidationError(
+                {name: ["This field is not allowed."] for name in unexpected}
+            )
+        return super().to_internal_value(data)
+
+    def update(self, instance, validated_data):
+        instance.display_name = validated_data["display_name"]
+        instance.save(update_fields=["display_name"])
+        return instance
+
+
 class SignInSerializer(TokenObtainPairSerializer):
     """Email and password sign-in with one message for every credential failure."""
 

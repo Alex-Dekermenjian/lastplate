@@ -10,6 +10,7 @@ from .authentication import IsOperator
 from .collection import CollectionRefused, UNDO_WINDOW, can_undo, pay_or_undo
 from .marketplace_client import MarketplaceUnavailable, operator_shop
 from .models import Order, PICKUP_CODE_REGEX, Status
+from .timers import expire_due_orders_quietly
 from .views import order_data
 
 
@@ -44,6 +45,7 @@ def shop_order_data(order):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated, IsOperator])
 def lookup(request):
+    expire_due_orders_quietly()  # LP-25: an overdue code stops working
     try:
         data = request.data if isinstance(request.data, dict) else {}
         shop = owned_shop(request.user.id)
@@ -68,6 +70,7 @@ def lookup(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated, IsOperator])
 def collect(request, ref, undo=False):
+    expire_due_orders_quietly()  # LP-25
     try:
         data = request.data if isinstance(request.data, dict) else {}
         shop = owned_shop(request.user.id)

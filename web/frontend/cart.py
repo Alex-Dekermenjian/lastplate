@@ -156,9 +156,12 @@ def add_to_cart(request, listing_id):
 
 
 @customer_required
-@require_POST
 def update_cart(request, listing_id):
     """− / + / remove for one line. Quantities stay between 1 and what's left."""
+    # LP-18: a customer whose session ended is sent back here with GET after
+    # logging in again. Nothing changes on GET; they land on their cart.
+    if request.method != "POST":
+        return redirect("cart")
     cart = get_cart(request)
     key = str(int(listing_id))
     if key not in cart["lines"]:

@@ -13,12 +13,15 @@ from .authentication import IsOperator
 from .marketplace_client import MarketplaceUnavailable, operator_shop
 from .models import Order, Status
 from .collection_views import shop_order_data
+from .timers import expire_due_orders_quietly
+from .sales import report
 
 
 @never_cache
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsOperator])
 def shop_reservations(request):
+    expire_due_orders_quietly()  # LP-25: overdue orders leave the Reserved list
     try:
         status, shop = operator_shop(request.user.id)
         if status == 404:
@@ -61,4 +64,8 @@ def shop_reservations(request):
     if request.query_params.get("count_only") != "1":
         for order in orders.prefetch_related("lines").order_by("pick_up_by", "id"):
             rows.append(shop_order_data(order))
-    return Response({"orders": rows, "branches": branches, "count": count})
+    body = {"orders": rows, "branches": branches, "count": count}
+    if request.query_params.get("include_summary") == "1":
+        body["summary"] = report(shop, {"from": today.isoformat(), "to": today.isoformat(),
+                                       "branch": branch}, now=now)["summary"]
+    return Response(body)

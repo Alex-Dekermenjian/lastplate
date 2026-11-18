@@ -29,9 +29,9 @@ def _read_json(response):
 
 
 @sensitive_variables("payload", "token", "body", "headers")
-def _call(service, method, path, payload=None, token=None, timeout=None):
+def _call(service, method, path, payload=None, token=None, timeout=None, csv=False):
     body = json.dumps(payload).encode() if payload is not None else None
-    headers = {"Accept": "application/json"}
+    headers = {"Accept": "text/csv" if csv else "application/json"}
 
     if body is not None:
         headers["Content-Type"] = "application/json"
@@ -51,6 +51,10 @@ def _call(service, method, path, payload=None, token=None, timeout=None):
             request,
             timeout=timeout or settings.SERVICE_API_TIMEOUT_SECONDS,
         ) as response:
+            if csv:
+                if response.headers.get_content_type() != "text/csv":
+                    raise ServiceUnavailable(service)
+                return response.status, response.read()
             return response.status, _read_json(response)
     except HTTPError as error:
         if error.code >= 500:
@@ -200,6 +204,18 @@ def refresh(refresh_token):
         "POST",
         "/api/auth/token/refresh/",
         {"refresh": refresh_token},
+    )
+
+
+@sensitive_variables("access")
+def update_account(access, display_name):
+    """LP-18: change the signed-in user's own display name."""
+    return _call(
+        "accounts",
+        "PATCH",
+        "/api/users/me/",
+        {"display_name": display_name},
+        token=access,
     )
 
 
@@ -395,8 +411,73 @@ def admin_review_shop(access, shop_id, decision):
     return _call("marketplace", "POST", f"/api/admin/shops/{int(shop_id)}/review", decision, token=access)
 
 
+# LP-80: customers' expired-order strikes (Reservations, Admin token only).
+@sensitive_variables("access")
+def admin_customers(access):
+    return _call("reservations", "GET", "/api/admin/customers", token=access)
+
+
+@sensitive_variables("access")
+def admin_customer(access, customer_user_id):
+    return _call("reservations", "GET", f"/api/admin/customers/{int(customer_user_id)}", token=access)
+
+
+@sensitive_variables("access")
+def admin_remove_strike(access, reservation_ref, reason):
+    return _call("reservations", "POST", f"/api/admin/strikes/{reservation_ref}/remove",
+                 {"reason": reason}, token=access)
+
+
+# LP-60: the admin suspends/restores a restaurant, removes an offer, and
+# blocks/unblocks a customer. Marketplace and Reservations check the Admin token.
+@sensitive_variables("access")
+def admin_suspend_shop(access, shop_id, reason):
+    return _call("marketplace", "POST", f"/api/admin/shops/{int(shop_id)}/suspend", {"reason": reason}, token=access)
+
+
+@sensitive_variables("access")
+def admin_restore_shop(access, shop_id):
+    return _call("marketplace", "POST", f"/api/admin/shops/{int(shop_id)}/restore", {}, token=access)
+
+
+@sensitive_variables("access")
+def admin_shop_listings(access, shop_id):
+    return _call("marketplace", "GET", f"/api/admin/shops/{int(shop_id)}/listings", token=access)
+
+
+@sensitive_variables("access")
+def admin_remove_listing(access, listing_id, reason):
+    return _call("marketplace", "POST", f"/api/admin/listings/{int(listing_id)}/remove", {"reason": reason},
+                 token=access)
+
+
+@sensitive_variables("access")
+def admin_block_customer(access, customer_user_id, until, reason):
+    return _call("reservations", "POST", f"/api/admin/customers/{int(customer_user_id)}/block",
+                 {"until": until, "reason": reason}, token=access)
+
+
+@sensitive_variables("access")
+def admin_unblock_customer(access, customer_user_id):
+    return _call("reservations", "POST", f"/api/admin/customers/{int(customer_user_id)}/unblock", {}, token=access)
+
+
+# LP-25: before the offers list is shown, Reservations expires late orders so
+# their food is back on sale even if its background timer is asleep. Never
+# makes a page fail or wait long: any problem is ignored (the timer retries).
+EXPIRE_TIMEOUT_SECONDS = 2
+
+
+def expire_late_orders():
+    try:
+        _call("reservations", "POST", "/api/timers/expire", {}, timeout=EXPIRE_TIMEOUT_SECONDS)
+    except Exception:  # noqa: BLE001 - best effort only
+        pass
+
+
 # LP-13: Public marketplace. No token is sent: these pages need no sign-in.
 def browse_listings():
+    expire_late_orders()
     return _call(
         "marketplace",
         "GET",
@@ -405,6 +486,7 @@ def browse_listings():
 
 
 def listing_offer(listing_id):
+    expire_late_orders()
     return _call(
         "marketplace",
         "GET",
@@ -414,6 +496,7 @@ def listing_offer(listing_id):
 
 # LP-39: A restaurant's public page. No token: anyone may open it.
 def restaurant_page(shop_id):
+    expire_late_orders()
     return _call(
         "marketplace",
         "GET",
@@ -464,6 +547,16 @@ def shop_orders(access, filters=None):
     return _call("reservations", "GET", "/api/shop/reservations?" + urlencode(filters or {}), token=access)
 
 
+@sensitive_variables("access")
+def shop_sales(access, filters=None):
+    return _call("reservations", "GET", "/api/shop/sales?" + urlencode(filters or {}), token=access)
+
+
+@sensitive_variables("access")
+def export_sales(access, filters=None):
+    return _call("reservations", "GET", "/api/shop/sales/export?" + urlencode(filters or {}), token=access, csv=True)
+
+
 @sensitive_variables("access", "payload")
 def pickup_lookup(access, payload):
     return _call("reservations", "POST", "/api/shop/reservations/lookup", payload, token=access)
@@ -478,3 +571,24 @@ def pickup_payment(access, ref, payload, undo=False):
 @sensitive_variables("access")
 def get_order(access, reservation_ref):
     return _call("reservations", "GET", f"/api/reservations/{reservation_ref}", token=access)
+
+
+# LP-27: the customer cancels their own order; Reservations decides and
+# returns the food to Marketplace.
+@sensitive_variables("access")
+def cancel_order(access, reservation_ref):
+    return _call("reservations", "POST", f"/api/reservations/{reservation_ref}/cancel", {}, token=access)
+
+
+# LP-79: the restaurant cancels one order, or all of a branch's for today,
+# with a reason. Reservations checks the shop owns them and tells Marketplace.
+@sensitive_variables("access")
+def shop_cancel_order(access, reservation_ref, reason):
+    return _call("reservations", "POST", f"/api/shop/reservations/{reservation_ref}/cancel",
+                 {"reason": reason}, token=access)
+
+
+@sensitive_variables("access")
+def shop_cancel_all(access, branch_id, reason):
+    return _call("reservations", "POST", "/api/shop/reservations/cancel-all",
+                 {"branch_id": branch_id, "reason": reason}, token=access)

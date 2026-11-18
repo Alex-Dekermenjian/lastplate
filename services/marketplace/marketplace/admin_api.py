@@ -11,7 +11,9 @@ from rest_framework.response import Response
 
 from .authentication import IsAdmin
 from .browse import visible_listings
-from .models import Shop
+from .models import Listing, Shop
+from .moderation import ModerationError, remove_listing, restore_shop, suspend_shop
+from .stock import free_quantity, with_committed
 from .serializers import PublicBranchSerializer, RejectUnknownFieldsMixin
 from .shop_review import ShopReviewError, review_shop
 
@@ -35,6 +37,8 @@ class AdminShopSerializer(serializers.ModelSerializer):
             "branches",
             # LP-45: asked for review again after a rejection.
             "review_requests", "last_rejection_reason", "review_request_note", "review_requested_at",
+            # LP-60: suspended by the admin, and why.
+            "suspended_at", "suspension_reason", "suspended_by_user_id",
         ]
         read_only_fields = fields
 
@@ -102,3 +106,69 @@ def shop_review(request, pk):
             status=status.HTTP_400_BAD_REQUEST,
         )
     return Response(AdminShopSerializer(shop).data)
+
+
+# ---------------------------------------------------------------------------
+# LP-60: suspend / restore a restaurant, see its offers, remove one offer.
+# ---------------------------------------------------------------------------
+
+class AdminListingSerializer(serializers.ModelSerializer):
+    free_quantity = serializers.SerializerMethodField()
+
+    def get_free_quantity(self, obj):
+        return free_quantity(obj)
+
+    class Meta:
+        model = Listing
+        fields = ["id", "title", "kind", "status", "discounted_price", "total_quantity", "free_quantity",
+                  "pickup_start", "pickup_end", "removed_at", "removal_reason", "removed_by_user_id"]
+        read_only_fields = fields
+
+
+def _moderation_error(error):
+    return Response({"code": error.code, "detail": error.detail}, status=error.http_status)
+
+
+def _reason_from(request):
+    return request.data.get("reason") if isinstance(request.data, dict) else None
+
+
+@api_view(["POST"])
+@permission_classes(ADMIN_ONLY)
+def shop_suspend(request, pk):
+    try:
+        shop = suspend_shop(pk, _reason_from(request), request.user.id)
+    except ModerationError as error:
+        return _moderation_error(error)
+    return Response(AdminShopSerializer(shop).data)
+
+
+@api_view(["POST"])
+@permission_classes(ADMIN_ONLY)
+def shop_restore(request, pk):
+    try:
+        shop = restore_shop(pk)
+    except ModerationError as error:
+        return _moderation_error(error)
+    return Response(AdminShopSerializer(shop).data)
+
+
+@api_view(["GET"])
+@permission_classes(ADMIN_ONLY)
+def shop_listings(request, pk):
+    if not Shop.objects.filter(pk=pk).exists():
+        return Response({"detail": "Shop not found."}, status=status.HTTP_404_NOT_FOUND)
+    # Drafts are the owner's business; published, ended and removed offers are shown.
+    listings = (with_committed(Listing.objects.filter(shop_id=pk).exclude(status=Listing.Status.DRAFT))
+                .order_by("-pickup_end", "-id")[:100])
+    return Response(AdminListingSerializer(listings, many=True).data)
+
+
+@api_view(["POST"])
+@permission_classes(ADMIN_ONLY)
+def listing_remove(request, pk):
+    try:
+        listing = remove_listing(pk, _reason_from(request), request.user.id)
+    except ModerationError as error:
+        return _moderation_error(error)
+    return Response(AdminListingSerializer(listing).data)

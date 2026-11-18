@@ -1,0 +1,10 @@
+{# LP-79: the reason a restaurant gives when it cancels; one must be chosen. #}
+<fieldset class="cancel-reasons">
+  <legend>Reason</legend>
+  {% for reason in cancel_reasons %}
+    <div class="check">
+      <input type="radio" id="reason-{{ prefix }}-{{ forloop.counter }}" name="reason" value="{{ reason }}" required>
+      <label for="reason-{{ prefix }}-{{ forloop.counter }}">{{ reason }}</label>
+    </div>
+  {% endfor %}
+</fieldset>

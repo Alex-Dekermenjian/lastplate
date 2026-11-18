@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("marketplace", "0012_allocation"),
+        ("marketplace", "0013_admin_moderation"),
     ]
 
     operations = [

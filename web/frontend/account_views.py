@@ -5,7 +5,7 @@ and which pages it may open.
 """
 
 from functools import wraps
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from django.conf import settings
 from django.contrib import messages
@@ -20,7 +20,7 @@ from django.views.decorators.http import require_POST
 from . import services, tokens
 from .browse_views import lebanon_time, pickup_window
 from .listing_photos import photo_url
-from .forms import PROFILE_IMAGES, LoginForm, ShopProfileForm, SignUpForm
+from .forms import PROFILE_IMAGES, LoginForm, ProfileForm, ShopProfileForm, SignUpForm
 from .services import ServiceUnavailable
 
 ACCOUNT_KEY = "account"
@@ -42,6 +42,7 @@ REGISTRATION_FAILED = "We couldn't complete your sign-up. Please check your deta
 SHOPS_ONLY = "That page is for restaurant accounts."
 CUSTOMERS_ONLY = "That page is for customer accounts."
 ADMINS_ONLY = "That page is for the LastPlate administrator."
+SESSION_ENDED = "Your session has ended. Please log in again."
 
 STATUS_EXPLANATIONS = {
     "PENDING": ("Pending review", "A LastPlate administrator checks new shops before they can publish offers. You can prepare drafts now, but you can't publish yet."),
@@ -75,6 +76,9 @@ def listing_summary(listing, shop):
             hidden_because = "its pickup time has ended."
         elif free is not None and free <= 0:
             hidden_because = "it has sold out. Add stock to show it again."
+
+    if published and not hidden_because and shop.get("suspended_at"):
+        hidden_because = "LastPlate suspended your restaurant."  # LP-60
 
     # LP-68: which branch the offer is at, when the restaurant has several.
     branch = listing.get("branch_details") if isinstance(listing.get("branch_details"), dict) else {}
@@ -185,6 +189,44 @@ def landing_url(account):
     return reverse("home")
 
 
+def return_path(request):
+    """Where a customer lands after logging in again.
+
+    A page opened with GET comes back to itself. A button (POST) cannot be
+    repeated by the browser after logging in, and some buttons are POST-only
+    (Reserve, for example), so it comes back to the page the button was on,
+    when the browser says which page that was and it is this site.
+    """
+    if request.method != "GET":
+        referer = request.META.get("HTTP_REFERER", "")
+        if referer and url_has_allowed_host_and_scheme(
+            referer, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+        ):
+            parts = urlsplit(referer)
+            if parts.path.startswith("/"):
+                return parts.path + (f"?{parts.query}" if parts.query else "")
+    return request.get_full_path()
+
+
+def login_with_next(request):
+    """Send the person to /login and bring them back to where they were."""
+    return redirect(f"{reverse('login')}?{urlencode({'next': return_path(request)})}")
+
+
+def session_ended(request, account):
+    """End the web session and ask the person to log in again.
+
+    LP-18: a customer returns to the page they were on once logged back in.
+    The view never ran, so nothing is changed: no cart change, no name change,
+    no reservation and no stock movement.
+    """
+    tokens.clear_tokens(request)
+    messages.info(request, SESSION_ENDED)
+    if account.get("role") == CUSTOMER:
+        return login_with_next(request)
+    return redirect("login")
+
+
 def role_required(role, refusal):
     """Allow signed-in accounts with this role only; never cache; end stale
     sessions cleanly. Anyone else is sent to their own landing page."""
@@ -198,12 +240,14 @@ def role_required(role, refusal):
             if account.get("role") != role:
                 messages.info(request, refusal)
                 return redirect(landing_url(account))
+            if role == CUSTOMER and tokens.refresh_token_expired(request):
+                # LP-18: the sign-in has run out even though the browser still
+                # holds a session cookie (cart, checkout and profile all land here).
+                return session_ended(request, account)
             try:
                 return view(request, *args, **kwargs)
             except SessionEnded:
-                tokens.clear_tokens(request)
-                messages.info(request, "Your session has ended. Please log in again.")
-                return redirect("login")
+                return session_ended(request, account)
 
         return never_cache(wrapper)
 
@@ -362,10 +406,31 @@ def sign_out(request):
     return redirect("login")
 
 
+NAME_NOT_SAVED = "We can't reach the account service right now, so your name was not saved. Please try again in a few minutes."
+
+
 @customer_required
 def my_account(request):
-    """A customer's own account page (LP-56). Only customers may open it."""
-    return render(request, "frontend/my_account.html", {"account": request.session[ACCOUNT_KEY]})
+    """A customer's profile (LP-56, LP-18): name and email, change the name,
+    log out. Only customers may open it."""
+    account = request.session[ACCOUNT_KEY]
+    form = ProfileForm(request.POST or None, initial={"display_name": account["display_name"]})
+    if request.method == "POST" and form.is_valid():
+        try:
+            status, body = authenticated_call(request, services.update_account, form.cleaned_data["display_name"])
+        except ServiceUnavailable:
+            form.add_error(None, NAME_NOT_SAVED)
+        else:
+            if status == 200 and isinstance(body, dict) and body.get("display_name"):
+                request.session[ACCOUNT_KEY] = {**account, "display_name": body["display_name"]}
+                messages.success(request, "Your name has been saved.")
+                return redirect("my-account")
+            if status == 400 and isinstance(body, dict):
+                for field, errors in body.items():
+                    form.add_error(field if field in form.fields else None, errors)
+            else:
+                form.add_error(None, NAME_NOT_SAVED)
+    return render(request, "frontend/my_account.html", {"account": account, "form": form})
 
 
 @operator_required

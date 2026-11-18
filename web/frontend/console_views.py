@@ -111,9 +111,21 @@ def console_restaurant(request, shop_id):
             "reviewed_at": lebanon_time(shop.get("reviewed_at")),
         }
 
+    # LP-60: the restaurant's offers, so the admin can remove one.
+    offers = None
+    if shop is not None:
+        offers_status, offers = call(request, services.admin_shop_listings, shop_id)
+        if offers_status != 200 or not isinstance(offers, list):
+            offers = None
+        else:
+            offers = [{**offer, "pickup_end": lebanon_time(offer.get("pickup_end")),
+                       "removed_at": lebanon_time(offer.get("removed_at"))} for offer in offers]
+        shop["suspended_at"] = lebanon_time(shop.get("suspended_at"))
+
     return render(request, "frontend/console_restaurant.html", {
         "shop": shop,
         "form": form,
         "unavailable": shop is None,
         "console_page": "restaurants",
+        "offers": offers,
     })

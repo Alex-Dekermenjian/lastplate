@@ -27,8 +27,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .authentication import IsCustomer
+from .cancellation import CancelRefused, cancel_by_customer
 from .checkout import CheckoutRefused, TryAgain, place_order
 from .models import Order, Status
+from .blocks import active_block
+from .strikes import strike_status
+from .timers import expire_due_orders_quietly
 
 # LP-78: how many orders "My orders" shows.
 MAX_LISTED = 50
@@ -42,6 +46,8 @@ def order_data(order):
         "status_label": order.status_label,
         # LP-78: who cancelled ("Customer", "Restaurant", "Admin") and when it was paid.
         "cancelled_by": order.get_cancelled_by_display() if order.cancelled_by else None,
+        # LP-79: why it was cancelled, so the customer sees the restaurant's reason.
+        "cancel_reason": order.cancel_reason if order.status == Status.CANCELLED else "",
         "collected_at": order.collected_at.isoformat() if order.collected_at else None,
         "pickup_code": order.pickup_code,
         "pick_up_by": order.pick_up_by.isoformat(),
@@ -76,9 +82,16 @@ def customer_orders(request):
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated, IsCustomer])
 def reservations(request):
+    # LP-25: late orders expire before they are read or counted.
+    expire_due_orders_quietly()
     if request.method == "GET":
         orders = customer_orders(request).prefetch_related("lines").order_by("-created_at", "-id")[:MAX_LISTED]
-        return Response({"orders": [order_data(order) for order in orders]})
+        # LP-80: the customer's strikes, for the warning banner. LP-60: and
+        # whether the admin blocked ordering (until when; the reason stays internal).
+        admin = active_block(request.user.id)
+        return Response({"orders": [order_data(order) for order in orders],
+                         "strikes": strike_status(request.user.id).as_dict(),
+                         "admin_block": {"blocked_until": admin.blocked_until.isoformat()} if admin else None})
 
     data = request.data if isinstance(request.data, dict) else {}
     try:
@@ -108,7 +121,23 @@ def reservations(request):
 def reservation_detail(request, ref):
     """LP-78: one order. Someone else's order is 404, never 403, so a
     reference reveals nothing about orders that are not yours."""
+    expire_due_orders_quietly()  # LP-25
     order = customer_orders(request).prefetch_related("lines").filter(reservation_ref=ref).first()
     if order is None:
         return Response({"code": "not_found", "detail": "No such order."}, status=status.HTTP_404_NOT_FOUND)
+    return Response(order_data(order))
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsCustomer])
+def reservation_cancel(request, ref):
+    """LP-27: POST /api/reservations/{ref}/cancel (customer token).
+
+    200 the Cancelled order; 404 not one of your orders; 409 already_cancelled,
+    already_paid, expired, or pickup_time_passed (with the shop's phone).
+    """
+    try:
+        order = cancel_by_customer(ref, request.user.id)
+    except CancelRefused as refused:
+        return Response(refused.body, status=refused.http_status)
     return Response(order_data(order))
