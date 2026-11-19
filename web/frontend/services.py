@@ -354,6 +354,12 @@ def mark_sold_out(access, listing_id):
 
 
 @sensitive_variables("access")
+def unpublish_listing(access, listing_id):
+    """LP-29: take a published offer down; reservations already made stay."""
+    return _call("marketplace", "POST", f"/api/listings/{int(listing_id)}/unpublish", token=access)
+
+
+@sensitive_variables("access")
 def delete_draft(access, listing_id):
     return _call("marketplace", "POST", f"/api/listings/{int(listing_id)}/delete", token=access)
 

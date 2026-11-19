@@ -19,8 +19,10 @@ from rest_framework.views import APIView
 from .authentication import IsShopOperator
 from .browse import visible_listing, visible_listings, visible_shop
 from .listing_service import (
+    UnpublishError,
     save_listing_draft,
     publish_listing as publish_listing_service,
+    withdraw_listing,
 )
 from .branch_service import (
     BranchError,
@@ -59,7 +61,7 @@ from .serializers import (
 )
 from .owner_actions import DraftDeleteError, delete_draft, mark_sold_out
 from .review_again import ReviewAgainError, request_review_again
-from .stock import with_committed
+from .stock import with_allocation_counts
 from .stock_service import StockAdjustmentError, adjust_stock
 
 
@@ -612,8 +614,8 @@ def my_listings(request):
 
     # Never accept a shop ID from the browser.
     # Return drafts and published listings owned by this shop only.
-    # LP-20: held and sold units are counted in the same query.
-    listings = with_committed(Listing.objects.filter(
+    # LP-20 and LP-29: held and sold units are counted in the same query.
+    listings = with_allocation_counts(Listing.objects.select_related("branch").filter(
         shop_id=shop.id
     )).order_by("-created_at")
 
@@ -692,7 +694,7 @@ def listing_stock_adjustments(request, pk):
             actor_user_id=request.user.id,
         )
     except StockAdjustmentError as exc:
-        return _error(exc.code, exc.detail, exc.http_status)
+        return _error(exc.code, exc.detail, exc.http_status, **exc.extra)
 
     return Response(
         {
@@ -837,7 +839,7 @@ def mark_listing_sold_out(request, pk):
     try:
         listing, adjustment = mark_sold_out(pk, shop.id, request.user.id)
     except StockAdjustmentError as exc:
-        return _error(exc.code, exc.detail, exc.http_status)
+        return _error(exc.code, exc.detail, exc.http_status, **exc.extra)
     return Response(
         {
             "adjustment": StockAdjustmentSerializer(adjustment).data,
@@ -845,3 +847,25 @@ def mark_listing_sold_out(request, pk):
         },
         status=status.HTTP_201_CREATED,
     )
+
+
+# --------------------------------------------------
+# LP-29: Take a published offer down
+# --------------------------------------------------
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsShopOperator])
+def unpublish_listing(request, pk):
+    """Customers stop seeing the offer and nobody new can reserve it. Units
+    already reserved stay held, so those orders can still be picked up."""
+    if request.data:
+        return _error("invalid", "Taking an offer down takes no fields.", status.HTTP_400_BAD_REQUEST)
+    shop = _operator_shop(request)
+    if shop is None:
+        return _error("no_shop", "You have no shop.", status.HTTP_403_FORBIDDEN)
+    try:
+        listing = withdraw_listing(pk, shop.id)
+    except UnpublishError as exc:
+        return _error(exc.code, exc.detail, exc.http_status)
+    listing = with_allocation_counts(Listing.objects.filter(pk=listing.pk)).get()
+    return Response(ListingSerializer(listing, context={"request": request}).data, status=status.HTTP_200_OK)

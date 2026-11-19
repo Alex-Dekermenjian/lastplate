@@ -216,8 +216,21 @@
       <label for="pickup_end">Pickup ends (Lebanon time)</label>
       <input id="pickup_end" name="pickup_end"
              type="datetime-local"
-             value="{{ form_values.pickup_end|default_if_none:''|slice:':16' }}">
+             value="{{ form_values.pickup_end|default_if_none:''|slice:':16' }}"
+             {% if closing_hint %}aria-describedby="closing-hint"{% endif %}>
+      {# LP-29: pickup should end by closing time. #}
+      {% if closing_hint %}<span class="help" id="closing-hint">{{ closing_hint }}</span>{% endif %}
     </p>
+
+    {% if closing_warning %}
+      <div class="notice notice--warning" role="alert" id="closing-warning">
+        <p>{{ closing_warning }}</p>
+        <p>
+          <input type="checkbox" id="confirm_after_closing" name="confirm_after_closing" value="1" required>
+          <label for="confirm_after_closing">Yes, customers can pick up after closing time</label>
+        </p>
+      </div>
+    {% endif %}
 
     {% if kind != "LASTBAG" %}
       <h2>Food safety information</h2>
