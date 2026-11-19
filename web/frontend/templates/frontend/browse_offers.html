@@ -20,7 +20,8 @@
   {% if unavailable %}
     <p class="notice notice--warning" role="alert">{{ unavailable }}</p>
   {% else %}
-    {% include "frontend/_food_search.html" %}
+    {# LP-18: signed-in customers search on the Search tab, so their home page doesn't repeat the boxes. #}
+    {% if request.session.account.role != "CUSTOMER" %}{% include "frontend/_food_search.html" %}{% endif %}
     {% if not offers and not searching %}
       <p class="notice notice--info">
         There's no food available right now. Check back later today.

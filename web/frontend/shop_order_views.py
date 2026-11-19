@@ -51,7 +51,7 @@ def today_orders(request):
     filters = {key: request.GET.get(key, "") for key in ("q", "branch_id", "status")}
     if not filters["status"]:
         filters.pop("status")
-    status, data = load(request, filters)
+    status, data = load(request, {**filters, "include_summary": "1"})
     context = {"query": filters["q"], "selected_branch": filters["branch_id"], "unavailable": data is None,
                "paid_tab": filters.get("status") == "COLLECTED", "cancel_reasons": CANCEL_REASONS}
     if data is not None:
@@ -69,7 +69,7 @@ def today_orders(request):
             context["unavailable"] = True
             status = 503
         else:
-            context.update(branches=data["branches"], orders=rows)
+            context.update(branches=data["branches"], orders=rows, summary=data.get("summary"))
     return render(request, "frontend/today_orders.html", context, status=status)
 
 

@@ -7,6 +7,20 @@
 <section class="card card--wide">
   <h1>My orders</h1>
 
+  {% if admin_block_until %}
+    {# LP-60 #}
+    <p class="notice notice--error" role="alert"><strong>LastPlate has blocked ordering on your account until {{ admin_block_until }}.</strong> You can still browse food.</p>
+  {% elif strikes %}
+    {# LP-80: expired orders are strikes. #}
+    {% if strikes.blocked %}
+      <p class="notice notice--error" role="alert"><strong>You can't place orders until {{ strikes.until }}.</strong>
+        {{ strikes.count }} of your orders expired without being picked up in the last 30 days. You can still browse food.</p>
+    {% else %}
+      <p class="notice notice--warning" role="status"><strong>{{ strikes.count }} of your orders expired without being picked up.</strong>
+        If {{ strikes.block_at }} orders expire within 30 days, you won't be able to order for 7 days. Cancel in time if you can't come.</p>
+    {% endif %}
+  {% endif %}
+
   {% if unavailable %}
     <p class="notice notice--warning" role="alert">{{ unavailable }}</p>
     <a class="button button--secondary button--block" href="{% url 'my-orders' %}">Try again</a>

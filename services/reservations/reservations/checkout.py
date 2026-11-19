@@ -43,6 +43,7 @@ ACTIVE_STATUSES = (Status.PROCESSING, Status.CONFIRMED)
 REJECT_MESSAGES = {
     "not_published": ("taken_down", "This offer was taken down."),
     "shop_not_approved": ("taken_down", "This offer was taken down."),
+    "shop_suspended": ("taken_down", "This offer was taken down."),  # LP-60
     "pickup_ended": ("pickup_ended", "Pickup ended."),
     "terms_changed": ("offer_changed", "This offer changed. Please check it again."),
 }
@@ -83,9 +84,23 @@ class _Item:
 
 
 def customer_is_blocked(customer_user_id):
-    """Hook for LP-80 ("12 · Expired-order strikes"): True stops the customer
-    from ordering. Nobody is blocked until LP-80 fills this in."""
-    return False
+    """When the customer may order again (an aware datetime), or None if they
+    may order now. LP-80: 3 expired orders within 30 days block ordering for
+    7 days after the 3rd. LP-60: or the admin blocked them until a date."""
+    from .blocks import ordering_block
+    return ordering_block(customer_user_id)[0]
+
+
+def blocked_detail(until, customer_user_id=None):
+    from .blocks import WHY_ADMIN, ordering_block
+    from .orders import time_text
+    if not isinstance(until, datetime):
+        return "Your account can't place orders right now. You can still browse."
+    if customer_user_id is not None and ordering_block(customer_user_id)[1] == WHY_ADMIN:
+        return (f"LastPlate has blocked ordering on your account until {time_text(until)}. "
+                "You can still browse.")
+    return (f"You can't place orders until {time_text(until)} because 3 of your orders expired "
+            "without being picked up. You can still browse.")
 
 
 def item_ref(order, listing_id):
@@ -225,8 +240,9 @@ def _save_processing_order(customer_user_id, request_key, items, now, customer_f
         existing = _existing(customer_user_id, request_key, items)
         if existing is not None:
             return existing, False
-        if customer_is_blocked(customer_user_id):
-            raise CheckoutRefused("customer_blocked", "Your account can't place orders right now.", 403)
+        blocked_until = customer_is_blocked(customer_user_id)
+        if blocked_until:
+            raise CheckoutRefused("customer_blocked", blocked_detail(blocked_until, customer_user_id), 403)
         active = Order.objects.filter(customer_user_id=customer_user_id, status__in=ACTIVE_STATUSES).count()
         if active >= MAX_ACTIVE_ORDERS:
             raise CheckoutRefused(

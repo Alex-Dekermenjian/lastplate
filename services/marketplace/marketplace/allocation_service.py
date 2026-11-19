@@ -63,6 +63,8 @@ def _reject_reason(listing, quantity, expected_terms_revision, now):
     ).exists()
     if not shop_approved:
         return Allocation.RejectReason.SHOP_NOT_APPROVED
+    if Shop.objects.filter(pk=listing.shop_id, suspended_at__isnull=False).exists():
+        return Allocation.RejectReason.SHOP_SUSPENDED  # LP-60
     if listing.pickup_end is None or listing.pickup_end <= now:
         return Allocation.RejectReason.PICKUP_ENDED
     if listing.terms_revision != expected_terms_revision:

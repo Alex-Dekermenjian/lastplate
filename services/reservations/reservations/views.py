@@ -30,6 +30,8 @@ from .authentication import IsCustomer
 from .cancellation import CancelRefused, cancel_by_customer
 from .checkout import CheckoutRefused, TryAgain, place_order
 from .models import Order, Status
+from .blocks import active_block
+from .strikes import strike_status
 from .timers import expire_due_orders_quietly
 
 # LP-78: how many orders "My orders" shows.
@@ -84,7 +86,12 @@ def reservations(request):
     expire_due_orders_quietly()
     if request.method == "GET":
         orders = customer_orders(request).prefetch_related("lines").order_by("-created_at", "-id")[:MAX_LISTED]
-        return Response({"orders": [order_data(order) for order in orders]})
+        # LP-80: the customer's strikes, for the warning banner. LP-60: and
+        # whether the admin blocked ordering (until when; the reason stays internal).
+        admin = active_block(request.user.id)
+        return Response({"orders": [order_data(order) for order in orders],
+                         "strikes": strike_status(request.user.id).as_dict(),
+                         "admin_block": {"blocked_until": admin.blocked_until.isoformat()} if admin else None})
 
     data = request.data if isinstance(request.data, dict) else {}
     try:

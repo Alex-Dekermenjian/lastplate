@@ -7,6 +7,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .serializers import (
     CustomerRegistrationSerializer,
+    ProfileUpdateSerializer,
     ShopOperatorRegistrationSerializer,
     SignInSerializer,
     UserSerializer,
@@ -50,4 +51,11 @@ class SignInView(TokenObtainPairView):
 
 class MeView(APIView):
     def get(self, request):
+        return Response(UserSerializer(request.user).data)
+
+    def patch(self, request):
+        """LP-18: change your own display name."""
+        serializer = ProfileUpdateSerializer(request.user, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
         return Response(UserSerializer(request.user).data)

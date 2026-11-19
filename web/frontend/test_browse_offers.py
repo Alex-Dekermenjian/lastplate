@@ -194,9 +194,9 @@ class BrowseOffersPageTests(TestCase):
             )
         )
 
-        self.assertContains(
-            response, "http://127.0.0.1:8002/media/listing_photos/42/photo.jpg"
-        )
+        # LP-46: a link on this site, served by the /media/ proxy.
+        self.assertContains(response, 'src="/media/listing_photos/42/photo.jpg"')
+        self.assertNotContains(response, "127.0.0.1:8002")
 
     def test_post_is_not_allowed(self):
         response = self.client.post(self.url)
