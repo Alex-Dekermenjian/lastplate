@@ -1,4 +1,4 @@
-{% load static %}<!doctype html>
+{% load static demo_clock_tags %}<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -11,6 +11,7 @@
 </head>
 <body>
   <div class="app-column">
+    {% demo_clock_box %}
     <header class="site-header {% block header_class %}{% endblock %}">
       <a class="logo" href="{% url 'home' %}"><span class="logo__mark" aria-hidden="true"></span>LastPlate</a>
       <nav class="site-nav" aria-label="Main">
@@ -52,8 +53,13 @@
   </div>
   {# LP-65: the searchable area list (does nothing on pages without one). #}
   <script src="{% static 'js/area-picker.js' %}" defer></script>
+  <script src="{% static 'js/demo-clock.js' %}" defer></script>
   {% if request.session.account.role == "SHOP_OPERATOR" %}
     <script src="{% static 'js/orders-badge.js' %}" defer></script>
+  {% endif %}
+  {% if request.session.account.role == "CUSTOMER" %}
+    {# LP-41: the bell's unread count. #}
+    <script src="{% static 'js/notifications-badge.js' %}?v=1" defer></script>
   {% endif %}
 </body>
 </html>

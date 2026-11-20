@@ -237,3 +237,5 @@ media/
 /.keys/
 *.pem
 
+# Demo clock (the moved time, written by the web site)
+.demo-clock/

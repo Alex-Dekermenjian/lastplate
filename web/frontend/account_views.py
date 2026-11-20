@@ -74,6 +74,8 @@ def listing_summary(listing, shop):
             hidden_because = "your shop isn't approved."
         elif pickup_ended:
             hidden_because = "its pickup time has ended."
+        elif start is not None and start > timezone.now():
+            hidden_because = f"its pickup hasn't started. It will appear for customers at {start.strftime('%a %d %b, %H:%M')}."
         elif free is not None and free <= 0:
             hidden_because = "it has sold out. Add stock to show it again."
 

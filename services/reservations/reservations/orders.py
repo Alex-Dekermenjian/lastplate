@@ -17,6 +17,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from . import notifications
 from .models import (
     OPEN_STATUSES,
     PICKUP_CODE_ALPHABET,
@@ -211,6 +212,8 @@ def change_status(order, to_status, *, actor, reason="", sync_state=None, expect
             order=locked, from_status=from_status, to_status=to_status,
             actor=actor, reason=reason, created_at=moment,
         )
+        # LP-41: the customer's notification, in the same transaction.
+        notifications.on_status_change(locked, from_status, to_status, actor, reason, moment)
     return locked
 
 

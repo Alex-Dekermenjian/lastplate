@@ -10,6 +10,7 @@ urlpatterns = [
     path("allocations/<uuid:ref>", internal_views.allocation_detail, name="internal-allocation"),
     path("allocations/<uuid:ref>/release", internal_views.allocation_release, name="internal-allocation-release"),
     path("allocations/<uuid:ref>/consume", internal_views.allocation_consume, name="internal-allocation-consume"),
+    path("demo-rewind", internal_views.demo_rewind, name="internal-demo-rewind"),
     path("allocations/<uuid:ref>/shop-cancel", internal_views.allocation_shop_cancel,
          name="internal-allocation-shop-cancel"),
 ]

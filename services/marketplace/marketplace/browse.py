@@ -3,8 +3,12 @@
 An offer is visible only while it is reservable (database-design.md §9):
 - the listing is PUBLISHED (not a draft, not withdrawn),
 - its shop is APPROVED,
-- pickup has not ended yet, and
+- its pickup window is open: it has started and has not ended yet, and
 - it has free units, as calculated by stock.free_quantity().
+
+A restaurant may publish an offer before its window opens; customers do not
+see it (and cannot reserve it) until pickup_start, and it leaves the site for
+good at pickup_end even if units are left.
 
 Shop details come from one extra query for the whole page, never one query
 per listing.
@@ -30,6 +34,7 @@ def _open_listings(now):
     # its held and sold units, so free stock needs no extra query per offer.
     return with_committed(Listing.objects.select_related("branch").filter(
         status=Listing.Status.PUBLISHED,
+        pickup_start__lte=now,
         pickup_end__gt=now,
         shop_id__in=_approved_shops().values("id"),
     ))

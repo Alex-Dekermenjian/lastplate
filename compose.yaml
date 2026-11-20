@@ -91,6 +91,7 @@ services:
       # never Git). If it is missing, every internal call is refused: run
       # scripts/init_dev_env.py again to add it.
       RESERVATIONS_SERVICE_KEY: ${RESERVATIONS_TO_MARKETPLACE_KEY:-}
+      DEMO_CLOCK_FILE: /demo-clock/clock.json
     volumes:
       # Only Accounts' public key, read-only: Marketplace can verify tokens but
       # never sign them. Fails clearly if scripts/init_dev_env.py has not run.
@@ -102,6 +103,11 @@ services:
           create_host_path: false
       # Uploaded listing photos survive rebuilding or recreating the container.
       - marketplace_media:/app/media
+      # Demo clock: the moved time, written by the web site, read by everyone.
+      - type: bind
+        source: ./.demo-clock
+        target: /demo-clock
+        read_only: true
     ports:
       - "127.0.0.1:8002:8000"
 
@@ -127,6 +133,7 @@ services:
       # LP-25: minutes an order is held. Put PICKUP_HOLD_MINUTES=2 in
       # compose.env to show expiry in a demo.
       PICKUP_HOLD_MINUTES: ${PICKUP_HOLD_MINUTES:-60}
+      DEMO_CLOCK_FILE: /demo-clock/clock.json
     volumes: &reservations-volumes
       # Only Accounts' public key, read-only, as for Marketplace.
       - type: bind
@@ -135,6 +142,11 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      # Demo clock: the moved time, written by the web site, read by everyone.
+      - type: bind
+        source: ./.demo-clock
+        target: /demo-clock
+        read_only: true
     ports:
       - "127.0.0.1:8003:8000"
 
@@ -171,6 +183,12 @@ services:
       # Where the visitor's browser reaches Marketplace's Django admin (the staff
       # backup). Photos do not use it: web serves them at /media/ (LP-46).
       MARKETPLACE_PUBLIC_URL: http://127.0.0.1:8002
+      DEMO_CLOCK_FILE: /demo-clock/clock.json
+    volumes:
+      # Demo clock: the moved time, written by the web site, read by everyone.
+      - type: bind
+        source: ./.demo-clock
+        target: /demo-clock
     ports:
       - "127.0.0.1:8000:8000"
 

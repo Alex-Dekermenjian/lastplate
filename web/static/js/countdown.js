@@ -20,8 +20,12 @@
     document.querySelectorAll("[data-after-deadline]").forEach(function (el) { el.hidden = false; });
   }
 
+  // The demo clock moves the whole app's time; the browser's own clock does not move.
+  var clock = document.querySelector("[data-demo-clock]");
+  var offset = clock ? Number(clock.getAttribute("data-offset-ms")) || 0 : 0;
+
   function update() {
-    var now = Date.now();
+    var now = Date.now() + offset;
     var passed = false;
     document.querySelectorAll(".countdown[data-deadline]").forEach(function (el) {
       var deadline = Date.parse(el.getAttribute("data-deadline"));

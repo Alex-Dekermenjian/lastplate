@@ -475,6 +475,16 @@ def expire_late_orders():
         pass
 
 
+# Demo clock only: the clock moved back, so orders placed after the new time
+# are deleted and their food goes back on sale. Marketplace is called too.
+REWIND_TIMEOUT_SECONDS = 15
+
+
+def rewind_orders(since):
+    return _call("reservations", "POST", "/api/demo/rewind", {"since": since.isoformat()},
+                 timeout=REWIND_TIMEOUT_SECONDS)
+
+
 # LP-13: Public marketplace. No token is sent: these pages need no sign-in.
 def browse_listings():
     expire_late_orders()
@@ -540,6 +550,19 @@ def create_reservation(access, request_key, lines, customer_phone=""):
 @sensitive_variables("access")
 def my_orders(access):
     return _call("reservations", "GET", "/api/reservations", token=access)
+
+
+# LP-41: the customer's in-app notifications.
+@sensitive_variables("access")
+def notifications(access, count_only=False):
+    return _call("reservations", "GET", "/api/notifications" + ("?count_only=1" if count_only else ""), token=access)
+
+
+@sensitive_variables("access")
+def mark_notifications_read(access, refs=None):
+    """Mark the given notifications read, or all of them when refs is None."""
+    return _call("reservations", "POST", "/api/notifications/read",
+                 {} if refs is None else {"refs": list(refs)}, token=access)
 
 
 @sensitive_variables("access")

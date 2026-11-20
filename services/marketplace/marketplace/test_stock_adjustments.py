@@ -18,7 +18,7 @@ from .stock_service import StockAdjustmentError, adjust_stock
 
 
 def published_listing(shop, **overrides):
-    start = timezone.now() + timedelta(days=1)
+    start = timezone.now() - timedelta(hours=1)  # the pickup window is open now
     fields = {
         "shop_id": shop.id,
         "title": "Croissant Box",
@@ -29,7 +29,7 @@ def published_listing(shop, **overrides):
         "total_quantity": 5,
         "pickup_address": "12 Bliss Street, Beirut",
         "pickup_start": start,
-        "pickup_end": start + timedelta(hours=2),
+        "pickup_end": start + timedelta(days=1, hours=1),
         "status": Listing.Status.PUBLISHED,
         **overrides,
     }

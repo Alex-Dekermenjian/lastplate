@@ -343,9 +343,13 @@ class LastBagBrowsingTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.shop = make_shop()
+        open_now = {  # customers only see an offer while its pickup window is open
+            "pickup_start": timezone.now() - timedelta(hours=1),
+            "pickup_end": timezone.now() + timedelta(hours=3),
+        }
         self.bag = make_listing(
             self.shop,
-            **bag_fields(ingredients="Secret: 2 croissants, 1 loaf"),
+            **bag_fields(ingredients="Secret: 2 croissants, 1 loaf", **open_now),
             status=Listing.Status.PUBLISHED,
         )
         self.item = make_listing(self.shop, title="6 butter croissants")

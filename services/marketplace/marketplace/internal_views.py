@@ -15,10 +15,16 @@ Answers (docs/microservices-plan.md §6):
 
 import uuid
 
+from django.db import transaction
+from django.db.models import Q
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from rest_framework import status
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+
+from config import demo_clock
 
 from .allocation_service import AllocationError, consume, release, reserve, shop_cancel
 from .models import Allocation, Shop
@@ -187,5 +193,32 @@ def allocation_shop_cancel(request, ref):
             actor_user_id=_positive_int(data, "actor_user_id"),
             reason=reason,
         ))
+
+    return _run(action)
+
+
+@internal(["POST"])
+def demo_rewind(request):
+    """Demo clock only: the clock moved back, so every allocation made after
+    that moment (or for an order Reservations is deleting) never happened.
+
+    Deleting them puts the held units back on sale. Does not exist (404) unless
+    the demo clock is on, so it can never run in CI or production."""
+    if not demo_clock.enabled():
+        return _error("not_found", "Not found.", status.HTTP_404_NOT_FOUND)
+
+    def action():
+        data = _body(request)
+        raw_since = data.get("since")
+        since = parse_datetime(raw_since) if isinstance(raw_since, str) else None
+        if since is None or timezone.is_naive(since):
+            raise BadRequest("since must be a date and time with a time zone.")
+        refs = data.get("refs", [])
+        if not isinstance(refs, list):
+            raise BadRequest("refs must be a list of references.")
+        refs = [_uuid(ref) for ref in refs]
+        with transaction.atomic():
+            removed, _ = Allocation.objects.filter(Q(created_at__gt=since) | Q(reservation_ref__in=refs)).delete()
+        return Response({"allocations_removed": removed})
 
     return _run(action)

@@ -190,3 +190,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # LP-11: Uploaded food photos
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+
+# Demo clock (development only): with DEMO_CLOCK_FILE set, the site's clock box
+# can move "now" for every service. Does nothing when the variable is unset.
+from . import demo_clock  # noqa: E402
+
+demo_clock.install()

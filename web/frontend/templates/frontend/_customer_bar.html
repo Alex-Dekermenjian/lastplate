@@ -4,6 +4,14 @@
   <a href="{% url 'browse-offers' %}"{% if page == "browse-offers" or page == "offer-detail" or page == "restaurant-detail" or page == "home" %} aria-current="page"{% endif %}>Home</a>
   <a href="{% url 'search' %}"{% if page == "search" %} aria-current="page"{% endif %}>Search</a>
   <a href="{% url 'my-orders' %}"{% if page == "my-orders" or page == "order-detail" %} aria-current="page"{% endif %}>My orders</a>
+  {# LP-41: the bell; the unread count is filled in by notifications-badge.js. #}
+  <a href="{% url 'notifications' %}"{% if page == "notifications" %} aria-current="page"{% endif %}>
+    <span class="bell">
+      <svg class="bell__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 22a2.4 2.4 0 0 0 2.4-2.4h-4.8A2.4 2.4 0 0 0 12 22Zm7-6.6V11a7 7 0 0 0-5.2-6.8V3.5a1.8 1.8 0 0 0-3.6 0v.7A7 7 0 0 0 5 11v4.4l-1.7 1.7V18h17.4v-.9L19 15.4Z"/></svg>
+      <span class="bell__count" data-notifications-badge data-url="{% url 'notifications-count' %}" hidden></span>
+    </span>
+    Alerts
+  </a>
   <a href="{% url 'my-account' %}"{% if page == "my-account" %} aria-current="page"{% endif %}>Profile</a>
 </nav>
 {% endwith %}

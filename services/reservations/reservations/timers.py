@@ -3,7 +3,9 @@
 run_timers() does four things, each safe to run twice, at the same moment
 from two processes, or late (the next run catches up):
 
-1. expire_due_orders(): every Reserved (CONFIRMED) order whose pick_up_by has
+1. expire_due_orders(): (LP-41: it also sends the "10 minutes left" reminder
+   to customers whose order is that close to pick_up_by, once per order.)
+   Every Reserved (CONFIRMED) order whose pick_up_by has
    passed becomes EXPIRED (actor = system), with sync_state RELEASE_PENDING,
    under the order's row lock (reservations.orders.change_status). After that
    commits, each item's allocation is released in Marketplace. If the offer
@@ -42,6 +44,7 @@ from . import marketplace_client as market
 from .checkout import item_ref
 from .collection import UNDO_WINDOW, claim_consumption
 from .models import Actor, Order, Status, SyncState
+from .notifications import remind_orders_close_to_deadline
 from .orders import InvalidStatusChange, change_status
 
 logger = logging.getLogger("reservations.timers")
@@ -95,6 +98,8 @@ def expire_due_orders(now=None, limit=BATCH):
         for pk in _ids(due, limit)) if order is not None]
     for order in expired:
         release_items(order)
+    # LP-41: the "10 minutes left" reminder, once per order.
+    remind_orders_close_to_deadline(now)
     return expired
 
 

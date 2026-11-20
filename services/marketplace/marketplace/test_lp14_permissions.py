@@ -47,7 +47,7 @@ def approved_shop(operator_user_id, name):
 
 
 def published_listing(shop, **overrides):
-    start = timezone.now() + timedelta(hours=2)
+    start = timezone.now() - timedelta(hours=1)  # the pickup window is open now
     values = {
         "shop_id": shop.id,
         "title": "Croissant Box",
@@ -58,7 +58,7 @@ def published_listing(shop, **overrides):
         "total_quantity": 5,
         "pickup_address": "Main street 1",
         "pickup_start": start,
-        "pickup_end": start + timedelta(hours=2),
+        "pickup_end": start + timedelta(hours=5),
         "status": Listing.Status.PUBLISHED,
     }
     values.update(overrides)

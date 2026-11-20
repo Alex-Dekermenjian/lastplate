@@ -628,6 +628,18 @@ p { margin: 0 0 12px; }
 .cancel-reasons legend { font-weight: 700; padding: 0; margin-bottom: 4px; }
 .cancel-reasons .check { margin: 0; }
 
+/* Demo clock: date and time bar at the top of every page (development only). */
+.demo-clock { background: var(--surface); border-bottom: 1px solid var(--border); font-size: 0.875rem; }
+.demo-clock summary { cursor: pointer; padding: 6px 16px; display: flex; gap: 8px; align-items: baseline; list-style-position: inside; }
+.demo-clock__label { font-weight: 800; color: var(--text-2); }
+.demo-clock time { font-variant-numeric: tabular-nums; font-weight: 700; }
+.demo-clock--shifted { background: var(--tint); }
+.demo-clock--shifted .demo-clock__label { color: var(--btn-hover); }
+.demo-clock__form { padding: 4px 16px 14px; display: grid; gap: 8px; }
+.demo-clock__form input[type="datetime-local"] { min-width: 0; max-width: 100%; padding: 10px 12px; border: 1px solid var(--input-border); border-radius: var(--radius-input); font: inherit; }
+.demo-clock__buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.demo-clock__note { margin: 0; color: var(--text-2); }
+
 /* LP-33: responsive reporting cards and a horizontally scrollable history. */
 .sales-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 12px; margin: 16px 0 20px; }
 .sales-summary .card { min-width: 0; overflow-wrap: anywhere; }
@@ -637,3 +649,18 @@ p { margin: 0 0 12px; }
 .sales-table th, .sales-table td { padding: 12px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
 .sales-table th { background: var(--tint); }
 .sales-table caption { text-align: left; font-weight: 700; margin-bottom: 8px; }
+
+/* LP-41: the bell in the customer bar, and the notifications page. */
+.bottom-bar-customer a { padding-left: 2px; padding-right: 2px; min-width: 0; }
+.bell { position: relative; display: inline-flex; line-height: 0; }
+.bell__count {
+  position: absolute; top: -6px; right: -10px; min-width: 18px; padding: 1px 5px; box-sizing: border-box;
+  border-radius: var(--radius-pill); background: var(--danger); color: #FFFFFF;
+  font-size: 11px; font-weight: 800; line-height: 16px; text-align: center;
+}
+.bell__count[hidden] { display: none; }
+.notification-list { list-style: none; padding: 0; margin: 0 0 16px; display: grid; gap: 10px; }
+.notification { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-input); background: var(--surface); color: var(--text); text-decoration: none; }
+.notification--unread { background: var(--tint); border-color: var(--accent); font-weight: 700; }
+.notification__message { overflow-wrap: anywhere; }
+.notification__when { font-size: 14px; font-weight: 400; }

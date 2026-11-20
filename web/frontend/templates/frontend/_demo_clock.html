@@ -1,0 +1,21 @@
+{% if enabled %}
+<div class="demo-clock{% if shifted %} demo-clock--shifted{% endif %}" data-demo-clock data-now-ms="{{ now_ms }}" data-offset-ms="{{ offset_ms }}">
+  <details>
+    <summary>
+      <span class="demo-clock__label">{% if shifted %}Demo time{% else %}Time{% endif %}</span>
+      <time data-demo-clock-text>{{ now_text }}</time>
+    </summary>
+    <form class="demo-clock__form" method="post" action="{% url 'demo-clock' %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <label for="demo-clock-moment">Date and time (Lebanon)</label>
+      <input id="demo-clock-moment" type="datetime-local" name="moment" step="1" value="{{ input_value }}" required>
+      <div class="demo-clock__buttons">
+        <button class="button button--primary" type="submit" name="action" value="set">Set time</button>
+        <button class="button button--secondary" type="submit" name="action" value="reset" formnovalidate>Use real time</button>
+      </div>
+      <p class="demo-clock__note">Demo only. This moves the time for the whole app: pickup windows, order expiry and timers.</p>
+    </form>
+  </details>
+</div>
+{% endif %}

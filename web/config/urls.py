@@ -7,6 +7,8 @@ https://docs.djangoproject.com/en/5.2/topics/http/urls/
 from django.urls import path
 from django.views.generic import RedirectView
 
+from frontend import demo_clock_views
+
 from frontend import (
     account_views,
     branch_views,
@@ -19,6 +21,7 @@ from frontend import (
     listing_photos,
     listing_views,
     offer_actions,
+    notification_views,
     offer_reserve,
     order_views,
     pickup_views,
@@ -50,6 +53,9 @@ urlpatterns = [
     path("cart/checkout/", cart.checkout, name="cart-checkout"),
 
     # LP-78: the customer's order page (shown at the counter) and My orders.
+    # LP-41: the bell and the customer's notifications.
+    path("notifications/", notification_views.notifications_page, name="notifications"),
+    path("notifications/count/", notification_views.notifications_count, name="notifications-count"),
     path("orders/", order_views.my_orders, name="my-orders"),
     path("orders/<uuid:reservation_ref>/", order_views.order_detail, name="order-detail"),
     # LP-27: the customer cancels before the pick-up-by time.
@@ -158,6 +164,7 @@ urlpatterns = [
     # LP-46: listing and shop photos, fetched from Marketplace through this site.
     path("media/<path:path>", listing_photos.media_proxy, name="media"),
 
+    path("demo-clock/", demo_clock_views.set_clock, name="demo-clock"),
     path("health/live/", health.live, name="health-live"),
     path("health/ready/", health.ready, name="health-ready"),
 ]

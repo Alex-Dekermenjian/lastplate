@@ -29,7 +29,8 @@ def make_shop(operator_user_id=OPERATOR_ID, **overrides):
 
 
 def make_listing(shop, **overrides):
-    start = timezone.now() + timedelta(hours=3)
+    # The pickup window is open now (customers only see an offer while it is open).
+    start = timezone.now() - timedelta(hours=1)
     fields = {
         "shop_id": shop.id,
         "title": "Croissant Box",
@@ -40,7 +41,7 @@ def make_listing(shop, **overrides):
         "total_quantity": 5,
         "pickup_address": "12 Bliss Street, Beirut",
         "pickup_start": start,
-        "pickup_end": start + timedelta(hours=2),
+        "pickup_end": start + timedelta(hours=6),
         "status": Listing.Status.PUBLISHED,
         **overrides,
     }
@@ -186,12 +187,12 @@ class BrowseListingsTests(MarketplaceTestCase):
         now = timezone.now()
         later = make_listing(
             self.shop,
-            pickup_start=now + timedelta(hours=5),
+            pickup_start=now - timedelta(hours=1),
             pickup_end=now + timedelta(hours=6),
         )
         sooner = make_listing(
             self.shop,
-            pickup_start=now + timedelta(hours=1),
+            pickup_start=now - timedelta(hours=1),
             pickup_end=now + timedelta(hours=2),
         )
 
@@ -246,6 +247,43 @@ class HiddenOfferTests(MarketplaceTestCase):
         )
 
         self.assert_hidden(listing)
+
+    def test_offer_is_hidden_until_its_pickup_starts(self):
+        # Published early: customers see nothing before the window opens, in the
+        # list or on the offer's own page, even though units are left.
+        now = timezone.now()
+        listing = make_listing(
+            self.shop,
+            pickup_start=now + timedelta(hours=1),
+            pickup_end=now + timedelta(hours=3),
+        )
+
+        self.assert_hidden(listing)
+
+    def test_offer_appears_exactly_at_pickup_start(self):
+        now = timezone.now()
+        listing = make_listing(
+            self.shop,
+            pickup_start=now + timedelta(hours=1),
+            pickup_end=now + timedelta(hours=3),
+        )
+
+        with patch("marketplace.browse.timezone.now", return_value=now + timedelta(hours=1)):
+            self.assertEqual(self.browsed_ids(), [listing.id])
+            self.assertEqual(self.client.get(self.detail_url(listing)).status_code, 200)
+
+    def test_an_offer_with_stock_left_still_disappears_at_pickup_end(self):
+        now = timezone.now()
+        listing = make_listing(
+            self.shop,
+            total_quantity=5,
+            pickup_start=now - timedelta(hours=1),
+            pickup_end=now + timedelta(hours=1),
+        )
+        self.assertEqual(self.browsed_ids(), [listing.id])
+
+        with patch("marketplace.browse.timezone.now", return_value=now + timedelta(hours=1)):
+            self.assert_hidden(listing)
 
     def test_offer_is_hidden_exactly_at_pickup_end(self):
         now = timezone.now()

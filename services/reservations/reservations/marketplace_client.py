@@ -125,6 +125,19 @@ def stock_call(action, ref, listing_id):
     return FAULT
 
 
+def demo_rewind(since, refs):
+    """Demo clock only: Marketplace deletes the allocations made after `since`
+    and those of the orders being deleted. Returns how many it removed; raises
+    MarketplaceUnavailable unless Marketplace answered 200."""
+    if not settings.MARKETPLACE_SERVICE_KEY:
+        raise MarketplaceUnavailable("Marketplace service key is not configured")
+    status, body = _request("POST", "/internal/demo-rewind",
+                            {"since": since.isoformat(), "refs": [str(ref) for ref in refs]}, internal=True)
+    if status != 200:
+        raise MarketplaceUnavailable(f"Marketplace answered {status}")
+    return body.get("allocations_removed", 0) if isinstance(body, dict) else 0
+
+
 def allocate(ref, listing_id, quantity, expected_terms_revision):
     if not settings.MARKETPLACE_SERVICE_KEY:
         logger.error("MARKETPLACE_SERVICE_KEY is not set; Marketplace will refuse every stock call.")

@@ -322,3 +322,39 @@ class CustomerBlock(models.Model):
 
     def delete(self, *args, **kwargs):
         raise NotDeletable("Customer blocks are never deleted.")
+
+
+class NotificationKind(models.TextChoices):
+    TEN_MINUTES_LEFT = "TEN_MINUTES_LEFT", "10 minutes left"
+    SHOP_CANCELLED = "SHOP_CANCELLED", "Cancelled by the restaurant"
+    EXPIRED = "EXPIRED", "Expired"
+
+
+class Notification(models.Model):
+    """LP-41: something the customer should know about one of their orders.
+
+    In-app only (no email, no push). Written in the same transaction as the
+    OrderEvent for a status change, or by the timer for the "10 minutes left"
+    reminder. One row per order and kind, so the same notification is never
+    created twice, whatever runs twice.
+    """
+
+    # Public reference used by the API, so the row id is never exposed.
+    ref = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name="notifications")
+    # The order's customer, copied here so "mine" is one indexed filter.
+    customer_user_id = models.PositiveBigIntegerField(db_index=True)
+    kind = models.CharField(max_length=20, choices=NotificationKind.choices)
+    # The wording the customer sees, fixed when the event happens.
+    message = models.TextField()
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["order", "kind"], name="notification_one_per_order_and_kind"),
+        ]
+
+    def __str__(self):
+        return f"{self.get_kind_display()} for order {self.order_id}"

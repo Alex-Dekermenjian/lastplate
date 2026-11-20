@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications — LastPlate{% endblock %}
+
+{% block content %}
+<section class="card card--wide">
+  <h1>Notifications</h1>
+
+  {% if unavailable %}
+    <p class="notice notice--warning" role="alert">{{ unavailable }}</p>
+    <a class="button button--secondary button--block" href="{% url 'notifications' %}">Try again</a>
+
+  {% elif not notifications %}
+    <p class="muted">Nothing yet. We'll tell you here when an order is about to run out of time, expires or is cancelled by the restaurant.</p>
+    <a class="button button--primary button--block" href="{% url 'my-orders' %}">My orders</a>
+
+  {% else %}
+    <ul class="notification-list">
+      {% for item in notifications %}
+        <li>
+          <a class="notification{% if item.unread %} notification--unread{% endif %}" href="{% url 'order-detail' item.order_ref %}">
+            <span class="notification__message">{% if item.unread %}<span class="visually-hidden">New: </span>{% endif %}{{ item.message }}</span>
+            <span class="notification__when muted">{{ item.when }}</span>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>
+{% endblock %}

@@ -248,6 +248,23 @@ Create an event with reservation creation and each successful status change.
 Save events in the same transaction as the change.
 Repeated actions must not create duplicate transition events.
 
+### Notification (implemented in LP-41)
+
+In-app only (no email or push). Owned by Reservations, next to the orders it is about.
+
+| Field | Purpose |
+| --- | --- |
+| ref | Public reference used by the API |
+| order | The order it is about |
+| customer_user_id | The order's customer; a customer reads only their own |
+| kind | `TEN_MINUTES_LEFT`, `SHOP_CANCELLED` (with the restaurant's reason) or `EXPIRED` |
+| message | The wording shown, fixed when the event happens |
+| created_at / read_at | When it was created and when the customer opened it |
+
+One row per order and kind (unique), so the same notification is never created twice.
+`SHOP_CANCELLED` and `EXPIRED` are written in the same transaction as the status change's event.
+`TEN_MINUTES_LEFT` is written by the timer (`expire_due_orders`) once `pick_up_by` is 10 minutes or less away.
+
 ## 9. Stock calculations
 
 T = total_quantity.
@@ -257,7 +274,7 @@ C = quantity in Collected reservations.
 Free stock = T - R - C.
 Always keep T >= R + C.
 
-Public reservable stock is zero unless the listing is Published, has free units and has not reached pickup end.
+Public reservable stock is zero unless the listing is Published, has free units, has reached pickup start and has not reached pickup end.
 
 | Action | T | R | C | Free |
 | --- | ---: | ---: | ---: | ---: |
@@ -277,7 +294,8 @@ Collection never deducts stock twice.
 
 - the listing is PUBLISHED (drafts and withdrawn offers are hidden);
 - its shop is APPROVED (a shop rejected later hides its offers straight away);
-- `pickup_end` is in the future (hidden from the exact end time);
+- `pickup_start` has been reached (an offer published early is hidden until its start time, and cannot be reserved before it);
+- `pickup_end` is in the future (hidden from the exact end time, even if units are left; the offer is not deleted, orders still refer to it);
 - `stock.free_quantity()` is above 0. It is not recalculated elsewhere, so reserved units will hide an offer once Sprint 2 fills in `committed_quantity()`.
 
 Hidden offers return 404 `{"code": "not_found", "detail": ...}` and are not told apart, so a visitor cannot learn whether a hidden offer is a draft, from a rejected shop, or sold out.

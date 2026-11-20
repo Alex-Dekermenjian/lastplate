@@ -24,6 +24,7 @@ import urllib.request
 import uuid
 import zlib
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from http.cookiejar import CookieJar
 from pathlib import Path
 
@@ -33,9 +34,11 @@ RUN = time.strftime("%H%M%S")
 OWNER_PASSWORD = secrets.token_urlsafe(18) + "-Aa1"
 ADMIN_PASSWORD = secrets.token_urlsafe(24)
 REVIEWER = f"flowcheck-reviewer-{RUN}"
-# Lebanon is UTC+2 or UTC+3; two days ahead keeps the window in the future in both.
-DAY = (datetime.now(timezone.utc) + timedelta(days=2)).strftime("%Y-%m-%d")
-START, END = f"{DAY}T16:00", f"{DAY}T18:00"
+# Customers only see an offer while its pickup window is open, so the checks'
+# offers are open from an hour ago to three hours from now (Lebanon time).
+_NOW = datetime.now(ZoneInfo("Asia/Beirut"))
+START = (_NOW - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M")
+END = (_NOW + timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M")
 failures = []
 
 

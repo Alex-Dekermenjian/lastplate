@@ -118,7 +118,7 @@ class WorkspaceVisibilityTests(WebAuthTestCase):
         base = {
             "id": 1, "title": "Box", "status": "PUBLISHED", "total_quantity": 5, "free_quantity": 5,
             "pickup_address": "12 Bliss Street", "photo_display": None,
-            "pickup_start": (timezone.now() + timedelta(hours=1)).isoformat(),
+            "pickup_start": (timezone.now() - timedelta(hours=1)).isoformat(),
             "pickup_end": (timezone.now() + timedelta(hours=2)).isoformat(),
         }
         self.sign_in_session()
@@ -145,6 +145,15 @@ class WorkspaceVisibilityTests(WebAuthTestCase):
         response = self.workspace(self.APPROVED, pickup_end=(timezone.now() - timedelta(hours=1)).isoformat())
         self.assertContains(response, "Hidden from customers: its pickup time has ended.")
         self.assertNotContains(response, "name=\"quantity_change\"")
+
+    def test_an_offer_published_early_says_when_it_will_appear(self):
+        start = timezone.now() + timedelta(hours=5)
+        response = self.workspace(
+            self.APPROVED, pickup_start=start.isoformat(), pickup_end=(start + timedelta(hours=2)).isoformat(),
+        )
+        self.assertContains(response, "Hidden from customers: its pickup hasn&#x27;t started.")
+        self.assertContains(response, "It will appear for customers at")
+        self.assertNotContains(response, "Customers can see this offer.")
 
     def test_rejected_shop_sees_its_request_instead_of_its_offers(self):
         response = self.workspace({**COMPLETE_SHOP, "approval_status": "REJECTED"})
