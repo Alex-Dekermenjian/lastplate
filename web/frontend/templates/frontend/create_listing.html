@@ -170,6 +170,16 @@
       {% endif %}
     {% endif %}
 
+    {# LP-84: the most one customer can reserve of this offer; empty = no limit. #}
+    <p>
+      <label for="max_per_customer">Max per customer (optional)</label>
+      <input id="max_per_customer" name="max_per_customer"
+             type="number" min="1" step="1"
+             value="{{ form_values.max_per_customer|default_if_none:'' }}"
+             placeholder="No limit">
+      <span class="muted">The most one customer can reserve of this offer, in total. Leave empty for no limit.</span>
+    </p>
+
     <h2>Pickup information</h2>
 
     {# LP-68: the pickup address is the branch's. #}

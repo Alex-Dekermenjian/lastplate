@@ -164,6 +164,7 @@ When listings are merged, verify:
 | category | Food category |
 | original_price / discounted_price | Decimal USD unit prices |
 | total_quantity | Current stock allocated to the offer |
+| max_per_customer | Most units one customer can reserve of this offer. Empty means no limit. Reservations counts the customer's Reserved, Processing and Paid orders for the offer (LP-84) |
 | pickup_address | Address copied from the shop and confirmed |
 | pickup_start / pickup_end | Timezone-aware pickup window |
 | photo | Optional image storage path |

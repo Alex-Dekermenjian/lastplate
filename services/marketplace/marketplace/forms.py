@@ -25,6 +25,7 @@ class ListingForm(forms.ModelForm):
             "original_price",
             "discounted_price",
             "total_quantity",
+            "max_per_customer",
             "pickup_address",
             "pickup_start",
             "pickup_end",
@@ -89,6 +90,7 @@ class ListingForm(forms.ModelForm):
             "original_price",
             "discounted_price",
             "total_quantity",
+            "max_per_customer",
             "pickup_start",
             "pickup_end",
         )
@@ -105,6 +107,7 @@ class ListingForm(forms.ModelForm):
                 pickup_end=cleaned_data.get("pickup_end"),
                 publishing=self.publishing,
                 kind=kind,
+                max_per_customer=cleaned_data.get("max_per_customer"),
             )
         except ValidationError as exc:
             for field, messages in exc.message_dict.items():

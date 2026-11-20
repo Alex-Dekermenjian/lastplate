@@ -302,6 +302,10 @@ class Listing(models.Model):
 
     total_quantity = models.PositiveIntegerField(default=0)
 
+    # LP-84: the most units of this offer one customer may reserve in total
+    # (across all their orders). Empty means no limit.
+    max_per_customer = models.PositiveIntegerField(null=True, blank=True)
+
     pickup_address = models.CharField(
         max_length=255,
         blank=True,
@@ -344,6 +348,11 @@ class Listing(models.Model):
             models.CheckConstraint(
                 condition=Q(kind__in=["LASTBAG", "ITEM"]),
                 name="marketplace_listing_valid_kind",
+            ),
+            # LP-84: a limit is at least 1 (empty means no limit).
+            models.CheckConstraint(
+                condition=Q(max_per_customer__isnull=True) | Q(max_per_customer__gte=1),
+                name="marketplace_listing_max_per_customer_positive",
             ),
         ]
 

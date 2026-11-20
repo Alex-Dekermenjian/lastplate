@@ -53,6 +53,7 @@ def validate_listing_for_publication(listing):
             pickup_end=listing.pickup_end,
             publishing=True,
             kind=listing.kind,
+            max_per_customer=listing.max_per_customer,
         )
     except ValidationError as exc:
         errors.update(exc.message_dict)

@@ -25,6 +25,8 @@ LISTING_FIELDS = (
     "original_price",
     "discounted_price",
     "total_quantity",
+    # LP-84: most one customer may reserve; empty means no limit.
+    "max_per_customer",
     # LP-68: no pickup address here; it comes from the offer's branch.
     "pickup_start",
     "pickup_end",
@@ -43,6 +45,7 @@ LASTBAG_FIELDS = (
     "discounted_price",
     "allergens",
     "total_quantity",
+    "max_per_customer",
     "pickup_start",
     "pickup_end",
 )
@@ -67,6 +70,7 @@ FIELD_LABELS = {
     "original_price": "Original price",
     "discounted_price": "Discounted price",
     "total_quantity": "Available quantity",
+    "max_per_customer": "Max per customer",
     "pickup_address": "Pickup address",
     "pickup_start": "Pickup starts",
     "pickup_end": "Pickup ends",
@@ -90,7 +94,7 @@ def offer_kind(value):
     return LASTBAG if str(value or "").upper() == LASTBAG else ITEM
 
 
-def listing_data_from(post, kind):
+def listing_data_from(post, kind, editing=False):
     """The fields this kind of offer sends to Marketplace.
 
     An item sends exactly what it did in LP-10. Empty numbers and times are
@@ -101,6 +105,15 @@ def listing_data_from(post, kind):
     for field in (*OPTIONAL_NUMBER_FIELDS, "pickup_start", "pickup_end"):
         if field in data and not data[field]:
             del data[field]
+
+    # LP-84: an empty limit means no limit. A new draft just leaves it out; when
+    # editing it is sent as null, so clearing the box removes a limit the draft
+    # had (leaving it out would keep the old one).
+    if "max_per_customer" in data and not data["max_per_customer"]:
+        if editing:
+            data["max_per_customer"] = None
+        else:
+            del data["max_per_customer"]
 
     return data
 
@@ -495,7 +508,7 @@ def edit_listing(request, listing_id):
     if request.method == "GET":
         return render(request, template, context)
 
-    listing_data = listing_data_from(request.POST, kind)
+    listing_data = listing_data_from(request.POST, kind, editing=True)
     add_confirm(request.POST, listing_data)
     known = {str(branch["id"]) for branch in branches}
     if len(branches) > 1 and request.POST.get("branch") in known:

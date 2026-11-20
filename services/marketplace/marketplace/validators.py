@@ -44,6 +44,7 @@ def validate_listing_data(
     pickup_end,
     publishing=False,
     kind=ITEM,
+    max_per_customer=None,
 ):
     errors = {}
 
@@ -82,6 +83,14 @@ def validate_listing_data(
         errors["total_quantity"] = "Stock must be a non-negative whole number."
     elif publishing and stock == 0:
         errors["total_quantity"] = "Published offers must have stock available."
+
+    # LP-84: the most one customer may reserve; empty means no limit.
+    if max_per_customer is not None and (
+        isinstance(max_per_customer, bool)
+        or not isinstance(max_per_customer, int)
+        or max_per_customer < 1
+    ):
+        errors["max_per_customer"] = "The limit per customer must be a whole number, 1 or more."
 
     # Pickup times
     if publishing:
