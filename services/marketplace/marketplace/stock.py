@@ -50,6 +50,53 @@ def committed_quantity(listing):
     )
 
 
+HELD_ANNOTATION = "held_units"
+SOLD_ANNOTATION = "sold_units"
+
+
+def with_allocation_counts(listings):
+    """LP-29: the owner's list also needs held (reserved) and sold units
+    apart, counted in the same query."""
+    from .models import Allocation
+
+    def units(status):
+        return Coalesce(Sum("allocations__quantity", filter=Q(allocations__status=status)), 0)
+
+    return with_committed(listings).annotate(**{
+        HELD_ANNOTATION: units(Allocation.Status.HELD),
+        SOLD_ANNOTATION: units(Allocation.Status.CONSUMED),
+    })
+
+
+def _units(listing, annotation, status):
+    counted = getattr(listing, annotation, None)
+    if counted is not None:
+        return counted
+    if listing.pk is None:
+        return 0
+
+    from .models import Allocation
+
+    return (
+        Allocation.objects.filter(listing_id=listing.pk, status=status)
+        .aggregate(total=Coalesce(Sum("quantity"), 0))["total"]
+    )
+
+
+def held_quantity(listing):
+    """Units reserved by customers and not picked up yet (HELD)."""
+    from .models import Allocation
+
+    return _units(listing, HELD_ANNOTATION, Allocation.Status.HELD)
+
+
+def sold_quantity(listing):
+    """Units picked up and paid for (CONSUMED)."""
+    from .models import Allocation
+
+    return _units(listing, SOLD_ANNOTATION, Allocation.Status.CONSUMED)
+
+
 def free_quantity(listing):
     """Units of this listing not committed to any reservation."""
     return listing.total_quantity - committed_quantity(listing)

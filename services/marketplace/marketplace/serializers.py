@@ -1,14 +1,21 @@
 
 import re
+from datetime import datetime, timedelta
 
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 from rest_framework import serializers
 
 from .branch_service import active_branches, ensure_first_branch, live_offers
 from .image_validators import validate_listing_photo
 from .logo_processing import prepare_logo
 from .models import MAX_BRANCHES, Branch, Listing, Shop, StockAdjustment
-from .stock import free_quantity as calculate_free_quantity
+from .stock import (
+    committed_quantity as calculate_committed_quantity,
+    free_quantity as calculate_free_quantity,
+    held_quantity as calculate_held_quantity,
+    sold_quantity as calculate_sold_quantity,
+)
 from .validators import LASTBAG as LASTBAG_KIND, validate_listing_data
 
 
@@ -317,6 +324,8 @@ class BranchInputSerializer(RejectUnknownFieldsMixin, serializers.Serializer):
     name = serializers.CharField(min_length=2, max_length=100)
     address = serializers.CharField(min_length=5, max_length=255)
     area = serializers.CharField(min_length=2, max_length=100)
+    # LP-29: when the branch closes, Lebanon time ("22:00"). Optional; null clears it.
+    closing_time = serializers.TimeField(required=False, allow_null=True)
 
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -333,7 +342,7 @@ class BranchSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Branch
-        fields = ["id", "name", "address", "area", "position", "draft_offers", "live_offers"]
+        fields = ["id", "name", "address", "area", "position", "closing_time", "draft_offers", "live_offers"]
         read_only_fields = fields
 
 
@@ -401,6 +410,29 @@ def lastbag_title(shop):
 BRANCH_NOT_YOURS = "Choose one of your restaurant's branches."
 
 
+# LP-29: pickup should end by the time the branch closes.
+def closing_moment(branch, pickup_start, pickup_end):
+    """When the branch closes on the offer's pickup day, or None when the
+    branch has no closing time. The day is the pickup start's (Lebanon time);
+    a closing time at or before the start (for example 01:00 for a start at
+    20:00) means the branch closes after midnight, so the next day."""
+    if branch is None or branch.closing_time is None or pickup_end is None:
+        return None
+    start = timezone.localtime(pickup_start or pickup_end)
+    closing = timezone.make_aware(datetime.combine(start.date(), branch.closing_time))
+    if pickup_start is not None and closing <= start:
+        closing += timedelta(days=1)
+    return closing
+
+
+def after_closing_message(branch, pickup_end, closing):
+    end = timezone.localtime(pickup_end)
+    return (
+        f"Pickup ends at {end:%H:%M}, after {branch.name} closes at {closing:%H:%M}. "
+        "Confirm that customers can still pick up then, or choose an earlier pickup end."
+    )
+
+
 # LP-10 and LP-11: Food listings (shop operator view)
 class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
 
@@ -411,8 +443,31 @@ class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
     )
     branch_details = serializers.SerializerMethodField()
 
+    # LP-29: what happened to the units posted: reserved (held for orders not
+    # picked up yet), sold (picked up), and both together, which stock can
+    # never go below. "left" is free_quantity.
+    reserved_quantity = serializers.SerializerMethodField()
+    sold_quantity = serializers.SerializerMethodField()
+    committed_quantity = serializers.SerializerMethodField()
+
+    # LP-29: the owner confirms a pickup end after the branch's closing time.
+    confirm_after_closing = serializers.BooleanField(write_only=True, required=False, default=False)
+
     def get_branch_details(self, obj):
-        return branch_payload(obj)
+        details = branch_payload(obj)
+        if details is not None:
+            closing = obj.branch.closing_time
+            details["closing_time"] = closing.strftime("%H:%M") if closing else None
+        return details
+
+    def get_reserved_quantity(self, obj):
+        return calculate_held_quantity(obj)
+
+    def get_sold_quantity(self, obj):
+        return calculate_sold_quantity(obj)
+
+    def get_committed_quantity(self, obj):
+        return calculate_committed_quantity(obj)
 
     class Meta:
         model = Listing
@@ -436,12 +491,16 @@ class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
             # LP-84: most units one customer may reserve (null = no limit).
             "max_per_customer",
             "free_quantity",
+            "reserved_quantity",
+            "sold_quantity",
+            "committed_quantity",
             "pickup_address",
             "pickup_start",
             "pickup_end",
             "status",
             "branch",
             "branch_details",
+            "confirm_after_closing",
             "created_at",
             "updated_at",
             # LP-60: removed by the LastPlate admin, and why.
@@ -536,8 +595,27 @@ class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
         if data["kind"] == LASTBAG_KIND and not (data["title"] or "").strip():
             attrs["title"] = lastbag_title(self.context.get("shop"))
 
+        confirmed = attrs.pop("confirm_after_closing", False)
         self._resolve_branch(attrs)
+        self._check_closing_time(attrs, data, confirmed)
         return attrs
+
+    def _check_closing_time(self, attrs, data, confirmed):
+        """LP-29: a pickup end after the branch closes needs the owner's
+        confirm. Only checked when the pickup end or branch is new or
+        changed, so saving an unrelated change never asks again."""
+        branch = attrs.get("branch") or getattr(self.instance, "branch", None)
+        if self.instance is not None and (
+            data["pickup_end"] == self.instance.pickup_end
+            and data["pickup_start"] == self.instance.pickup_start
+            and getattr(branch, "pk", None) == self.instance.branch_id
+        ):
+            return
+        closing = closing_moment(branch, data["pickup_start"], data["pickup_end"])
+        if closing is not None and data["pickup_end"] > closing and not confirmed:
+            raise serializers.ValidationError({
+                "confirm_after_closing": [after_closing_message(branch, data["pickup_end"], closing)],
+            })
 
     def _resolve_branch(self, attrs):
         """LP-68: an offer is at one of its restaurant's active branches, and

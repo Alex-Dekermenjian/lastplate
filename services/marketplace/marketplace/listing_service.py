@@ -103,3 +103,37 @@ def publish_listing(listing_id, shop_id, shop_approved=False, profile_complete=F
     return listing
 
 
+# --------------------------------------------------
+# LP-29: Take a published offer down (unpublish)
+# --------------------------------------------------
+
+class UnpublishError(Exception):
+    def __init__(self, code, detail, http_status):
+        super().__init__(detail)
+        self.code = code
+        self.detail = detail
+        self.http_status = http_status
+
+
+def withdraw_listing(listing_id, shop_id):
+    """PUBLISHED -> WITHDRAWN. Customers no longer see it and every new
+    reserve call is refused (not_published), but existing allocations are not
+    touched: held units stay held, so those orders are still valid and can be
+    picked up and paid (consume works on a withdrawn offer). A withdrawn offer
+    stays withdrawn; the restaurant posts a new one instead.
+
+    The listing lock is the same one reserve calls take, so a reserve that
+    arrives after this commits is refused, and one that got in first is held.
+    """
+    with transaction.atomic():
+        listing = Listing.objects.select_for_update().filter(pk=listing_id, shop_id=shop_id).first()
+        if listing is None:
+            raise UnpublishError("not_owner", "You do not own this listing.", 403)
+        if listing.status == Listing.Status.WITHDRAWN:
+            # Pressed twice: already done.
+            return listing
+        if listing.status != Listing.Status.PUBLISHED:
+            raise UnpublishError("not_published", "Only published offers can be taken down.", 409)
+        listing.status = Listing.Status.WITHDRAWN
+        listing.save(update_fields=["status", "updated_at"])
+    return listing

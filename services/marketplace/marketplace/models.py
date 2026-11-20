@@ -197,6 +197,10 @@ class Branch(models.Model):
     area = models.CharField(max_length=100, blank=True)
     # 1 is the main branch; the order owners and customers see.
     position = models.PositiveSmallIntegerField(default=1)
+    # LP-29: when this branch closes (Lebanon time). A new offer's pickup end
+    # defaults to it, and a pickup end after it needs the owner's confirm.
+    # Empty: not set, so nothing is checked.
+    closing_time = models.TimeField(null=True, blank=True)
     # A removed branch is hidden but kept, so past offers keep their branch.
     removed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

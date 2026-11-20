@@ -305,7 +305,7 @@ A reference alone does not grant access to private reservation details.
 Store timezone-aware timestamps and display Asia/Beirut times.
 Final states cannot be overwritten by competing actions.
 
-Withdrawal closes availability and resolves active reservations atomically. Preserve collected records and history. Until this flow is implemented in Sprint 3, deny withdrawal with active reservations.
+Withdrawal (LP-29) closes availability only: the offer is hidden and new reservations are refused, but active reservations stay valid and can still be collected or cancelled. Preserve collected records and history. Stock can never be set below the units already reserved or collected (HELD + CONSUMED). A branch's optional closing_time (LP-29) is the default pickup end for new offers there; a pickup end after it needs the owner's explicit confirmation.
 
 ## 11. Retention and implementation checks
 

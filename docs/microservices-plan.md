@@ -224,7 +224,9 @@ Full request/response examples go in `docs/api/<service>.md` before coding.
 | `POST /api/shops`, `GET/PATCH /api/shops/me` | operator | Create (Pending) and edit own shop |
 | `POST /api/listings`, `PATCH /api/listings/{id}` | operator | Draft and edit own listings |
 | `POST /api/listings/{id}/publish` | operator | Publish; requires Approved, complete shop |
-| `POST /api/listings/{id}/stock-adjustments` | operator | Change allocated stock with a reason |
+| `POST /api/listings/{id}/stock-adjustments` | operator | Change allocated stock with a reason; never below HELD + CONSUMED (`below_committed`, with `already_reserved`) |
+| `POST /api/listings/{id}/unpublish` | operator | LP-29: take a published offer down; existing reservations stay valid (§6 case 10) |
+| `PATCH /api/shops/me/branches/{id}/` | operator | LP-68 branch edit; LP-29 adds `closing_time` ("HH:MM" or null) |
 | `GET /api/admin/shops?status=PENDING` | staff | Review queue |
 | `POST /api/admin/shops/{id}/approve`, `/reject` | staff | Decision; reject needs a reason |
 | `GET /internal/shops/by-operator/{user_id}` | Reservations | Which shop an operator runs |
@@ -421,10 +423,16 @@ These cases were unresolved in the first draft.
    has recorded, or, once Marketplace is reachable again, re-run the reconciler.
    A reservation is never marked CONFIRMED without a HELD allocation, or
    NOT_RESERVED without a stored REJECTED one.
-10. **Listing withdrawal with active allocations** (Sprint 3). Marketplace
-    cannot release allocations itself. Withdrawal asks Reservations to
-    shop-cancel each CONFIRMED reservation and stays blocked while any
-    reservation for the listing is PROCESSING.
+10. **Listing withdrawal with active allocations** (decided in LP-29,
+    implemented). Withdrawal (`POST /api/listings/{id}/unpublish`, PUBLISHED →
+    WITHDRAWN) hides the offer and refuses every new reserve call
+    (`not_published`), but it does not touch existing allocations: HELD units
+    stay held, so those reservations stay valid and can still be picked up,
+    paid (consume) or cancelled (release). Marketplace still never releases
+    an allocation itself, and nothing is sent to Reservations. A reserve call
+    takes the same listing lock, so one that arrives after the withdrawal is
+    rejected and one that got in first is held. A withdrawn offer is final.
+    The restaurant can still cancel individual orders (shop-cancel).
 
 ## 7. Testing
 

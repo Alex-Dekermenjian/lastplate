@@ -101,7 +101,7 @@ def sync_main_from_shop(shop):
     return main
 
 
-def add_branch(shop, name, address, area):
+def add_branch(shop, name, address, area, closing_time=None):
     with transaction.atomic():
         shop = _lock(shop)
         if active_branches(shop).count() >= MAX_BRANCHES:
@@ -110,6 +110,7 @@ def add_branch(shop, name, address, area):
         position = (Branch.objects.filter(shop=shop).aggregate(top=Max("position"))["top"] or 0) + 1
         branch = Branch.objects.create(
             shop=shop, name=name.strip(), address=address.strip(), area=area.strip(), position=position,
+            closing_time=closing_time,
         )
         _sync_shop_from_main(shop)
         return branch
@@ -124,6 +125,9 @@ def update_branch(branch, **changes):
         for field in ("name", "address", "area"):
             if field in changes:
                 setattr(branch, field, changes[field].strip())
+        # LP-29: a time, or None to clear it.
+        if "closing_time" in changes:
+            branch.closing_time = changes["closing_time"]
         branch.save()
         if "address" in changes:
             _update_drafts(branch)

@@ -147,8 +147,9 @@
                 {% if listing.branch_name %}<p class="branch-tag">📍 {{ listing.branch_name }}</p>{% endif %}
                 <p class="offer-row__facts">
                   {% if listing.discounted_price %}<strong>${{ listing.discounted_price }}</strong>{% endif %}
-                  {% if listing.status == "PUBLISHED" %}
-                    · {{ listing.free_quantity|default_if_none:listing.total_quantity }} left
+                  {% if listing.counts_line %}
+                    {# LP-29: reserved = held for customers, left = still on sale, sold = picked up. #}
+                    · <span class="offer-row__counts">{{ listing.counts_line }}</span>
                   {% else %}
                     · {{ listing.total_quantity }} to sell
                   {% endif %}
@@ -205,7 +206,8 @@
                     <button class="button button--danger" type="submit">Yes, delete draft</button>
                   </form>
                 </details>
-              {% elif listing.can_mark_sold_out %}
+              {% else %}
+                {% if listing.can_mark_sold_out %}
                 <details class="confirm">
                   <summary class="button button--secondary">Mark sold out</summary>
                   <form method="post" action="{% url 'mark-sold-out' listing.id %}">
@@ -214,6 +216,22 @@
                     <button class="button button--primary" type="submit">Yes, it's sold out</button>
                   </form>
                 </details>
+                {% endif %}
+                {% if listing.can_unpublish %}
+                {# LP-29: hidden from customers; orders already reserved stay valid. #}
+                <details class="confirm">
+                  <summary class="link-button">Take down</summary>
+                  <form method="post" action="{% url 'unpublish-listing' listing.id %}">
+                    {% csrf_token %}
+                    <p>
+                      Take “{{ listing.title|default:"Untitled offer" }}” down? Customers stop seeing it and nobody new can reserve it.
+                      {% if listing.reserved_count %}The {{ listing.reserved_count }} already reserved stay reserved and can still be picked up.{% endif %}
+                      This can't be undone; post a new offer to sell it again.
+                    </p>
+                    <button class="button button--danger" type="submit">Yes, take it down</button>
+                  </form>
+                </details>
+                {% endif %}
               {% endif %}
             </div>
 
@@ -294,11 +312,15 @@
                       name="quantity_change"
                       type="number"
                       step="1"
+                      {% if listing.lowest_change is not None %}min="{{ listing.lowest_change }}"{% endif %}
                       required
                       aria-describedby="quantity-help-{{ listing.id }}"
                     >
                     <p id="quantity-help-{{ listing.id }}" class="muted">
                       Use 3 to add three units, or -2 to remove two.
+                      {# LP-29: stock never goes below what customers reserved. #}
+                      <br><strong>Already reserved: {{ listing.already_reserved }}</strong>
+                      {% if listing.already_reserved %}· stock can't go below {{ listing.already_reserved }}{% endif %}
                     </p>
 
                     <label for="stock-reason-{{ listing.id }}">Reason</label>
