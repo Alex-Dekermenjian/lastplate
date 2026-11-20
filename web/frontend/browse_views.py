@@ -97,6 +97,8 @@ def offer_for_display(data):
         "original_price": data.get("original_price"),
         "discounted_price": data.get("discounted_price"),
         "free_quantity": data.get("free_quantity"),
+        # LP-84: most one customer may reserve (None = no limit).
+        "max_per_customer": data.get("max_per_customer"),
         "pickup_address": data.get("pickup_address") or "",
         "pickup_window": pickup_window(start, end),
         "pickup_today": start is not None

@@ -4,10 +4,12 @@ docs/microservices-plan.md §6 "Creating a reservation", for a cart of one or
 more items from one branch:
 
 1. Recheck every item with Marketplace's public offer API (still on sale,
-   enough left, same price). Any problem: nothing is saved, and the customer
-   is told exactly what changed. Prices and terms always come from Marketplace.
+   enough left, same price, and within the offer's LP-84 limit per customer).
+   Any problem: nothing is saved, and the customer is told exactly what
+   changed. Prices and terms always come from Marketplace.
 2. Under a per-customer lock: a known request_key returns that same order;
-   blocked customers and a 3rd active order are refused; otherwise the order
+   blocked customers and a 3rd active order are refused; the LP-84 limit is
+   counted again (two tabs cannot both get past it); otherwise the order
    is saved as PROCESSING before Marketplace's stock is touched.
 3. Outside the transaction, hold each item (one LP-20 allocation per item,
    with a reference derived from the order's reference and the offer ID).
@@ -26,11 +28,12 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 from django.db import IntegrityError, connection, transaction
+from django.db.models import Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from . import marketplace_client as market
-from .models import Actor, Order, Status, SyncState
+from .models import Actor, Order, OrderLine, Status, SyncState
 from .orders import InvalidStatusChange, LineSnapshot, change_status, create_order
 
 MAX_ACTIVE_ORDERS = 2
@@ -38,6 +41,10 @@ MAX_LINES = 20
 MAX_QUANTITY = 100
 # Orders that count towards MAX_ACTIVE_ORDERS: Reserved, and ones still being placed.
 ACTIVE_STATUSES = (Status.PROCESSING, Status.CONFIRMED)
+# LP-84: orders that use up a customer's limit on an offer: being placed,
+# Reserved, and Paid (already collected). Cancelled, Expired and Not reserved
+# orders give their units back, so the customer may reserve them again.
+LIMIT_STATUSES = (Status.PROCESSING, Status.CONFIRMED, Status.COLLECTED)
 
 # What each Marketplace refusal means for the customer.
 REJECT_MESSAGES = {
@@ -149,8 +156,47 @@ def parse_items(lines):
     return items
 
 
-def _recheck(items, now):
-    """Step 1: every item is still on sale, with enough left, at the same price."""
+def _limit_of(offer):
+    """LP-84: the offer's most units per customer, or None when it has no limit."""
+    limit = offer.get("max_per_customer")
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+        return None
+    return limit
+
+
+def _limit_problems(customer_user_id, items):
+    """LP-84: one problem for each item that would take the customer above the
+    offer's limit, counting what they already reserved or collected from the
+    same offer in other orders. Allowed is how many more they may still take."""
+    limited = [item for item in items if _limit_of(item.offer) is not None]
+    if not limited:
+        return []
+    totals = OrderLine.objects.filter(
+        order__customer_user_id=customer_user_id,
+        order__status__in=LIMIT_STATUSES,
+        listing_id__in=[item.listing_id for item in limited],
+    ).values("listing_id").annotate(total=Sum("quantity"))
+    have = {row["listing_id"]: row["total"] for row in totals}
+
+    problems = []
+    for item in limited:
+        limit, already = _limit_of(item.offer), have.get(item.listing_id, 0)
+        allowed = max(limit - already, 0)
+        if item.quantity <= allowed:
+            continue
+        if already == 0:
+            detail = f"Limit of {limit} per customer."
+        elif allowed == 0:
+            detail = f"You have reached the limit of {limit} per customer for this offer."
+        else:
+            detail = f"Limit of {limit} per customer: you can reserve {allowed} more."
+        problems.append(_problem(item, "over_limit", detail, allowed=allowed, limit=limit))
+    return problems
+
+
+def _recheck(items, now, customer_user_id=None):
+    """Step 1: every item is still on sale, with enough left, at the same price,
+    and within the offer's limit per customer (LP-84)."""
     problems = []
     for item in items:
         try:
@@ -175,6 +221,11 @@ def _recheck(items, now):
         elif item.expected_unit_price is not None and price != item.expected_unit_price:
             problems.append(_problem(item, "price_changed", f"The price changed to ${price}.",
                                      unit_price=str(price)))
+
+    if customer_user_id is not None:
+        # An item that already has a problem keeps that one, not a second.
+        flagged = {problem["listing_id"] for problem in problems}
+        problems += _limit_problems(customer_user_id, [i for i in items if i.offer and i.listing_id not in flagged])
 
     places = {(i.offer.get("shop", {}).get("id"), (i.offer.get("branch") or {}).get("id")) for i in items if i.offer}
     if len(places) > 1:
@@ -249,6 +300,12 @@ def _save_processing_order(customer_user_id, request_key, items, now, customer_f
                 "too_many_orders",
                 f"You already have {MAX_ACTIVE_ORDERS} orders waiting for pickup. "
                 "Pick one up or cancel one before ordering again.", 409)
+        # LP-84: counted again under the lock, so two checkouts at once (two
+        # tabs) cannot both pass the limit.
+        over_limit = _limit_problems(customer_user_id, items)
+        if over_limit:
+            raise CheckoutRefused("cart_changed", "Something in your cart changed. Nothing was reserved.", 409,
+                                  over_limit)
         first = items[0].offer
         order = create_order(
             customer_user_id=customer_user_id,
@@ -366,7 +423,7 @@ def place_order(customer_user_id, request_key, lines, now=None, customer_first_n
         return _finished(existing)
 
     if existing is None:
-        _recheck(items, now)
+        _recheck(items, now, customer_user_id)
         try:
             order, created = _save_processing_order(customer_user_id, request_key, items, now, customer_first_name, customer_phone)
         except IntegrityError:

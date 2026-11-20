@@ -57,6 +57,11 @@
       <dt>Available</dt>
       <dd>{{ offer.free_quantity }} left</dd>
 
+      {% if offer.max_per_customer %}
+        <dt>Limit</dt>
+        <dd>{{ offer.max_per_customer }} per customer</dd>
+      {% endif %}
+
       <dt>Pickup time</dt>
       <dd>{{ offer.pickup_window }} <span class="muted">(Lebanon time)</span></dd>
 

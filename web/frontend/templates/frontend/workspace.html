@@ -152,6 +152,7 @@
                   {% else %}
                     · {{ listing.total_quantity }} to sell
                   {% endif %}
+                  {% if listing.max_per_customer %}· max {{ listing.max_per_customer }} per customer{% endif %}
                   {% if listing.pickup_window %}<br>{{ listing.pickup_window }}{% endif %}
                 </p>
                 <p class="muted offer-row__status">

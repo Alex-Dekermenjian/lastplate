@@ -94,6 +94,28 @@ def back_url(request, fallback="cart"):
     return fallback
 
 
+def most_allowed(offer):
+    """LP-84: the most of this offer one cart line may hold: what is left, or
+    the restaurant's limit per customer if that is lower. The limit counted
+    here is for one order; Reservations also counts the customer's earlier
+    orders when they press Reserve."""
+    free = int(offer.get("free_quantity") or 0)
+    limit = offer.get("max_per_customer")
+    if isinstance(limit, int) and not isinstance(limit, bool) and limit >= 1:
+        return min(free, limit)
+    return free
+
+
+def limit_in_force(offer):
+    """LP-84: the restaurant's limit when it, not the stock, is what stops a
+    line from going higher; otherwise None."""
+    free = int(offer.get("free_quantity") or 0)
+    limit = offer.get("max_per_customer")
+    if isinstance(limit, int) and not isinstance(limit, bool) and 1 <= limit < free:
+        return limit
+    return None
+
+
 def fetch_offer(listing_id):
     """(status, offer) from the public offer API; offer is None unless 200."""
     status, data = services.listing_offer(listing_id)
@@ -134,11 +156,15 @@ def add_to_cart(request, listing_id):
         cart = empty_cart()
 
     key = str(int(listing_id))
-    free = int(offer.get("free_quantity") or 0)
+    allowed = most_allowed(offer)
     wanted = cart["lines"].get(key, 0) + 1
-    if wanted > free:
-        messages.info(request, f"Only {free} left of {offer.get('title') or 'this food'}.")
-        wanted = free
+    if wanted > allowed:
+        # LP-84: either what is left or the restaurant's limit per customer.
+        limit = limit_in_force(offer)
+        title = offer.get("title") or "this food"
+        messages.info(request, f"Limit of {limit} per customer for {title}." if limit
+                      else f"Only {allowed} left of {title}.")
+        wanted = allowed
     cart.update(
         shop_id=shop.get("id"), shop_name=shop.get("name") or "", shop_logo=shop.get("logo_display") or "",
         branch_id=branch.get("id"),
@@ -180,8 +206,10 @@ def update_cart(request, listing_id):
             messages.error(request, UNAVAILABLE)
             return redirect("cart")
         free = int(offer.get("free_quantity") or 0) if offer else 0
-        if cart["lines"][key] + 1 > free:
-            messages.info(request, f"Only {free} left." if free else NO_LONGER_AVAILABLE)
+        if cart["lines"][key] + 1 > most_allowed(offer or {}):
+            limit = limit_in_force(offer or {})
+            messages.info(request, f"Limit of {limit} per customer." if limit
+                          else f"Only {free} left." if free else NO_LONGER_AVAILABLE)
         else:
             cart["lines"][key] += 1
     if not cart["lines"]:
@@ -208,11 +236,16 @@ def view_cart(request):
             lines.append({"id": int(key), "title": cart.get("titles", {}).get(key, "This food"),
                           "quantity": quantity, "available": False})
             continue
-        if quantity > free:
-            # Someone else took some: never keep more than is left.
-            quantity = cart["lines"][key] = free
+        allowed = most_allowed(offer)
+        if quantity > allowed:
+            # Someone else took some, or the restaurant set a limit per
+            # customer (LP-84): never keep more than that.
+            quantity = cart["lines"][key] = allowed
             new_attempt(cart)
-            messages.info(request, f"Only {free} left of {offer.get('title') or 'one item'}; we updated your cart.")
+            limit = limit_in_force(offer)
+            title = offer.get("title") or "one item"
+            messages.info(request, f"Limit of {limit} per customer for {title}; we updated your cart." if limit
+                          else f"Only {allowed} left of {title}; we updated your cart.")
         cart["prices"][key] = str(offer.get("discounted_price"))
         cart.setdefault("titles", {})[key] = offer.get("title") or ""
         # LP-19: so a later "no longer available" can say "Pickup ended".
@@ -224,7 +257,7 @@ def view_cart(request):
             "quantity": quantity,
             "line_total": line_total,
             "available": True,
-            "at_most": quantity >= free,
+            "at_most": quantity >= allowed,
         })
 
     problems = cart.get("problems", {})
@@ -268,6 +301,12 @@ def _apply_problems(request, cart, problems):
         free = problem.get("free_quantity")
         if problem.get("code") == "only_n_left" and isinstance(free, int) and free > 0:
             cart["lines"][key] = min(cart["lines"][key], free)
+        # LP-84: over the restaurant's limit, counting earlier orders. Bring the
+        # line down to what is still allowed; if nothing is, the customer
+        # removes it themselves (the message says why).
+        allowed = problem.get("allowed")
+        if problem.get("code") == "over_limit" and isinstance(allowed, int) and allowed > 0:
+            cart["lines"][key] = min(cart["lines"][key], allowed)
         if problem.get("code") == "price_changed" and problem.get("unit_price"):
             cart["prices"][key] = str(problem["unit_price"])
     new_attempt(cart)

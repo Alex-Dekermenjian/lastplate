@@ -433,6 +433,8 @@ class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
             "original_price",
             "discounted_price",
             "total_quantity",
+            # LP-84: most units one customer may reserve (null = no limit).
+            "max_per_customer",
             "free_quantity",
             "pickup_address",
             "pickup_start",
@@ -500,6 +502,7 @@ class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
             "original_price",
             "discounted_price",
             "total_quantity",
+            "max_per_customer",
             "pickup_start",
             "pickup_end",
         ]
@@ -521,6 +524,7 @@ class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
                 pickup_end=data["pickup_end"],
                 publishing=False,
                 kind=data["kind"],
+                max_per_customer=data["max_per_customer"],
             )
         except ValidationError as exc:
             raise serializers.ValidationError(
@@ -669,6 +673,8 @@ class PublicListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
             "original_price",
             "discounted_price",
             "free_quantity",
+            # LP-84: most units one customer may reserve (null = no limit).
+            "max_per_customer",
             "pickup_address",
             "pickup_start",
             "pickup_end",

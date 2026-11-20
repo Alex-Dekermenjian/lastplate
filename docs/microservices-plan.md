@@ -76,6 +76,11 @@ Changes from `docs/database-design.md`:
 - Free stock is calculated inside Marketplace:
   `free = total_quantity - sum(quantity of allocations in HELD or CONSUMED)`.
   This preserves the README rule: free = allocated − Confirmed − Collected.
+- **Max per customer (LP-84).** An offer can carry `max_per_customer`. Marketplace
+  stores and validates it and sends it with the offer terms; Reservations enforces
+  it at checkout by adding up the customer's Reserved, Processing and Paid units of
+  that offer. It is separate from, and checked alongside, the limit of 2 open orders
+  per customer.
 
 ## 4. Authentication
 
