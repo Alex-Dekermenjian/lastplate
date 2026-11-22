@@ -20,6 +20,12 @@ def listing_photo_upload_path(instance, filename):
     return _unique_image_path("listing_photos", filename)
 
 
+# LP-54: the blurred copy customers see. A separate folder, so the Marketplace
+# media route can refuse originals by folder and file name.
+def listing_blurred_photo_upload_path(instance, filename):
+    return _unique_image_path("listing_photos_blurred", filename)
+
+
 # LP-37: Restaurant cover photos and logos
 def shop_photo_upload_path(instance, filename):
     return _unique_image_path("shop_photos", filename)

@@ -664,3 +664,28 @@ p { margin: 0 0 12px; }
 .notification--unread { background: var(--tint); border-color: var(--accent); font-weight: 700; }
 .notification__message { overflow-wrap: anywhere; }
 .notification__when { font-size: 14px; font-weight: 400; }
+
+/* LP-54: photo effect. Blurred photos and the one-tap "magic" peek. The hint
+   is white on --btn (5.7:1, as the LastBag badge). */
+.peek { position: relative; overflow: hidden; display: block; }
+.peek__photo { display: block; }
+.peek[data-peek] { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.peek--done[data-peek] { cursor: default; }
+.peek[data-peek]:focus-visible { outline: 3px solid var(--btn); outline-offset: 2px; }
+.offer-detail .peek, .lastbag .peek { border-radius: var(--radius-input); margin-bottom: 16px; }
+.peek .offer-detail__photo { margin-bottom: 0; border-radius: 0; }
+.peek__circle {
+  position: absolute; aspect-ratio: 1; height: auto; transform: translate(-50%, -50%);
+  border-radius: 50%; box-shadow: 0 0 0 3px var(--surface), var(--shadow); pointer-events: none;
+}
+.peek__hint {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); max-width: calc(100% - 24px);
+  padding: 4px 12px; border-radius: var(--radius-pill); background: var(--btn); color: #FFFFFF;
+  font-size: 14px; font-weight: 800; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.peek__hint a { color: #FFFFFF; }
+.photo-effect { border: 1px solid var(--border); border-radius: var(--radius-input); padding: 12px 14px; margin: 0 0 16px; }
+.photo-effect legend { font-weight: 800; padding: 0 4px; }
+.photo-effect__choice { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; font-weight: 400; }
+.photo-effect__choice input { margin-top: 4px; flex: none; }
+.photo-effect-label { margin: 4px 0 0; color: var(--text-2); font-size: 13px; font-weight: 700; }

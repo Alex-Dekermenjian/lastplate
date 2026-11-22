@@ -1,0 +1,38 @@
+{% comment %}
+LP-54: an offer's photo on customer pages (offer cards, the restaurant page
+and the offer page). Needs: offer, photo_class.
+
+Normal: the photo. Blurred: the blurred copy only. Blurred with magic: the
+blurred copy, and a signed-in customer taps once to see a small circle of the
+real photo there (photo-peek.js). Marketplace never sends the original's
+address for Blurred or Magic offers, so it is never on this page.
+{% endcomment %}
+{% if offer.photo_url %}
+  {% if offer.photo_effect == "MAGIC" %}
+    {% with role=request.session.account.role %}
+    {% if role == "CUSTOMER" %}{% firstof "customer" as viewer %}{% elif role %}{% firstof "other" as viewer %}{% else %}{% firstof "guest" as viewer %}{% endif %}
+    <div class="peek{% if offer.peek %} peek--done{% endif %}"
+         data-peek
+         data-peek-url="{% url 'offer-peek' offer.id %}"
+         data-login-url="{% url 'login' %}?next={{ request.get_full_path|urlencode }}"
+         data-csrf="{{ csrf_token }}"
+         data-viewer="{{ viewer }}"
+         {% if offer.peek %}data-x="{{ offer.peek.x|stringformat:'s' }}" data-y="{{ offer.peek.y|stringformat:'s' }}" data-size="{{ offer.peek.size|stringformat:'s' }}"
+         {% elif viewer != "other" %}role="button" tabindex="0" aria-label="{% if viewer == 'customer' %}Tap once to peek at the real photo of {{ offer.title }}{% else %}Log in to peek at the real photo of {{ offer.title }}{% endif %}"{% endif %}>
+      <img class="{{ photo_class }} peek__photo" src="{{ offer.photo_url }}" alt="Blurred photo of {{ offer.title }}">
+      {% if offer.peek %}
+        <img class="peek__circle" src="{{ offer.peek.image }}" alt="Your peek at the real photo"
+             style="left: {{ offer.peek.x|stringformat:'s' }}%; top: {{ offer.peek.y|stringformat:'s' }}%; width: {{ offer.peek.size|stringformat:'s' }}%;">
+      {% endif %}
+      <span class="peek__hint" data-peek-hint aria-live="polite">{% if offer.peek %}You've had your peek ✨{% elif viewer == "customer" %}Tap once to peek ✨{% elif viewer == "guest" %}<a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Log in to peek ✨</a>{% else %}Customers can peek once ✨{% endif %}</span>
+    </div>
+    {% endwith %}
+  {% elif offer.photo_effect == "BLURRED" %}
+    <div class="peek peek--blurred">
+      <img class="{{ photo_class }} peek__photo" src="{{ offer.photo_url }}" alt="Blurred photo of {{ offer.title }}">
+      <span class="peek__hint">A surprise · blurred</span>
+    </div>
+  {% else %}
+    <img class="{{ photo_class }}" src="{{ offer.photo_url }}" alt="Photo of {{ offer.title }}">
+  {% endif %}
+{% endif %}

@@ -4,6 +4,7 @@ from django.db import transaction
 
 from .image_validators import validate_listing_photo
 from .models import Listing
+from .photo_effects import sync_blurred_photo
 
 
 def replace_listing_photo(listing_id, shop_id, uploaded_file):
@@ -26,6 +27,9 @@ def replace_listing_photo(listing_id, shop_id, uploaded_file):
 
         listing.photo = uploaded_file
         listing.save(update_fields=["photo", "updated_at"])
+
+    # LP-54: a Blurred or Magic offer gets a new blurred copy of the new photo.
+    sync_blurred_photo(listing, photo_changed=True)
 
     # Remove the old photo only after the new one is saved.
     if old_photo_name and old_photo_name != listing.photo.name:

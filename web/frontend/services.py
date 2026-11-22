@@ -514,6 +514,54 @@ def restaurant_page(shop_id):
     )
 
 
+# LP-54: the magic peek. One tap per customer per offer, saved by Marketplace.
+@sensitive_variables("access")
+def peek_photo(access, listing_id, x, y):
+    return _call(
+        "marketplace",
+        "POST",
+        f"/api/listings/{int(listing_id)}/peek",
+        {"x": x, "y": y},
+        token=access,
+    )
+
+
+# LP-54: this customer's saved peeks for the offers on one page.
+@sensitive_variables("access")
+def my_peeks(access, listing_ids):
+    query = urlencode({"listings": ",".join(str(int(pk)) for pk in listing_ids)})
+    return _call("marketplace", "GET", f"/api/peeks/mine?{query}", token=access)
+
+
+OWNER_PHOTO_TYPES = {"image/jpeg", "image/png"}
+MAX_OWNER_PHOTO_BYTES = 10 * 1024 * 1024
+
+
+# LP-54: the owner's real photo, whatever effect customers get. Returns
+# (status, (content_type, bytes)) on success, (status, None) otherwise.
+@sensitive_variables("access", "headers")
+def owner_listing_photo(access, listing_id):
+    headers = {"Accept": "image/jpeg, image/png", "Authorization": f"Bearer {access}"}
+    request = Request(
+        settings.SERVICE_URLS["marketplace"] + f"/api/listings/{int(listing_id)}/photo/original",
+        method="GET",
+        headers=headers,
+    )
+    try:
+        with urlopen(request, timeout=settings.SERVICE_API_TIMEOUT_SECONDS) as response:
+            content_type = response.headers.get_content_type()
+            body = response.read(MAX_OWNER_PHOTO_BYTES + 1)
+    except HTTPError as error:
+        if error.code >= 500:
+            raise ServiceUnavailable("marketplace") from None
+        return error.code, None
+    except (URLError, TimeoutError, OSError):
+        raise ServiceUnavailable("marketplace") from None
+    if content_type not in OWNER_PHOTO_TYPES or len(body) > MAX_OWNER_PHOTO_BYTES:
+        raise ServiceUnavailable("marketplace")
+    return 200, (content_type, body)
+
+
 # LP-68: the owner's branches. Marketplace finds the restaurant from the token.
 @sensitive_variables("access")
 def my_branches(access):

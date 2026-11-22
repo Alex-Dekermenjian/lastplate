@@ -61,7 +61,11 @@ def delete_draft(listing_id, shop_id):
             )
         photo = listing.photo.name if listing.photo else ""
         storage = listing.photo.storage if listing.photo else None
+        # LP-54: and its blurred copy, if it has one.
+        blurred = listing.photo_blurred.name or ""
         listing.delete()
     # The photo file goes only after the row is gone for good.
     if photo and storage is not None:
         storage.delete(photo)
+    if blurred:
+        listing.photo_blurred.storage.delete(blurred)

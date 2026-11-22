@@ -12,7 +12,7 @@ from . import services
 from .account_views import authenticated_call, operator_required
 from .apply_views import approved_shop_required
 from .services import ServiceUnavailable
-from .listing_photos import photo_url
+from .photo_peek import owner_photo_fields
 from .food_types import canonical, type_choices
 
 CHOOSE_A_FOOD_TYPE = "Choose a type of food from the list."
@@ -63,6 +63,9 @@ OPTIONAL_NUMBER_FIELDS = (
 
 MAX_PHOTO_SIZE = 5 * 1024 * 1024
 
+# LP-54: Normal, Blurred, Blurred with magic.
+PHOTO_EFFECTS = ("NORMAL", "BLURRED", "MAGIC")
+
 FIELD_LABELS = {
     "title": "Food title",
     "description": "Description",
@@ -77,6 +80,7 @@ FIELD_LABELS = {
     "ingredients": "Ingredients",
     "allergens": "Allergens",
     "typical_contents": "What's usually inside",
+    "photo_effect": "Photo effect",
 }
 
 LASTBAG_LABELS = {
@@ -114,6 +118,12 @@ def listing_data_from(post, kind, editing=False):
             data["max_per_customer"] = None
         else:
             del data["max_per_customer"]
+
+    # LP-54: how customers see the photo. Sent only when the form chose one
+    # of the three; Marketplace keeps Normal otherwise.
+    effect = post.get("photo_effect", "").strip().upper()
+    if effect in PHOTO_EFFECTS:
+        data["photo_effect"] = effect
 
     return data
 
@@ -494,7 +504,8 @@ def edit_listing(request, listing_id):
         "kind": kind,
         "listing": {
             **listing,
-            "photo_display": photo_url(listing.get("photo_display")),
+            # LP-54: the owner always sees the real photo.
+            **owner_photo_fields(listing),
         },
         "listing_id": listing_id,
         "form_values": listing,

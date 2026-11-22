@@ -480,10 +480,13 @@ def workspace(request):
         listings = []
     else:
     # Convert Marketplace media paths into browser-accessible URLs.
+    # LP-54: always the real photo, with the effect customers get.
+        from .photo_peek import owner_photo_fields  # photo_peek imports this module
+
         listings = [
             {
                 **listing,
-                "photo_display": photo_url(listing.get("photo_display")),
+                **owner_photo_fields(listing),
                 **listing_summary(listing, shop),
             }
             for listing in listings

@@ -24,6 +24,7 @@ from frontend import (
     notification_views,
     offer_reserve,
     order_views,
+    photo_peek,
     pickup_views,
     sales_views,
     shop_order_views,
@@ -42,6 +43,8 @@ urlpatterns = [
     ),
     # LP-83: a customer reserves one offer from its page.
     path("offers/<int:listing_id>/reserve/", offer_reserve.reserve_offer, name="offer-reserve"),
+    # LP-54: one tap on a "Blurred with magic" photo (JSON, from photo-peek.js).
+    path("offers/<int:listing_id>/peek/", photo_peek.peek_offer, name="offer-peek"),
     # LP-39: a restaurant's page with everything it has left.
     path("restaurants/<int:shop_id>/", browse_views.restaurant_detail, name="restaurant-detail"),
 
@@ -121,6 +124,8 @@ urlpatterns = [
         listing_views.create_listing,
         name="create-listing",
     ),
+    # LP-54: the owner's real photo, whatever effect customers get.
+    path("workspace/listings/<int:listing_id>/photo/", photo_peek.owner_photo, name="owner-offer-photo"),
     path(
         "workspace/listings/<int:listing_id>/edit/",
         listing_views.edit_listing,

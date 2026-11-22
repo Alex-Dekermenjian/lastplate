@@ -10,6 +10,7 @@ from .branch_service import active_branches, ensure_first_branch, live_offers
 from .image_validators import validate_listing_photo
 from .logo_processing import prepare_logo
 from .models import MAX_BRANCHES, Branch, Listing, Shop, StockAdjustment
+from .photo_effects import customer_photo_path, sync_blurred_photo
 from .stock import (
     committed_quantity as calculate_committed_quantity,
     free_quantity as calculate_free_quantity,
@@ -481,6 +482,8 @@ class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
             "typical_contents",
             "photo",
             "photo_display",
+            # LP-54: how customers see the photo (NORMAL, BLURRED or MAGIC).
+            "photo_effect",
             "ingredients",
             "allergens",
             "ingredients_display",
@@ -532,6 +535,13 @@ class ListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
             )
 
         return super().to_internal_value(data)
+
+    def save(self, **kwargs):
+        # LP-54: a Blurred or Magic offer always has its blurred copy, made
+        # again when the photo changes; a Normal one has none.
+        photo_changed = "photo" in self.validated_data
+        listing = super().save(**kwargs)
+        return sync_blurred_photo(listing, photo_changed=photo_changed)
 
     def validate_photo(self, value):
         if value:
@@ -719,6 +729,11 @@ class PublicListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
 
     shop = serializers.SerializerMethodField()
 
+    # LP-54: for a Blurred or Magic offer only the blurred copy's address is
+    # ever sent, never the original's.
+    def get_photo_display(self, obj):
+        return customer_photo_path(obj)
+
     # LP-38: Customers never see a LastBag's exact contents, only what it
     # usually holds (typical_contents).
     def get_ingredients_display(self, obj):
@@ -746,6 +761,8 @@ class PublicListingSerializer(ListingDisplayMixin, serializers.ModelSerializer):
             "category",
             "typical_contents",
             "photo_display",
+            # LP-54: NORMAL, BLURRED or MAGIC (MAGIC: one tap to peek).
+            "photo_effect",
             "ingredients_display",
             "allergens_display",
             "original_price",

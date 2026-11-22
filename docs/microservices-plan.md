@@ -81,6 +81,12 @@ Changes from `docs/database-design.md`:
   it at checkout by adding up the customer's Reserved, Processing and Paid units of
   that offer. It is separate from, and checked alongside, the limit of 2 open orders
   per customer.
+- **Photo effect (LP-54).** `Listing.photo_effect` is NORMAL, BLURRED or MAGIC.
+  For BLURRED and MAGIC, Marketplace makes a strongly blurred copy when the photo
+  or effect changes (`Listing.photo_blurred`) and public responses carry only that
+  copy's address. The development `/media/` route refuses the original of such an
+  offer. A MAGIC offer's peeks (`PhotoPeek`: customer, offer, x, y, the cut-out)
+  are unique per customer and offer.
 
 ## 4. Authentication
 
@@ -227,6 +233,9 @@ Full request/response examples go in `docs/api/<service>.md` before coding.
 | `POST /api/listings/{id}/stock-adjustments` | operator | Change allocated stock with a reason; never below HELD + CONSUMED (`below_committed`, with `already_reserved`) |
 | `POST /api/listings/{id}/unpublish` | operator | LP-29: take a published offer down; existing reservations stay valid (§6 case 10) |
 | `PATCH /api/shops/me/branches/{id}/` | operator | LP-68 branch edit; LP-29 adds `closing_time` ("HH:MM" or null) |
+| `GET /api/listings/{id}/photo/original` | operator | LP-54: the owner's real photo, whatever effect customers get |
+| `POST /api/listings/{id}/peek`, `GET .../peek` | customer | LP-54: one tap on a "Blurred with magic" photo (`{x, y}` as percentages); saves the point and returns a circular PNG cut-out of the original. A second tap is 409 `already_peeked` with the saved peek |
+| `GET /api/peeks/mine?listings=1,2` | customer | LP-54: the customer's saved peeks for the offers on one page |
 | `GET /api/admin/shops?status=PENDING` | staff | Review queue |
 | `POST /api/admin/shops/{id}/approve`, `/reject` | staff | Decision; reject needs a reason |
 | `GET /internal/shops/by-operator/{user_id}` | Reservations | Which shop an operator runs |

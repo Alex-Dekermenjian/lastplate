@@ -4,7 +4,8 @@
         <li class="offer-card{% if offer.is_lastbag %} offer-card--lastbag{% endif %}">
           <div class="offer-card__media">
             {% if offer.photo_url %}
-              <img class="offer-card__photo" src="{{ offer.photo_url }}" alt="Photo of {{ offer.title }}">
+              {# LP-54: Normal, Blurred, or Blurred with magic (tap once to peek). #}
+              {% include "frontend/_offer_photo.html" with photo_class="offer-card__photo" %}
             {% else %}
               <div class="offer-card__photo offer-card__photo--empty" role="img" aria-label="No photo available">
                 No photo

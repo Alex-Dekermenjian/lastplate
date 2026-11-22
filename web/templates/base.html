@@ -54,6 +54,8 @@
   {# LP-65: the searchable area list (does nothing on pages without one). #}
   <script src="{% static 'js/area-picker.js' %}" defer></script>
   <script src="{% static 'js/demo-clock.js' %}" defer></script>
+  {# LP-54: the one-tap peek on "Blurred with magic" photos (does nothing elsewhere). #}
+  <script src="{% static 'js/photo-peek.js' %}" defer></script>
   {% if request.session.account.role == "SHOP_OPERATOR" %}
     <script src="{% static 'js/orders-badge.js' %}" defer></script>
   {% endif %}

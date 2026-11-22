@@ -266,6 +266,8 @@
       <p>Current photo:</p>
       <img class="offer-form__photo" src="{{ listing.photo_display }}"
            alt="Current photo of {{ listing.title }}">
+      {# LP-54: the owner always sees the real photo. #}
+      <p class="photo-effect-label">Customers see: {{ listing.photo_effect_label }}</p>
     {% endif %}
 
     <p>
@@ -277,6 +279,25 @@
     </p>
 
     <p class="muted">JPEG or PNG, maximum 5 MB.</p>
+
+    {# LP-54: how customers see the photo. A LastBag suggests "Blurred with magic". #}
+    {% if kind == "LASTBAG" %}{% firstof form_values.photo_effect "MAGIC" as effect %}{% else %}{% firstof form_values.photo_effect "NORMAL" as effect %}{% endif %}
+    <fieldset class="photo-effect">
+      <legend>Photo effect</legend>
+      <label class="photo-effect__choice">
+        <input type="radio" name="photo_effect" value="NORMAL"{% if effect == "NORMAL" %} checked{% endif %}>
+        <span><strong>Normal</strong><br><span class="muted">Customers see the photo as it is.</span></span>
+      </label>
+      <label class="photo-effect__choice">
+        <input type="radio" name="photo_effect" value="BLURRED"{% if effect == "BLURRED" %} checked{% endif %}>
+        <span><strong>Blurred</strong><br><span class="muted">Customers only see a blurred version.</span></span>
+      </label>
+      <label class="photo-effect__choice">
+        <input type="radio" name="photo_effect" value="MAGIC"{% if effect == "MAGIC" %} checked{% endif %}>
+        <span><strong>Blurred with magic ✨</strong>{% if kind == "LASTBAG" %} <span class="badge">Suggested</span>{% endif %}<br><span class="muted">Blurred, and each signed-in customer can tap once to see a small circle of the real photo.</span></span>
+      </label>
+      <p class="muted">You always see the real photo.</p>
+    </fieldset>
 
     <button class="button button--primary" type="submit">
       {% if editing %}Save changes{% else %}Save draft{% endif %}

@@ -91,7 +91,10 @@ def offer_for_display(data):
         "title": data.get("title") or ("Surprise bag" if is_lastbag else "Food offer"),
         "description": data.get("description") or "",
         "category": data.get("category") or "",
+        # LP-54: for Blurred and Magic offers Marketplace sends only the
+        # blurred copy, so photo_url is never the original there.
         "photo_url": photo_url(data.get("photo_display")),
+        "photo_effect": data.get("photo_effect") if data.get("photo_effect") in ("BLURRED", "MAGIC") else "NORMAL",
         "ingredients": "" if is_lastbag else _known(data.get("ingredients_display")),
         "allergens": _known(data.get("allergens_display")),
         "original_price": data.get("original_price"),
@@ -158,12 +161,20 @@ def browse_offers(request):
     return render(request, template, food_search_context(request, offers))
 
 
+def with_peeks(request, offers):
+    """LP-54: this customer's saved peeks, so a reload shows the same circle."""
+    from .photo_peek import attach_peeks  # photo_peek imports account_views, which imports this module
+
+    return attach_peeks(request, offers)
+
+
 def food_search_context(request, offers):
     """LP-69: the search bar and the offers that fit it."""
     form = FoodSearchForm(request.GET)
     search = form.search()
     searching = any(search.values())
     shown = filter_offers(offers, search) if searching else offers
+    with_peeks(request, shown)
     return {
         "offers": shown,
         "search_form": form,
@@ -230,6 +241,7 @@ def offer_detail(request, listing_id):
         )
 
     offer = offer_for_display(data)
+    with_peeks(request, [offer])
     return render(request, template, {
         "offer": offer,
         "notice": notice,
@@ -279,6 +291,7 @@ def restaurant_detail(request, shop_id):
         if isinstance(item, dict):
             branch_id = (item.get("branch") or {}).get("id") or (branches[0]["id"] if branches else None)
             counts[branch_id] = counts.get(branch_id, 0) + 1
+    with_peeks(request, offers)
     branch_tabs = [
         {**branch, "active": selected is not None and branch["id"] == selected["id"], "offer_count": counts.get(branch["id"], 0)}
         for branch in branches
