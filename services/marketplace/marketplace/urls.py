@@ -1,9 +1,14 @@
 
 from django.urls import path
 
-from . import admin_api, views
+from . import admin_api, favourites, views
 
 urlpatterns = [
+    # LP-82: a customer's favourite restaurants (customers only)
+    path("favourites/shops", favourites.my_favourite_shops, name="favourite-shops"),
+    path("favourites/shops/<int:pk>/toggle", favourites.toggle_favourite, name="favourite-toggle"),
+    path("favourites/offers", favourites.my_favourite_offers, name="favourite-offers"),
+
     # LP-57: admin API for /console (Admin tokens only)
     path("admin/summary", admin_api.summary, name="admin-summary"),
     path("admin/shops", admin_api.shop_list, name="admin-shops"),

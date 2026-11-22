@@ -241,6 +241,7 @@ def offer_detail(request, listing_id):
 def restaurant_detail(request, shop_id):
     """LP-39: a restaurant's page: its details, then its LastBag and items."""
     from .cart import cart_summary  # cart imports this module
+    from .favourite_views import is_favourite  # LP-82; it imports this module too
 
     template = "frontend/restaurant.html"
 
@@ -304,4 +305,8 @@ def restaurant_detail(request, shop_id):
         # asked to log in first); restaurants and the admin never see them.
         "can_add": request.session.get("account", {}).get("role", "CUSTOMER") == "CUSTOMER",
         "cart": cart_summary(request),
+        # LP-82: the heart, for customers and signed-out visitors (who are
+        # asked to log in); filled when this customer saved the restaurant.
+        "show_heart": request.session.get("account", {}).get("role", "CUSTOMER") == "CUSTOMER",
+        "is_favourite": is_favourite(request, shop.get("id")),
     })

@@ -11,6 +11,10 @@
 {# LP-69: the food is right here, with a search by place and by words. #}
 <section class="home-food" aria-labelledby="home-food-title">
   <h2 id="home-food-title" class="home-food__title">Food left near you</h2>
+  {% if request.session.account.role == "CUSTOMER" %}
+    {# LP-82: today's food from the customer's favourite restaurants. #}
+    <p><a href="{% url 'favourites' %}"><span aria-hidden="true">♥</span> Your favourites today</a></p>
+  {% endif %}
   {% if unavailable %}
     <p class="notice notice--warning" role="alert">{{ unavailable }}</p>
   {% else %}

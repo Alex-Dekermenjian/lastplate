@@ -664,3 +664,16 @@ p { margin: 0 0 12px; }
 .notification--unread { background: var(--tint); border-color: var(--accent); font-weight: 700; }
 .notification__message { overflow-wrap: anywhere; }
 .notification__when { font-size: 14px; font-weight: 400; }
+
+/* LP-82: the heart on a restaurant page (existing colours only).
+   Empty outline when not saved; filled when it is a favourite. */
+.heart-form { margin: 0 0 0 auto; }
+.heart-button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; padding: 0;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-pill);
+  color: var(--btn); cursor: pointer;
+}
+.heart-button:hover { background: var(--tint); color: var(--btn-hover); }
+.heart-button__icon { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+.heart-button[aria-pressed="true"] .heart-button__icon { fill: currentColor; }
