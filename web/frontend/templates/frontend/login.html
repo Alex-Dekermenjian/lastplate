@@ -33,6 +33,7 @@
       {% endfor %}
       <button class="button button--primary button--block" type="submit">Log in</button>
     </form>
+    <p class="auth__switch"><a href="{% url 'forgot-password' %}">Forgot your password?</a></p>
   </div>
 
   <p class="auth__switch">New here? <a href="{% url 'signup' %}">Sign up</a></p>

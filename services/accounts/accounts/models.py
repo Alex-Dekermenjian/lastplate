@@ -47,6 +47,9 @@ class User(AbstractUser):
         choices=Role.choices,
         default=Role.CUSTOMER,
     )
+    # LP-50: set when an admin gives the account a temporary password. The
+    # person must choose a new password before doing anything else.
+    must_change_password = models.BooleanField(default=False)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["display_name"]
@@ -63,3 +66,24 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+
+
+class TemporaryPasswordLog(models.Model):
+    """LP-50: who gave whom a temporary password, and when.
+
+    The password itself is never stored here or anywhere else in plain text.
+    Emails are copied so the record still reads correctly if an account is
+    later deleted.
+    """
+
+    user = models.ForeignKey(User, null=True, on_delete=models.SET_NULL, related_name="+")
+    user_email = models.EmailField()
+    set_by = models.ForeignKey(User, null=True, on_delete=models.SET_NULL, related_name="+")
+    set_by_email = models.EmailField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"{self.set_by_email} set a temporary password for {self.user_email}"

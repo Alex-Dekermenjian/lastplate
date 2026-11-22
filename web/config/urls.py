@@ -25,6 +25,7 @@ from frontend import (
     notification_views,
     offer_reserve,
     order_views,
+    password_views,
     photo_peek,
     pickup_views,
     sales_views,
@@ -76,6 +77,10 @@ urlpatterns = [
     path("signup/", account_views.signup, name="signup"),
     path("sign-out/", account_views.sign_out, name="sign-out"),
     path("account/", account_views.my_account, name="my-account"),
+    # LP-50: forgotten passwords (no email): ask support, get a temporary
+    # password from the admin, then choose a new one before anything else.
+    path("login/forgot-password/", password_views.forgot_password, name="forgot-password"),
+    path("account/new-password/", password_views.choose_new_password, name="choose-new-password"),
     # Old addresses from LP-7; ?next= and other query strings are kept.
     path("sign-in/", RedirectView.as_view(pattern_name="login", query_string=True), name="sign-in"),
     path("register/", RedirectView.as_view(pattern_name="signup", query_string=True), name="register"),
@@ -103,6 +108,10 @@ urlpatterns = [
          name="console-block-customer"),
     path("console/customers/<int:customer_user_id>/unblock/", customer_console_views.unblock_customer,
          name="console-unblock-customer"),
+    # LP-50: find an account and give it a temporary password.
+    path("console/accounts/", password_views.console_accounts, name="console-accounts"),
+    path("console/accounts/<int:user_id>/temporary-password/", password_views.console_temporary_password,
+         name="console-temporary-password"),
 
     path("workspace/", account_views.workspace, name="workspace"),
     path("workspace/orders/", shop_order_views.today_orders, name="today-orders"),

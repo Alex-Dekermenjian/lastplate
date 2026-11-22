@@ -107,6 +107,28 @@ Changes from `docs/database-design.md`:
   rejected with 400.
 - Access token claims: `user_id`, `role`, `is_staff`, `display_name`.
   Access tokens last 15 minutes, refresh tokens 1 day.
+- **Keep me logged in (LP-50).** `POST /api/auth/token/` accepts
+  `remember_me: true`; the refresh token then lasts 30 days and the web
+  session too. Without it nothing changes: a 1-day refresh token and a web
+  session that ends when the browser closes. Access tokens stay 15 minutes.
+- **Forgotten passwords (LP-50), no email.** The person contacts support; an
+  admin (role ADMIN or staff) finds the account in /console and sets a
+  temporary password:
+  - `GET /api/admin/users/?q=` finds accounts by email or account number;
+  - `POST /api/admin/users/{id}/temporary-password/` makes a random password,
+    stores only its hash, sets `User.must_change_password`, revokes the
+    account's refresh tokens and returns the password once (`no-store`).
+    Customer and restaurant accounts only; admin and staff accounts are
+    recovered with `create_admin` or the Django admin. Customers and shop
+    operators get 403.
+  - Every one is recorded (who, for whom, when; never the password) in
+    `TemporaryPasswordLog` and the `accounts.audit` log.
+  - `GET /api/users/me/` returns `must_change_password`. While it is true the
+    web app only opens "Choose a new password" (and sign-out).
+    `POST /api/users/me/password/` takes `current_password` and `new_password`,
+    applies Django's password validation and clears the flag; the temporary
+    password stops working. Tokens stay in the web server's session, so a
+    customer never holds one to go around that page.
 - **Signing: RS256 (implemented).** Only Accounts holds the private key and
   signs tokens. Marketplace and Reservations will receive the public key only,
   so they can verify tokens but never create them.
