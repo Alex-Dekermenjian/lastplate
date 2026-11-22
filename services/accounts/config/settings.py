@@ -94,6 +94,7 @@ REST_FRAMEWORK = {
         "auth_register": "10/hour",
         "auth_sign_in": "30/minute",
         "auth_sign_in_email": "5/minute",
+        "auth_password_change": "30/hour",
     },
 }
 
@@ -122,6 +123,8 @@ SIMPLE_JWT = {
     "SIGNING_KEY": read_key_file("JWT_PRIVATE_KEY_FILE", JWT_KEY_DIR / "jwt-private.pem"),
     "VERIFYING_KEY": read_key_file("JWT_PUBLIC_KEY_FILE", JWT_KEY_DIR / "jwt-public.pem"),
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    # LP-50: "Keep me logged in" issues a 30-day refresh token instead
+    # (accounts/tokens.py); without it this lifetime applies.
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     "AUTH_HEADER_TYPES": ("Bearer",),
     "UPDATE_LAST_LOGIN": True,
@@ -186,3 +189,16 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# LP-50: the audit trail of temporary passwords (who, for whom, when, never
+# the password) goes to the console, where the host collects service logs.
+# Each entry is also kept in the TemporaryPasswordLog table.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {
+        "accounts.audit": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
+}

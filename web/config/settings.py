@@ -86,6 +86,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    # LP-50: after a temporary password, nothing opens until a new one is chosen.
+    "frontend.middleware.NewPasswordRequiredMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -131,6 +133,10 @@ SESSION_ENGINE = "django.contrib.sessions.backends.db"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_AGE = 60 * 60 * 24  # matches the planned refresh-token lifetime
+# LP-50: with "Keep me logged in" ticked, the session and Accounts' refresh
+# token both last 30 days. Unticked, nothing changes: the session ends when the
+# browser closes (and after SESSION_COOKIE_AGE at the latest).
+KEEP_LOGGED_IN_SESSION_AGE = 60 * 60 * 24 * 30
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"

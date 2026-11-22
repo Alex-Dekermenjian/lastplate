@@ -63,7 +63,7 @@ class LoginTests(WebAuthTestCase):
     def test_password_is_sent_exactly_as_typed(self):
         spaced = f"  {PASSWORD}  "
         _, sign_in_api, _ = self.log_in(CUSTOMER, {"email": "rami@example.test", "password": spaced})
-        sign_in_api.assert_called_once_with("rami@example.test", spaced)
+        sign_in_api.assert_called_once_with("rami@example.test", spaced, remember_me=False)
 
     def test_keep_me_logged_in_decides_how_long_the_session_lasts(self):
         self.log_in(CUSTOMER, {"email": "rami@example.test", "password": PASSWORD, "remember_me": "on"})

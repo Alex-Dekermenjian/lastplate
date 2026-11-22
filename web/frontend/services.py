@@ -174,17 +174,13 @@ def register(display_name, email, password, account_type="restaurant"):
     )
 
 
-@sensitive_variables("password")
-def sign_in(email, password):
-    return _call(
-        "accounts",
-        "POST",
-        "/api/auth/token/",
-        {
-            "email": email,
-            "password": password,
-        },
-    )
+@sensitive_variables("password", "payload")
+def sign_in(email, password, remember_me=False):
+    payload = {"email": email, "password": password}
+    if remember_me:
+        # LP-50: "Keep me logged in" asks Accounts for a 30-day refresh token.
+        payload["remember_me"] = True
+    return _call("accounts", "POST", "/api/auth/token/", payload)
 
 
 @sensitive_variables("access")
@@ -687,3 +683,20 @@ def favourite_shops(access):
 def favourite_offers(access):
     expire_late_orders()
     return _call("marketplace", "GET", "/api/favourites/offers", token=access)
+
+
+# LP-50: choosing a new password, and the admin's temporary passwords.
+@sensitive_variables("access", "current_password", "new_password")
+def change_password(access, current_password, new_password):
+    return _call("accounts", "POST", "/api/users/me/password/",
+                 {"current_password": current_password, "new_password": new_password}, token=access)
+
+
+@sensitive_variables("access")
+def admin_find_accounts(access, query):
+    return _call("accounts", "GET", f"/api/admin/users/?{urlencode({'q': query})}", token=access)
+
+
+@sensitive_variables("access")
+def admin_set_temporary_password(access, user_id):
+    return _call("accounts", "POST", f"/api/admin/users/{int(user_id)}/temporary-password/", token=access)

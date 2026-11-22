@@ -84,7 +84,8 @@ class LoginForm(forms.Form):
         label="Password", strip=False, max_length=128,
         widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}),
     )
-    remember_me = forms.BooleanField(label="Keep me logged in", required=False, initial=True)
+    # LP-50: ticked, the sign-in lasts 30 days (docs/design/screens/01-login.png).
+    remember_me = forms.BooleanField(label="Keep me logged in (30 days)", required=False, initial=True)
 
 
 class ProfileForm(forms.Form):
@@ -161,3 +162,27 @@ class ShopProfileForm(forms.Form):
         details = {name: value for name, value in self.cleaned_data.items() if name not in PROFILE_IMAGES}
         images = {name: self.cleaned_data[name] for name in PROFILE_IMAGES if self.cleaned_data.get(name)}
         return details, images
+
+class NewPasswordForm(forms.Form):
+    """LP-50: replace the temporary password an admin gave. Accounts checks
+    the new one with Django's password validation and has the final say."""
+
+    current_password = forms.CharField(
+        label="Temporary password", strip=False, max_length=128,
+        widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}),
+    )
+    new_password = forms.CharField(
+        label="New password", strip=False, max_length=128,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+        help_text="At least 8 characters. Not only numbers, and not a common password.",
+    )
+    new_password_again = forms.CharField(
+        label="New password again", strip=False, max_length=128,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
+
+    def clean(self):
+        data = super().clean()
+        if data.get("new_password") and data.get("new_password_again")                 and data["new_password"] != data["new_password_again"]:
+            self.add_error("new_password_again", "The two new passwords don't match.")
+        return data

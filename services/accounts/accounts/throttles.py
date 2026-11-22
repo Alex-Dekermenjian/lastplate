@@ -1,4 +1,4 @@
-from rest_framework.throttling import SimpleRateThrottle
+from rest_framework.throttling import SimpleRateThrottle, UserRateThrottle
 
 
 class SignInEmailThrottle(SimpleRateThrottle):
@@ -16,3 +16,10 @@ class SignInEmailThrottle(SimpleRateThrottle):
         if not email:
             return None  # nothing to key on; the per-client limit still applies
         return self.cache_format % {"scope": self.scope, "ident": email}
+
+
+class PasswordChangeThrottle(UserRateThrottle):
+    """LP-50: limits password-change attempts per signed-in account, so the
+    current password can't be guessed through a stolen session."""
+
+    scope = "auth_password_change"

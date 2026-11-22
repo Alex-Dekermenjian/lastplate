@@ -6,13 +6,15 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .serializers import (
+    ChangePasswordSerializer,
     CustomerRegistrationSerializer,
+    MeSerializer,
     ProfileUpdateSerializer,
     ShopOperatorRegistrationSerializer,
     SignInSerializer,
     UserSerializer,
 )
-from .throttles import SignInEmailThrottle
+from .throttles import PasswordChangeThrottle, SignInEmailThrottle
 
 
 class ShopOperatorRegisterView(APIView):
@@ -51,11 +53,25 @@ class SignInView(TokenObtainPairView):
 
 class MeView(APIView):
     def get(self, request):
-        return Response(UserSerializer(request.user).data)
+        return Response(MeSerializer(request.user).data)
 
     def patch(self, request):
         """LP-18: change your own display name."""
         serializer = ProfileUpdateSerializer(request.user, data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(UserSerializer(request.user).data)
+        return Response(MeSerializer(request.user).data)
+
+
+class ChangePasswordView(APIView):
+    """LP-50: POST /api/users/me/password/ with the current and the new
+    password. Used after an admin gave a temporary password: once changed,
+    the temporary password no longer works and the account is unlocked."""
+
+    throttle_classes = [PasswordChangeThrottle]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(request.user, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(MeSerializer(request.user).data)

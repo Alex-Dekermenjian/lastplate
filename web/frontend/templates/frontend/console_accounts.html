@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Accounts — Console — LastPlate{% endblock %}
+{% block header_class %}header-restaurant{% endblock %}
+
+{% block content %}
+<section class="card card--wide">
+  <p class="eyebrow">Console</p>
+  <h1>Accounts</h1>
+  <p class="help">Someone forgot their password? Check who they are first, then give them a temporary password. They must choose a new one when they log in.</p>
+
+  <form method="get" class="inline-form">
+    <div class="field">
+      <label for="find-account">Find an account by email or account number</label>
+      <input type="text" name="q" id="find-account" value="{{ query }}" maxlength="254" placeholder="e.g. rami@example.com or 501">
+    </div>
+    <button class="button button--secondary" type="submit">Find</button>
+  </form>
+
+  {% if unavailable %}
+    <p class="notice notice--warning" role="alert">We can't reach the account service right now. Please try again in a few minutes.</p>
+  {% elif query and not accounts %}
+    <p class="muted">No account matches “{{ query }}”.</p>
+  {% elif accounts %}
+    <ul class="order-list">
+      {% for person in accounts %}
+        <li>
+          <div>
+            <strong>{{ person.display_name }}</strong> · {{ person.email }} · account #{{ person.id }}
+            <span class="status">{% if person.role == "SHOP_OPERATOR" %}Restaurant{% elif person.role == "ADMIN" %}Admin{% else %}Customer{% endif %}</span>
+            {% if person.must_change_password %}<span class="status status--PENDING">Temporary password not changed yet</span>{% endif %}
+          </div>
+          {% if person.can_get_temporary_password %}
+            <form method="post" action="{% url 'console-temporary-password' person.id %}">
+              {% csrf_token %}
+              <button class="button button--secondary" type="submit">Give a temporary password</button>
+            </form>
+          {% else %}
+            <p class="muted">Admin and team accounts can't get a temporary password here.</p>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block bottom_bar %}{% include "frontend/_console_bar.html" %}{% endblock %}

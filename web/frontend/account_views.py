@@ -24,6 +24,8 @@ from .forms import PROFILE_IMAGES, LoginForm, ProfileForm, ShopProfileForm, Sign
 from .services import ServiceUnavailable
 
 ACCOUNT_KEY = "account"
+# LP-50: set while the account must replace a temporary password.
+NEW_PASSWORD_KEY = "must_change_password"
 PENDING_SHOP_KEY = "pending_shop_name"
 
 CUSTOMER = "CUSTOMER"
@@ -273,13 +275,18 @@ def authenticated_call(request, call, *args):
     return call(refreshed["access"], *args)
 
 
-def start_session(request, token_data, account, remember=True):
+def start_session(request, token_data, account, remember=None):
     tokens.store_tokens(request, token_data["access"], token_data["refresh"])
     request.session[ACCOUNT_KEY] = {key: account[key] for key in ("id", "email", "display_name", "role")}
-    if not remember:
+    if account.get("must_change_password"):
+        request.session[NEW_PASSWORD_KEY] = True  # LP-50
+    if remember is False:
         # Without "Keep me logged in" the session ends when the browser closes.
-        # With it, the session lasts SESSION_COOKIE_AGE, the refresh-token lifetime.
         request.session.set_expiry(0)
+    elif remember:
+        # LP-50: with it, 30 days, like the refresh token Accounts issued.
+        request.session.set_expiry(settings.KEEP_LOGGED_IN_SESSION_AGE)
+    # Sign-up (remember=None) keeps SESSION_COOKIE_AGE, the refresh-token lifetime.
 
 
 @sensitive_variables("data")
@@ -355,8 +362,11 @@ def login(request):
 
     form = LoginForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
+        remember = form.cleaned_data["remember_me"]
         try:
-            status, token_data = services.sign_in(form.cleaned_data["email"], form.cleaned_data["password"])
+            status, token_data = services.sign_in(
+                form.cleaned_data["email"], form.cleaned_data["password"], remember_me=remember
+            )
             if status == 200:
                 account_status, account = services.account(token_data["access"])
         except ServiceUnavailable:
@@ -377,7 +387,9 @@ def login(request):
                 revoke(token_data["refresh"])
                 form.add_error(None, SIGN_IN_UNAVAILABLE)
             else:
-                start_session(request, token_data, account, remember=form.cleaned_data["remember_me"])
+                start_session(request, token_data, account, remember=remember)
+                if account.get("must_change_password"):
+                    return redirect("choose-new-password")  # LP-50
                 return redirect(next_url or landing_url(account))
     return render(request, "frontend/login.html", {"form": form, "next": next_url})
 
