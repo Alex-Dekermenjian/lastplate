@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Favourites — LastPlate{% endblock %}
+
+{% block content %}
+{# LP-82: what the customer's favourite restaurants have left today. #}
+<section class="card card--wide">
+  <h1>Favourites</h1>
+  <p class="muted">Food left today at the restaurants you saved.</p>
+
+  {% if unavailable %}
+    <p class="notice notice--warning" role="alert">{{ unavailable }}</p>
+    <a class="button button--secondary button--block" href="{% url 'favourites' %}">Try again</a>
+
+  {% elif not has_favourites %}
+    <p class="notice notice--info">You haven't saved any restaurants yet. Tap the heart on a restaurant's page to see its food here.</p>
+    <a class="button button--primary button--block" href="{% url 'browse-offers' %}">Browse food</a>
+
+  {% elif not offers %}
+    <p class="notice notice--info">Your favourite restaurants have nothing left today. Check back later, or find food from other places.</p>
+    <a class="button button--primary button--block" href="{% url 'browse-offers' %}">Browse food</a>
+  {% endif %}
+</section>
+
+{% if offers %}
+  <p class="offer-count">{{ offers|length }} offer{{ offers|length|pluralize }} available today</p>
+  {% include "frontend/_offer_grid.html" %}
+{% endif %}
+{% endblock %}

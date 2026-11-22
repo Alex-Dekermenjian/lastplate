@@ -14,6 +14,11 @@
   </form>
 </section>
 
+{# LP-82: the bottom bar is full, so Favourites is reached from Profile (and the home page). #}
+<section class="card">
+  <a class="button button--secondary button--block" href="{% url 'favourites' %}">Favourite restaurants</a>
+</section>
+
 <section class="card">
   <form method="post" action="{% url 'sign-out' %}">
     {% csrf_token %}

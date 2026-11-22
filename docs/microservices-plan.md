@@ -227,6 +227,9 @@ Full request/response examples go in `docs/api/<service>.md` before coding.
 | `POST /api/listings/{id}/stock-adjustments` | operator | Change allocated stock with a reason; never below HELD + CONSUMED (`below_committed`, with `already_reserved`) |
 | `POST /api/listings/{id}/unpublish` | operator | LP-29: take a published offer down; existing reservations stay valid (§6 case 10) |
 | `PATCH /api/shops/me/branches/{id}/` | operator | LP-68 branch edit; LP-29 adds `closing_time` ("HH:MM" or null) |
+| `POST /api/favourites/shops/{id}/toggle` | customer | LP-82: save a restaurant, or remove it if already saved (`{shop_id, favourite}`); only approved, unsuspended restaurants can be saved (404 otherwise); operators, admins and staff get 403 |
+| `GET /api/favourites/shops` | customer | LP-82: own saved restaurants that are approved and not suspended, most recent first |
+| `GET /api/favourites/offers` | customer | LP-82: today's offers from own saved restaurants, with the public browse rules (`{has_favourites, offers}`) |
 | `GET /api/admin/shops?status=PENDING` | staff | Review queue |
 | `POST /api/admin/shops/{id}/approve`, `/reject` | staff | Decision; reject needs a reason |
 | `GET /internal/shops/by-operator/{user_id}` | Reservations | Which shop an operator runs |
