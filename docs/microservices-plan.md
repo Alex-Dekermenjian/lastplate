@@ -226,6 +226,7 @@ Full request/response examples go in `docs/api/<service>.md` before coding.
 | `POST /api/listings/{id}/publish` | operator | Publish; requires Approved, complete shop |
 | `POST /api/listings/{id}/stock-adjustments` | operator | Change allocated stock with a reason; never below HELD + CONSUMED (`below_committed`, with `already_reserved`) |
 | `POST /api/listings/{id}/unpublish` | operator | LP-29: take a published offer down; existing reservations stay valid (§6 case 10) |
+| `POST /api/listings/{id}/repost` | operator | LP-44: a new draft from one of the shop's ended offers (pickup over or taken down), with the same food, prices, branch and its own copy of the photo, the same pickup hours today (tomorrow if today's end has passed) and quantity 0 to fill in; the ended offer is not changed. Another shop's offer is 403 `not_owner`, a live offer or draft 409 `not_ended`, a removed branch 409 `branch_removed` |
 | `PATCH /api/shops/me/branches/{id}/` | operator | LP-68 branch edit; LP-29 adds `closing_time` ("HH:MM" or null) |
 | `GET /api/admin/shops?status=PENDING` | staff | Review queue |
 | `POST /api/admin/shops/{id}/approve`, `/reject` | staff | Decision; reject needs a reason |

@@ -60,6 +60,7 @@ from .serializers import (
     StockAdjustmentSerializer,
 )
 from .owner_actions import DraftDeleteError, delete_draft, mark_sold_out
+from .repost import RepostError, repost_listing
 from .review_again import ReviewAgainError, request_review_again
 from .stock import with_allocation_counts
 from .stock_service import StockAdjustmentError, adjust_stock
@@ -869,3 +870,25 @@ def unpublish_listing(request, pk):
         return _error(exc.code, exc.detail, exc.http_status)
     listing = with_allocation_counts(Listing.objects.filter(pk=listing.pk)).get()
     return Response(ListingSerializer(listing, context={"request": request}).data, status=status.HTTP_200_OK)
+
+
+# --------------------------------------------------
+# LP-44: Repost an ended offer as today's draft
+# --------------------------------------------------
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsShopOperator])
+def repost_ended_listing(request, pk):
+    """A NEW draft with the same food, prices, branch and photo, and the same
+    pickup hours today. Quantity is empty. The ended offer is not changed."""
+    if request.data:
+        return _error("invalid", "Reposting an offer takes no fields.", status.HTTP_400_BAD_REQUEST)
+    shop = _operator_shop(request)
+    if shop is None:
+        return _error("no_shop", "You have no shop.", status.HTTP_403_FORBIDDEN)
+    try:
+        draft = repost_listing(pk, shop.id)
+    except RepostError as exc:
+        return _error(exc.code, exc.detail, exc.http_status)
+    draft = with_allocation_counts(Listing.objects.filter(pk=draft.pk)).get()
+    return Response(ListingSerializer(draft, context={"request": request}).data, status=status.HTTP_201_CREATED)
