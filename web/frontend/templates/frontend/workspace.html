@@ -234,6 +234,13 @@
                   </form>
                 </details>
                 {% endif %}
+                {% if listing.tab == "ended" %}
+                {# LP-44: a new draft with the same food and today's pickup hours; this offer stays as it was. #}
+                <form method="post" action="{% url 'repost-listing' listing.id %}">
+                  {% csrf_token %}
+                  <button class="button button--secondary" type="submit">Repost</button>
+                </form>
+                {% endif %}
               {% endif %}
             </div>
 

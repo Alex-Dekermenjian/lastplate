@@ -9,7 +9,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("marketplace", "0015_listing_max_per_customer"),
+        ("marketplace", "0016_favourite"),
     ]
 
     operations = [

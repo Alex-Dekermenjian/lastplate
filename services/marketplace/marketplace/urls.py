@@ -1,9 +1,14 @@
 
 from django.urls import path
 
-from . import admin_api, photo_effect_views, views
+from . import admin_api, favourites, photo_effect_views, views
 
 urlpatterns = [
+    # LP-82: a customer's favourite restaurants (customers only)
+    path("favourites/shops", favourites.my_favourite_shops, name="favourite-shops"),
+    path("favourites/shops/<int:pk>/toggle", favourites.toggle_favourite, name="favourite-toggle"),
+    path("favourites/offers", favourites.my_favourite_offers, name="favourite-offers"),
+
     # LP-57: admin API for /console (Admin tokens only)
     path("admin/summary", admin_api.summary, name="admin-summary"),
     path("admin/shops", admin_api.shop_list, name="admin-shops"),
@@ -104,6 +109,13 @@ urlpatterns = [
         "listings/<int:pk>/unpublish",
         views.unpublish_listing,
         name="listing_unpublish",
+    ),
+
+    # LP-44: the owner reposts an ended offer as today's draft.
+    path(
+        "listings/<int:pk>/repost",
+        views.repost_ended_listing,
+        name="listing_repost",
     ),
 
     # LP-12: Stock adjustments (POST) and their history (GET)

@@ -17,6 +17,7 @@ from frontend import (
     console_views,
     customer_console_views,
     customer_views,
+    favourite_views,
     health,
     listing_photos,
     listing_views,
@@ -47,6 +48,9 @@ urlpatterns = [
     path("offers/<int:listing_id>/peek/", photo_peek.peek_offer, name="offer-peek"),
     # LP-39: a restaurant's page with everything it has left.
     path("restaurants/<int:shop_id>/", browse_views.restaurant_detail, name="restaurant-detail"),
+    # LP-82: the heart on a restaurant page, and the customer's Favourites page.
+    path("restaurants/<int:shop_id>/favourite/", favourite_views.toggle_favourite, name="favourite-toggle"),
+    path("favourites/", favourite_views.favourites, name="favourites"),
 
     # LP-62: the customer's cart (one restaurant, kept in the session).
     path("cart/", cart.view_cart, name="cart"),
@@ -155,6 +159,12 @@ urlpatterns = [
         "workspace/listings/<int:listing_id>/delete/",
         offer_actions.delete_draft,
         name="delete-draft",
+    ),
+    # LP-44: repost an ended offer as today's draft.
+    path(
+        "workspace/listings/<int:listing_id>/repost/",
+        offer_actions.repost,
+        name="repost-listing",
     ),
     # LP-58: /business is the restaurant's area; it is the workspace.
     path("business/", RedirectView.as_view(pattern_name="workspace", query_string=True), name="business"),

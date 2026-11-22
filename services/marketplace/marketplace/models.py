@@ -576,3 +576,33 @@ class PhotoPeek(models.Model):
 
     def __str__(self):
         return f"Peek by customer {self.customer_user_id} at listing {self.listing_id} ({self.x}%, {self.y}%)"
+
+
+# LP-82: a customer's favourite restaurants.
+class Favourite(models.Model):
+    """
+    One restaurant a customer saved with the heart button.
+
+    customer_user_id is the Accounts user ID (no cross-service ForeignKey).
+    The pair is unique, so a customer saves a restaurant at most once.
+    """
+
+    customer_user_id = models.PositiveBigIntegerField()
+    shop = models.ForeignKey(
+        Shop,
+        on_delete=models.CASCADE,
+        related_name="favourites",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["customer_user_id", "shop"],
+                name="marketplace_favourite_unique_customer_shop",
+            ),
+        ]
+
+    def __str__(self):
+        return f"customer {self.customer_user_id} likes shop {self.shop_id}"

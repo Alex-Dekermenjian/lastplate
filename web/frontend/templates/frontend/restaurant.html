@@ -29,6 +29,16 @@
         {% if shop.category %}<p class="eyebrow">{{ shop.category }}</p>{% endif %}
         <h1>{{ shop.name }}</h1>
       </div>
+      {% if show_heart %}
+        {# LP-82: save the restaurant; a signed-out visitor is asked to log in first. #}
+        <form class="heart-form" method="post" action="{% url 'favourite-toggle' shop.id %}">
+          {% csrf_token %}
+          <button class="heart-button" type="submit" aria-pressed="{% if is_favourite %}true{% else %}false{% endif %}"
+                  aria-label="Favourite {{ shop.name }}">
+            <svg class="heart-button__icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M12 20.6 4.7 13.5a4.9 4.9 0 0 1 6.9-6.9l.4.4.4-.4a4.9 4.9 0 0 1 6.9 6.9Z"/></svg>
+          </button>
+        </form>
+      {% endif %}
     </div>
     {% if branch_tabs %}
       {# LP-68: each branch is like its own store: its address and its food. #}

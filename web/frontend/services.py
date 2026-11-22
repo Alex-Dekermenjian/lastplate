@@ -364,6 +364,12 @@ def delete_draft(access, listing_id):
     return _call("marketplace", "POST", f"/api/listings/{int(listing_id)}/delete", token=access)
 
 
+@sensitive_variables("access")
+def repost_listing(access, listing_id):
+    """LP-44: a new draft from an ended offer, with today's pickup hours."""
+    return _call("marketplace", "POST", f"/api/listings/{int(listing_id)}/repost", token=access)
+
+
 # LP-12: Change a published listing's stock with a reason.
 @sensitive_variables("access")
 def adjust_stock(access, listing_id, quantity_change, reason):
@@ -663,3 +669,21 @@ def shop_cancel_order(access, reservation_ref, reason):
 def shop_cancel_all(access, branch_id, reason):
     return _call("reservations", "POST", "/api/shop/reservations/cancel-all",
                  {"branch_id": branch_id, "reason": reason}, token=access)
+
+
+# LP-82: a customer's favourite restaurants. Marketplace finds the customer
+# from the token, so these never name a customer.
+@sensitive_variables("access")
+def toggle_favourite(access, shop_id):
+    return _call("marketplace", "POST", f"/api/favourites/shops/{int(shop_id)}/toggle", token=access)
+
+
+@sensitive_variables("access")
+def favourite_shops(access):
+    return _call("marketplace", "GET", "/api/favourites/shops", token=access)
+
+
+@sensitive_variables("access")
+def favourite_offers(access):
+    expire_late_orders()
+    return _call("marketplace", "GET", "/api/favourites/offers", token=access)

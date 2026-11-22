@@ -508,7 +508,9 @@ def edit_listing(request, listing_id):
             **owner_photo_fields(listing),
         },
         "listing_id": listing_id,
-        "form_values": listing,
+        # LP-44: a draft with no units yet (a reposted offer) shows an empty
+        # quantity box rather than 0, so the owner enters today's quantity.
+        "form_values": {**listing, "total_quantity": listing.get("total_quantity") or None},
         # LP-68: a draft can move to another branch.
         "branches": branch_rows(branches, selected=listing.get("branch")),
         "several_branches": len(branches) > 1,
@@ -527,7 +529,7 @@ def edit_listing(request, listing_id):
         context["branches"] = branch_rows(branches, selected=request.POST["branch"])
 
     context["form_values"] = {
-        **listing,
+        **context["form_values"],
         **{key: value for key, value in listing_data.items() if key != CONFIRM_AFTER_CLOSING},
     }
 
