@@ -1,12 +1,14 @@
 
 """URL configuration for the Marketplace service."""
 
+import re
+
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import include, path, re_path
 
 from config import health
+from marketplace.photo_effect_views import guarded_media
 
 urlpatterns = [
     # LP-9: Shop approval through Django Admin
@@ -24,8 +26,12 @@ urlpatterns = [
 ]
 
 # LP-11: Serve uploaded photos during local development only.
+# LP-54: through a guard that never serves the original photo of a Blurred or
+# "Blurred with magic" offer (customers only ever get its blurred copy).
 if settings.DEBUG:
-    urlpatterns += static(
-        settings.MEDIA_URL,
-        document_root=settings.MEDIA_ROOT,
-    )
+    urlpatterns += [
+        re_path(
+            r"^%s(?P<path>.*)$" % re.escape(settings.MEDIA_URL.lstrip("/")),
+            guarded_media,
+        ),
+    ]

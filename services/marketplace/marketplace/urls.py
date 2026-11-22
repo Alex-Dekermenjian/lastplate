@@ -1,7 +1,7 @@
 
 from django.urls import path
 
-from . import admin_api, favourites, views
+from . import admin_api, favourites, photo_effect_views, views
 
 urlpatterns = [
     # LP-82: a customer's favourite restaurants (customers only)
@@ -75,6 +75,20 @@ urlpatterns = [
         views.upload_listing_photo,
         name="upload_listing_photo",
     ),
+
+    # LP-54: the owner's real photo, whatever effect customers get.
+    path(
+        "listings/<int:pk>/photo/original",
+        photo_effect_views.owner_original_photo,
+        name="listing_original_photo",
+    ),
+    # LP-54: one magic peek per customer per offer (POST taps, GET reloads).
+    path(
+        "listings/<int:pk>/peek",
+        photo_effect_views.listing_peek,
+        name="listing_peek",
+    ),
+    path("peeks/mine", photo_effect_views.my_peeks, name="my_peeks"),
 
     # LP-58: the owner deletes one of their drafts.
     path(

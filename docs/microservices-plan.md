@@ -81,6 +81,14 @@ Changes from `docs/database-design.md`:
   it at checkout by adding up the customer's Reserved, Processing and Paid units of
   that offer. It is separate from, and checked alongside, the limit of 2 open orders
   per customer.
+- **Photo effect (LP-54).** `Listing.photo_effect` is NORMAL, BLURRED or MAGIC.
+  Only a LastBag can be BLURRED or MAGIC, and only when its owner chooses it
+  (the default is NORMAL); Marketplace and the database refuse it for items.
+  For BLURRED and MAGIC, Marketplace makes a strongly blurred copy when the photo
+  or effect changes (`Listing.photo_blurred`) and public responses carry only that
+  copy's address. The development `/media/` route refuses the original of such an
+  offer. A MAGIC offer's peeks (`PhotoPeek`: customer, offer, x, y, the cut-out)
+  are unique per customer and offer.
 
 ## 4. Authentication
 
@@ -228,6 +236,9 @@ Full request/response examples go in `docs/api/<service>.md` before coding.
 | `POST /api/listings/{id}/unpublish` | operator | LP-29: take a published offer down; existing reservations stay valid (§6 case 10) |
 | `POST /api/listings/{id}/repost` | operator | LP-44: a new draft from one of the shop's ended offers (pickup over or taken down), with the same food, prices, branch and its own copy of the photo, the same pickup hours today (tomorrow if today's end has passed) and quantity 0 to fill in; the ended offer is not changed. Another shop's offer is 403 `not_owner`, a live offer or draft 409 `not_ended`, a removed branch 409 `branch_removed` |
 | `PATCH /api/shops/me/branches/{id}/` | operator | LP-68 branch edit; LP-29 adds `closing_time` ("HH:MM" or null) |
+| `GET /api/listings/{id}/photo/original` | operator | LP-54: the owner's real photo, whatever effect customers get |
+| `POST /api/listings/{id}/peek`, `GET .../peek` | customer | LP-54: one tap on a "Blurred with magic" photo (`{x, y}` as percentages); saves the point and returns a circular PNG cut-out of the original. A second tap is 409 `already_peeked` with the saved peek |
+| `GET /api/peeks/mine?listings=1,2` | customer | LP-54: the customer's saved peeks for the offers on one page |
 | `POST /api/favourites/shops/{id}/toggle` | customer | LP-82: save a restaurant, or remove it if already saved (`{shop_id, favourite}`); only approved, unsuspended restaurants can be saved (404 otherwise); operators, admins and staff get 403 |
 | `GET /api/favourites/shops` | customer | LP-82: own saved restaurants that are approved and not suspended, most recent first |
 | `GET /api/favourites/offers` | customer | LP-82: today's offers from own saved restaurants, with the public browse rules (`{has_favourites, offers}`) |

@@ -145,6 +145,8 @@
                 {% if listing.kind == "LASTBAG" %}<p class="offer-card__kind"><span class="lastbag-badge">LastBag · surprise</span></p>{% endif %}
                 <h3 class="offer-row__title">{{ listing.title|default:"Untitled offer" }}</h3>
                 {% if listing.branch_name %}<p class="branch-tag">📍 {{ listing.branch_name }}</p>{% endif %}
+                {# LP-54: the owner sees the real photo; this says what customers get. #}
+                {% if listing.photo_display and listing.photo_effect != "NORMAL" %}<p class="photo-effect-label">Customers see: {{ listing.photo_effect_label }}</p>{% endif %}
                 <p class="offer-row__facts">
                   {% if listing.discounted_price %}<strong>${{ listing.discounted_price }}</strong>{% endif %}
                   {% if listing.counts_line %}

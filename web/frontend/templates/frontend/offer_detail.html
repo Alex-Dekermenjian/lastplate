@@ -29,9 +29,8 @@
 
 {% else %}
   <article class="card card--wide offer-detail{% if offer.is_lastbag %} offer-detail--lastbag{% endif %}">
-    {% if offer.photo_url %}
-      <img class="offer-detail__photo" src="{{ offer.photo_url }}" alt="Photo of {{ offer.title }}">
-    {% endif %}
+    {# LP-54: Normal, Blurred, or Blurred with magic (tap once to peek). #}
+    {% include "frontend/_offer_photo.html" with photo_class="offer-detail__photo" %}
 
     {% if offer.is_lastbag %}
       <p class="offer-card__kind"><span class="lastbag-badge">LastBag · surprise</span></p>

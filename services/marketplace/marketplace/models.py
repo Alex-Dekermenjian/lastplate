@@ -8,6 +8,7 @@ from django.db.models import Q
 
 from .image_validators import validate_listing_photo
 from .upload_paths import (
+    listing_blurred_photo_upload_path,
     listing_photo_upload_path,
     shop_logo_upload_path,
     shop_photo_upload_path,
@@ -245,6 +246,12 @@ class Listing(models.Model):
         LASTBAG = "LASTBAG", "LastBag (surprise)"
         ITEM = "ITEM", "Specific item"
 
+    # LP-54: how customers see the photo. The owner always sees the real one.
+    class PhotoEffect(models.TextChoices):
+        NORMAL = "NORMAL", "Normal"
+        BLURRED = "BLURRED", "Blurred"
+        MAGIC = "MAGIC", "Blurred with magic"
+
     # Numeric reference to a Shop in Marketplace
     shop_id = models.PositiveBigIntegerField()
 
@@ -280,6 +287,24 @@ class Listing(models.Model):
         validators=[validate_listing_photo],
         null=True,
         blank=True,
+    )
+
+    # LP-54: Normal, Blurred, or Blurred with magic (one tap to peek). Only
+    # a LastBag can be blurred, and only when its owner chooses it.
+    photo_effect = models.CharField(
+        max_length=10,
+        choices=PhotoEffect.choices,
+        default=PhotoEffect.NORMAL,
+        db_default=PhotoEffect.NORMAL,
+    )
+    # LP-54: the strongly blurred copy customers get for Blurred and Magic
+    # offers. Made by the server (photo_effects.py), never uploaded.
+    photo_blurred = models.ImageField(
+        upload_to=listing_blurred_photo_upload_path,
+        blank=True,
+        default="",
+        db_default="",
+        editable=False,
     )
 
     # LP-11: Ingredients and allergens
@@ -353,6 +378,15 @@ class Listing(models.Model):
             models.CheckConstraint(
                 condition=Q(max_per_customer__isnull=True) | Q(max_per_customer__gte=1),
                 name="marketplace_listing_max_per_customer_positive",
+            ),
+            models.CheckConstraint(
+                condition=Q(photo_effect__in=["NORMAL", "BLURRED", "MAGIC"]),
+                name="marketplace_listing_valid_photo_effect",
+            ),
+            # LP-54: only a LastBag's photo can be blurred; items show theirs as is.
+            models.CheckConstraint(
+                condition=Q(photo_effect="NORMAL") | Q(kind="LASTBAG"),
+                name="marketplace_listing_photo_effect_only_for_lastbags",
             ),
         ]
 
@@ -512,6 +546,36 @@ class Allocation(models.Model):
 
     def __str__(self):
         return f"{self.status} {self.quantity} of listing {self.listing_id} ({self.reservation_ref})"
+
+
+# LP-54: a customer's one peek at a "Blurred with magic" photo. The point is
+# kept as percentages of the photo's width and height, with the circular
+# cut-out the server made there, so every reload shows the same circle.
+class PhotoPeek(models.Model):
+    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name="photo_peeks")
+    customer_user_id = models.PositiveBigIntegerField()
+    x = models.DecimalField(max_digits=5, decimal_places=2)
+    y = models.DecimalField(max_digits=5, decimal_places=2)
+    # The cut-out's diameter, as a percentage of the photo's width.
+    size = models.DecimalField(max_digits=5, decimal_places=2)
+    # A small PNG, transparent outside the circle.
+    cutout = models.BinaryField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["listing", "customer_user_id"],
+                name="marketplace_one_peek_per_customer_per_offer",
+            ),
+            models.CheckConstraint(
+                condition=Q(x__gte=0, x__lte=100, y__gte=0, y__lte=100),
+                name="marketplace_photopeek_point_inside_photo",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Peek by customer {self.customer_user_id} at listing {self.listing_id} ({self.x}%, {self.y}%)"
 
 
 # LP-82: a customer's favourite restaurants.

@@ -71,6 +71,8 @@
 
   {% for bag in lastbags %}
     <article class="card card--wide lastbag" aria-labelledby="bag-{{ bag.id }}">
+      {# LP-54: the bag's photo, usually blurred so it stays a surprise. #}
+      {% include "frontend/_offer_photo.html" with offer=bag photo_class="offer-detail__photo" %}
       <p class="eyebrow">LastBag · surprise bag</p>
       <h2 id="bag-{{ bag.id }}">{{ bag.title }}</h2>
       <p class="price">
@@ -98,7 +100,8 @@
         <li class="offer-card">
           <div class="offer-card__media">
             {% if offer.photo_url %}
-              <img class="offer-card__photo" src="{{ offer.photo_url }}" alt="Photo of {{ offer.title }}">
+              {# LP-54: Normal, Blurred, or Blurred with magic (tap once to peek). #}
+              {% include "frontend/_offer_photo.html" with photo_class="offer-card__photo" %}
             {% else %}
               <div class="offer-card__photo offer-card__photo--empty" role="img" aria-label="No photo available">No photo</div>
             {% endif %}
