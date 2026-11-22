@@ -82,6 +82,8 @@ Changes from `docs/database-design.md`:
   that offer. It is separate from, and checked alongside, the limit of 2 open orders
   per customer.
 - **Photo effect (LP-54).** `Listing.photo_effect` is NORMAL, BLURRED or MAGIC.
+  Only a LastBag can be BLURRED or MAGIC, and only when its owner chooses it
+  (the default is NORMAL); Marketplace and the database refuse it for items.
   For BLURRED and MAGIC, Marketplace makes a strongly blurred copy when the photo
   or effect changes (`Listing.photo_blurred`) and public responses carry only that
   copy's address. The development `/media/` route refuses the original of such an

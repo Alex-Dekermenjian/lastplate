@@ -23,9 +23,10 @@ BLURRED_COPY = "/media/listing_photos_blurred/fedcba9876543210fedcba9876543210.j
 CIRCLE = "data:image/png;base64,iVBORw0KGgo="
 SAVED_PEEK = {"listing_id": 42, "x": 25.0, "y": 60.5, "size": 28.0, "image": CIRCLE}
 
+# Only a LastBag can be blurred (Marketplace refuses it for items).
 NORMAL_OFFER = offer(id=42, photo_display=ORIGINAL, photo_effect="NORMAL")
-BLURRED_OFFER = offer(id=42, photo_display=BLURRED_COPY, photo_effect="BLURRED")
-MAGIC_OFFER = offer(id=42, photo_display=BLURRED_COPY, photo_effect="MAGIC")
+BLURRED_OFFER = bag_offer(id=42, photo_display=BLURRED_COPY, photo_effect="BLURRED")
+MAGIC_OFFER = bag_offer(id=42, photo_display=BLURRED_COPY, photo_effect="MAGIC")
 PEEK_URL = reverse("offer-peek", args=[42])
 
 
@@ -82,13 +83,14 @@ class EachEffectShowsTheRightImageTests(PhotoEffectPageTestCase):
 
     def test_magic_works_on_offer_cards_and_the_restaurant_page(self):
         bag = bag_offer(id=50, photo_display=BLURRED_COPY, photo_effect="MAGIC")
-        item = offer(id=42, kind="ITEM", photo_display=BLURRED_COPY, photo_effect="MAGIC")
+        item = offer(id=42, kind="ITEM", photo_display=ORIGINAL, photo_effect="NORMAL")
 
         for response in (self.restaurant_page([bag, item])[0], self.browse_page([bag, item])[0]):
             html = response.content.decode()
-            self.assertEqual(html.count("Tap once to peek ✨"), 2)
+            self.assertEqual(html.count("Tap once to peek ✨"), 1)
             self.assertIn(f'data-peek-url="{reverse("offer-peek", args=[50])}"', html)
-            self.assertIn(f'data-peek-url="{reverse("offer-peek", args=[42])}"', html)
+            self.assertNotIn(f'data-peek-url="{reverse("offer-peek", args=[42])}"', html)
+            self.assertIn(f'src="{ORIGINAL}"', html)
 
     def test_the_restaurant_page_now_shows_a_lastbags_photo(self):
         bag = bag_offer(id=50, photo_display=ORIGINAL, photo_effect="NORMAL")
@@ -226,11 +228,11 @@ class SameSpotOnReloadTests(PhotoEffectPageTestCase):
 
     def test_one_lookup_for_the_whole_page_and_only_for_magic_offers(self):
         offers = [
-            offer(id=1, photo_display=BLURRED_COPY, photo_effect="MAGIC"),
+            bag_offer(id=1, photo_display=BLURRED_COPY, photo_effect="MAGIC"),
             offer(id=2, photo_display=ORIGINAL, photo_effect="NORMAL"),
-            offer(id=3, photo_display=BLURRED_COPY, photo_effect="BLURRED"),
-            offer(id=4, photo_display=BLURRED_COPY, photo_effect="MAGIC"),
-            offer(id=5, photo_display=None, photo_effect="MAGIC"),
+            bag_offer(id=3, photo_display=BLURRED_COPY, photo_effect="BLURRED"),
+            bag_offer(id=4, photo_display=BLURRED_COPY, photo_effect="MAGIC"),
+            bag_offer(id=5, photo_display=None, photo_effect="MAGIC"),
         ]
 
         _, my_peeks = self.browse_page(offers)
@@ -305,29 +307,40 @@ class OwnerSeesTheOriginalTests(ApprovedShopMixin, WebAuthTestCase):
 
 
 class OfferFormEffectTests(ApprovedShopMixin, WebAuthTestCase):
+    """Only a LastBag's owner chooses a photo effect, and it starts on Normal."""
 
     def setUp(self):
         self.url = reverse("create-listing")
         self.sign_in_session()
 
-    def test_items_default_to_normal(self):
+    def test_items_have_no_photo_effect_choice(self):
         response = self.client.get(self.url, {"kind": "ITEM"})
+
+        self.assertNotContains(response, "Photo effect")
+        self.assertNotContains(response, 'name="photo_effect"')
+
+    def test_a_lastbag_starts_on_normal_and_suggests_magic_without_ticking_it(self):
+        response = self.client.get(self.url, {"kind": "LASTBAG"})
 
         self.assertContains(response, "Photo effect")
         self.assertContains(response, 'value="NORMAL" checked')
         self.assertNotContains(response, 'value="MAGIC" checked')
+        self.assertNotContains(response, 'value="BLURRED" checked')
+        self.assertContains(response, "Blurred with magic ✨</strong> <span class=\"badge\">Suggested</span>")
 
-    def test_a_lastbag_suggests_blurred_with_magic(self):
-        response = self.client.get(self.url, {"kind": "LASTBAG"})
-
-        self.assertContains(response, 'value="MAGIC" checked')
-        self.assertContains(response, "Suggested")
-
-    def test_the_chosen_effect_is_sent_to_marketplace(self):
+    def test_the_chosen_effect_is_sent_for_a_lastbag(self):
         with patch_service("create_listing", return_value=(201, {"id": 7})) as create:
-            self.client.post(self.url, {**BAG_POST, "photo_effect": "BLURRED"})
+            self.client.post(self.url, {**BAG_POST, "photo_effect": "MAGIC"})
 
-        self.assertEqual(create.call_args.args[1]["photo_effect"], "BLURRED")
+        self.assertEqual(create.call_args.args[1]["photo_effect"], "MAGIC")
+
+    def test_an_item_never_sends_an_effect(self):
+        item = {"title": "Soup", "discounted_price": "3", "photo_effect": "MAGIC"}
+
+        with patch_service("create_listing", return_value=(201, {"id": 7})) as create:
+            self.client.post(self.url, item)
+
+        self.assertNotIn("photo_effect", create.call_args.args[1])
 
     def test_an_unknown_effect_is_not_sent(self):
         with patch_service("create_listing", return_value=(201, {"id": 7})) as create:
@@ -335,9 +348,14 @@ class OfferFormEffectTests(ApprovedShopMixin, WebAuthTestCase):
 
         self.assertNotIn("photo_effect", create.call_args.args[1])
 
-    def test_editing_sends_the_new_effect(self):
-        with patch_service("my_listings", return_value=(200, [DRAFT_BAG])), \
-                patch_service("edit_listing", return_value=(200, DRAFT_BAG)) as edit:
+    def test_editing_a_lastbag_sends_the_new_effect(self):
+        with patch_service("my_listings", return_value=(200, [DRAFT_BAG])),                 patch_service("edit_listing", return_value=(200, DRAFT_BAG)) as edit:
             self.client.post(reverse("edit-listing", args=[42]), {**BAG_POST, "photo_effect": "NORMAL"})
 
         self.assertEqual(edit.call_args.args[2]["photo_effect"], "NORMAL")
+
+    def test_editing_a_lastbag_keeps_the_saved_choice(self):
+        with patch_service("my_listings", return_value=(200, [{**DRAFT_BAG, "photo_effect": "BLURRED"}])):
+            response = self.client.get(reverse("edit-listing", args=[42]))
+
+        self.assertContains(response, 'value="BLURRED" checked')

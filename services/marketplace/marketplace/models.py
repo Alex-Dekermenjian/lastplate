@@ -289,7 +289,8 @@ class Listing(models.Model):
         blank=True,
     )
 
-    # LP-54: Normal, Blurred, or Blurred with magic (one tap to peek).
+    # LP-54: Normal, Blurred, or Blurred with magic (one tap to peek). Only
+    # a LastBag can be blurred, and only when its owner chooses it.
     photo_effect = models.CharField(
         max_length=10,
         choices=PhotoEffect.choices,
@@ -381,6 +382,11 @@ class Listing(models.Model):
             models.CheckConstraint(
                 condition=Q(photo_effect__in=["NORMAL", "BLURRED", "MAGIC"]),
                 name="marketplace_listing_valid_photo_effect",
+            ),
+            # LP-54: only a LastBag's photo can be blurred; items show theirs as is.
+            models.CheckConstraint(
+                condition=Q(photo_effect="NORMAL") | Q(kind="LASTBAG"),
+                name="marketplace_listing_photo_effect_only_for_lastbags",
             ),
         ]
 

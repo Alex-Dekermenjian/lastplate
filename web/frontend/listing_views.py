@@ -119,10 +119,10 @@ def listing_data_from(post, kind, editing=False):
         else:
             del data["max_per_customer"]
 
-    # LP-54: how customers see the photo. Sent only when the form chose one
-    # of the three; Marketplace keeps Normal otherwise.
+    # LP-54: how customers see a LastBag's photo, as its owner chose. Items
+    # never send one: their photo always shows as it is.
     effect = post.get("photo_effect", "").strip().upper()
-    if effect in PHOTO_EFFECTS:
+    if kind == LASTBAG and effect in PHOTO_EFFECTS:
         data["photo_effect"] = effect
 
     return data

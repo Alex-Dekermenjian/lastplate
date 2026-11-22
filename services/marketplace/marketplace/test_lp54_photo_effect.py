@@ -54,9 +54,12 @@ class PhotoEffectTestCase(MarketplaceTestCase):
 
     def offer(self, effect, **overrides):
         """A published offer with a photo and this effect, as the owner would
-        have saved it (the blurred copy is made by the same code)."""
+        have saved it (the blurred copy is made by the same code). Only a
+        LastBag can be blurred, so Blurred and Magic offers are LastBags."""
         from .photo_effects import sync_blurred_photo
 
+        if effect != NORMAL:
+            overrides.setdefault("kind", Listing.Kind.LASTBAG)
         listing = make_listing(self.shop, photo_effect=effect, **overrides)
         listing.photo.save("dish.png", photo_upload(), save=True)
         return sync_blurred_photo(listing, photo_changed=True)
@@ -162,7 +165,7 @@ class BlurredCopyIsMadeOnUploadAndEffectChangeTests(PhotoEffectTestCase):
     def setUp(self):
         super().setUp()
         self.as_owner()
-        self.draft = make_listing(self.shop, status=Listing.Status.DRAFT)
+        self.draft = make_listing(self.shop, status=Listing.Status.DRAFT, kind=Listing.Kind.LASTBAG)
 
     def upload_photo(self):
         return self.client.post(
@@ -223,10 +226,20 @@ class BlurredCopyIsMadeOnUploadAndEffectChangeTests(PhotoEffectTestCase):
         self.assertIn("photo_effect", response.json())
 
     def test_a_new_offer_is_normal_unless_the_owner_chooses(self):
-        response = self.client.post(self.list_url, {"title": "Soup"}, format="json")
+        item = self.client.post(self.list_url, {"title": "Soup"}, format="json")
+        bag = self.client.post(self.list_url, {"kind": "LASTBAG"}, format="json")
+
+        self.assertEqual(item.status_code, 201)
+        self.assertEqual(item.json()["photo_effect"], NORMAL)
+        # Nothing is blurred unless the owner picks it, LastBags included.
+        self.assertEqual(bag.status_code, 201)
+        self.assertEqual(bag.json()["photo_effect"], NORMAL)
+
+    def test_a_lastbags_owner_can_choose_magic_when_creating_it(self):
+        response = self.client.post(self.list_url, {"kind": "LASTBAG", "photo_effect": MAGIC}, format="json")
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["photo_effect"], NORMAL)
+        self.assertEqual(response.json()["photo_effect"], MAGIC)
 
     def test_deleting_the_draft_deletes_its_blurred_copy(self):
         self.patch(photo_effect=BLURRED)
@@ -465,3 +478,50 @@ class OwnerSeesTheOriginalTests(PhotoEffectTestCase):
         self.assertEqual(self.client.get(url).status_code, 403)
         self.anonymous()
         self.assertEqual(self.client.get(url).status_code, 401)
+
+
+class ItemsAreNeverBlurredTests(PhotoEffectTestCase):
+    """Only a LastBag's photo can be blurred; a specific item always shows its
+    photo as it is."""
+
+    def setUp(self):
+        super().setUp()
+        self.as_owner()
+
+    def test_creating_an_item_with_a_blurred_or_magic_photo_is_refused(self):
+        for effect in (BLURRED, MAGIC):
+            with self.subTest(effect=effect):
+                response = self.client.post(self.list_url, {"title": "Soup", "photo_effect": effect}, format="json")
+
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("Only a LastBag", response.json()["photo_effect"][0])
+        self.assertFalse(Listing.objects.exists())
+
+    def test_an_item_draft_cannot_be_switched_to_blurred_or_magic(self):
+        draft = make_listing(self.shop, status=Listing.Status.DRAFT)
+        draft.photo.save("dish.png", photo_upload(), save=True)
+
+        for effect in (BLURRED, MAGIC):
+            with self.subTest(effect=effect):
+                response = self.client.patch(self.detail_url(draft), {"photo_effect": effect}, format="json")
+                self.assertEqual(response.status_code, 400)
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.photo_effect, NORMAL)
+        self.assertFalse(draft.photo_blurred)
+
+    def test_an_item_keeps_normal_when_sent_normal(self):
+        response = self.client.post(self.list_url, {"title": "Soup", "photo_effect": NORMAL}, format="json")
+
+        self.assertEqual(response.status_code, 201)
+
+    def test_the_database_refuses_a_blurred_item(self):
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            make_listing(self.shop, kind=Listing.Kind.ITEM, photo_effect=MAGIC)
+
+    def test_an_items_photo_is_shown_to_customers_as_it_is(self):
+        item = self.offer(NORMAL)
+        self.anonymous()
+
+        for response in self.customer_responses(item):
+            self.assertEqual(self.shown_photo(response, item)["photo_display"], item.photo.url)

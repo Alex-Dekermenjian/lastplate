@@ -1,5 +1,5 @@
-# LP-54: photo effect (Normal / Blurred / Blurred with magic), the blurred
-# copy customers get, and one magic peek per customer per offer.
+# LP-54: photo effect (Normal / Blurred / Blurred with magic, LastBags only),
+# the blurred copy customers get, and one magic peek per customer per offer.
 
 import django.db.models.deletion
 import marketplace.upload_paths
@@ -65,6 +65,15 @@ class Migration(migrations.Migration):
                     ("photo_effect__in", ["NORMAL", "BLURRED", "MAGIC"])
                 ),
                 name="marketplace_listing_valid_photo_effect",
+            ),
+        ),
+        migrations.AddConstraint(
+            model_name="listing",
+            constraint=models.CheckConstraint(
+                condition=models.Q(
+                    ("photo_effect", "NORMAL"), ("kind", "LASTBAG"), _connector="OR"
+                ),
+                name="marketplace_listing_photo_effect_only_for_lastbags",
             ),
         ),
         migrations.AddField(

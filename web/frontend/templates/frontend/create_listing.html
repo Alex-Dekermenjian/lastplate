@@ -266,8 +266,8 @@
       <p>Current photo:</p>
       <img class="offer-form__photo" src="{{ listing.photo_display }}"
            alt="Current photo of {{ listing.title }}">
-      {# LP-54: the owner always sees the real photo. #}
-      <p class="photo-effect-label">Customers see: {{ listing.photo_effect_label }}</p>
+      {# LP-54: the owner always sees the real photo; a LastBag says what customers get. #}
+      {% if kind == "LASTBAG" %}<p class="photo-effect-label">Customers see: {{ listing.photo_effect_label }}</p>{% endif %}
     {% endif %}
 
     <p>
@@ -280,8 +280,10 @@
 
     <p class="muted">JPEG or PNG, maximum 5 MB.</p>
 
-    {# LP-54: how customers see the photo. A LastBag suggests "Blurred with magic". #}
-    {% if kind == "LASTBAG" %}{% firstof form_values.photo_effect "MAGIC" as effect %}{% else %}{% firstof form_values.photo_effect "NORMAL" as effect %}{% endif %}
+    {# LP-54: a LastBag's owner may blur its photo so the bag stays a surprise.
+       Normal unless the owner picks another; items have no choice. #}
+    {% if kind == "LASTBAG" %}
+    {% firstof form_values.photo_effect "NORMAL" as effect %}
     <fieldset class="photo-effect">
       <legend>Photo effect</legend>
       <label class="photo-effect__choice">
@@ -294,10 +296,11 @@
       </label>
       <label class="photo-effect__choice">
         <input type="radio" name="photo_effect" value="MAGIC"{% if effect == "MAGIC" %} checked{% endif %}>
-        <span><strong>Blurred with magic ✨</strong>{% if kind == "LASTBAG" %} <span class="badge">Suggested</span>{% endif %}<br><span class="muted">Blurred, and each signed-in customer can tap once to see a small circle of the real photo.</span></span>
+        <span><strong>Blurred with magic ✨</strong> <span class="badge">Suggested</span><br><span class="muted">Blurred, and each signed-in customer can tap once to see a small circle of the real photo.</span></span>
       </label>
       <p class="muted">You always see the real photo.</p>
     </fieldset>
+    {% endif %}
 
     <button class="button button--primary" type="submit">
       {% if editing %}Save changes{% else %}Save draft{% endif %}
