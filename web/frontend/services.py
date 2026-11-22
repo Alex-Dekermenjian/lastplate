@@ -364,6 +364,12 @@ def delete_draft(access, listing_id):
     return _call("marketplace", "POST", f"/api/listings/{int(listing_id)}/delete", token=access)
 
 
+@sensitive_variables("access")
+def repost_listing(access, listing_id):
+    """LP-44: a new draft from an ended offer, with today's pickup hours."""
+    return _call("marketplace", "POST", f"/api/listings/{int(listing_id)}/repost", token=access)
+
+
 # LP-12: Change a published listing's stock with a reason.
 @sensitive_variables("access")
 def adjust_stock(access, listing_id, quantity_change, reason):

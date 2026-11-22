@@ -97,6 +97,13 @@ urlpatterns = [
         name="listing_unpublish",
     ),
 
+    # LP-44: the owner reposts an ended offer as today's draft.
+    path(
+        "listings/<int:pk>/repost",
+        views.repost_ended_listing,
+        name="listing_repost",
+    ),
+
     # LP-12: Stock adjustments (POST) and their history (GET)
     path(
         "listings/<int:pk>/stock-adjustments",

@@ -155,6 +155,12 @@ urlpatterns = [
         offer_actions.delete_draft,
         name="delete-draft",
     ),
+    # LP-44: repost an ended offer as today's draft.
+    path(
+        "workspace/listings/<int:listing_id>/repost/",
+        offer_actions.repost,
+        name="repost-listing",
+    ),
     # LP-58: /business is the restaurant's area; it is the workspace.
     path("business/", RedirectView.as_view(pattern_name="workspace", query_string=True), name="business"),
 

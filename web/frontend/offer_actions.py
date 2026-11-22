@@ -1,4 +1,5 @@
 """LP-58: Mark sold out and Delete draft, from the owner's offer list.
+LP-29 adds Take down, and LP-44 adds Repost on an ended offer.
 
 Both ask Marketplace, which decides: only the owner's own offers, only
 published ones can be sold out, only drafts can be deleted.
@@ -27,6 +28,13 @@ UNPUBLISH_ERRORS = {
     "not_published": "Only live offers can be taken down.",
     "not_owner": "You can only change your own offers.",
     "no_shop": "You can only change your own offers.",
+}
+
+REPOST_ERRORS = {
+    "not_ended": "Only ended offers can be reposted.",
+    "branch_removed": "This offer's branch was removed, so it can't be reposted. Create a new offer instead.",
+    "not_owner": "You can only repost your own offers.",
+    "no_shop": "You can only repost your own offers.",
 }
 
 DELETE_ERRORS = {
@@ -107,3 +115,29 @@ def delete_draft(request, listing_id):
     code = body.get("code") if isinstance(body, dict) else None
     messages.error(request, DELETE_ERRORS.get(code, "Deleting the draft was unsuccessful. Please try again."))
     return back_to("drafts")
+
+
+@operator_required
+@require_http_methods(["POST"])
+def repost(request, listing_id):
+    """LP-44: Marketplace copies the ended offer into a new draft with today's
+    pickup hours and no quantity; the owner lands on its edit page to enter
+    the quantity and publish as usual. The ended offer is not changed."""
+    try:
+        status, body = authenticated_call(request, services.repost_listing, listing_id)
+    except ServiceUnavailable:
+        messages.warning(
+            request,
+            "We couldn't confirm whether the offer was reposted. Check your drafts before trying again.",
+        )
+        return back_to("drafts")
+    draft_id = body.get("id") if isinstance(body, dict) else None
+    if status == 201 and isinstance(draft_id, int):
+        messages.success(
+            request,
+            "Reposted as a new draft for today. Enter today's quantity, check the pickup time, then publish.",
+        )
+        return redirect("edit-listing", listing_id=draft_id)
+    code = body.get("code") if isinstance(body, dict) else None
+    messages.error(request, REPOST_ERRORS.get(code, "Reposting the offer was unsuccessful. Please try again."))
+    return back_to("ended")
